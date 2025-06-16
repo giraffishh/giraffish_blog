@@ -38,6 +38,13 @@ collections:      # https://www.netlifycms.org/docs/configuration-options/#colle
   - name: "pages"
     label: "Pages"
     files:
+      - file: "source/storage/index.md"
+        name: "storage"
+        label: "储物间"
+        fields:
+          - {label: "标题", name: "title", widget: "string"}
+          - {label: "内容", name: "body", widget: "markdown", required: false}
+          - {label: "评论", name: "comments", widget: "boolean", default: true, required: false}
       - file: "source/about/index.md"
         name: "about"
         label: "关于"
