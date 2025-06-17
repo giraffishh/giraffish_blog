@@ -28,11 +28,15 @@ date: 2025-06-01 17:56:45
 
 #### 3. 数据分类
 
-1. 朴素贝叶斯
-2. 决策树
-3. KNN (K近邻算法)
-4. 支持向量机
-5. 随机森林
+1. 朴素贝叶斯✅
+2. 决策树✅
+3. KNN (K近邻算法)✅
+4. 支持向量机✅
+5. 随机森林✅
+
+> 2 / 3 / 5 -> 吴恩达机器学习： https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> 1 / 4 -> 白板推导： https://www.bilibili.com/video/BV1aE411o7qd/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 3. 规划类模型
 
@@ -42,8 +46,8 @@ date: 2025-06-01 17:56:45
 4. 动态规划✅
 5. 多目标规划✅
 
-> 线性 / 整数 / 非线性 / 多目标规划：https://www.bilibili.com/video/BV1kC4y1a7Ee/?p=6&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
-> 非线性 / 多目标 / 动态规划：https://www.bilibili.com/video/BV1bc411n7yv/?p=19&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 1 / 2 / 3 / 5：https://www.bilibili.com/video/BV1kC4y1a7Ee/?p=6&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 2 / 4 / 5：https://www.bilibili.com/video/BV1bc411n7yv/?p=19&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 4. 评价类模型
 
@@ -53,7 +57,7 @@ date: 2025-06-01 17:56:45
 4. 主成分分析✅
 4. 秩和比评价模型❌
 
-> https://www.bilibili.com/video/BV1bc411n7yv/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 1 / 2 / 3 / 4：https://www.bilibili.com/video/BV1bc411n7yv/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 5. 预测类模型
 
@@ -64,8 +68,8 @@ date: 2025-06-01 17:56:45
 5. ARIMA时间序列预测✅
 4. 神经网络预测✅
 
-> 线性 / 非线性回归 / 灰色预测 / ARIMA：https://www.bilibili.com/video/BV1bc411n7yv/?p=36&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
-> 吴恩达机器学习：https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 1 / 3 / 4 / 5：https://www.bilibili.com/video/BV1bc411n7yv/?p=36&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 1 / 2 / 3 / 6 -> 吴恩达机器学习：https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 6. 智能优化模型
 
