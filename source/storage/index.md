@@ -8,41 +8,41 @@ date: 2025-06-01 17:56:45
 
 ## 🍀Giraffish的储物间
 
+> 📌：高学习有限度
+> ❄️：低学习优先度
+
 ### Learning TodoList
+
+#### 0. Python
+
+1.  基础语法📌✅
+2.  面向对象📌✅
+3.  numpy / panda / Matplotlib📌✅
+
+> https://www.bilibili.com/video/BV1Ex411L7oT/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> https://www.bilibili.com/video/BV1wN4y1T7K9/?p=2&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 1. 数据处理
 
-1. 数据清洗与数据集成
-2. 数据规约
-3. 数据转换与数据降维
-4. Apriori算法及实战演练
-5. FP-growth算法及实战演练
+1. 数据清洗与数据集成📌
+2. 数据规约📌
+3. 数据转换与数据降维📌
+4. Apriori算法❄️（数据挖掘题）
+5. FP-growth算法❄️（数据挖掘题）
 
 #### 2. 数据检验
 
-1. 正态性检验，均匀性检验，独立性检验方法
-2. 方差分析方法
-3. 拟合优度检验方法
-4. t检验方法
+1. 正态性检验，均匀性检验，独立性检验方法📌
+2. 方差分析方法📌
+3. 拟合优度检验方法📌
+4. t检验方法📌
 5. 秩和检验方法
-
-#### 3. 数据分类
-
-1. 朴素贝叶斯✅
-2. 决策树✅
-3. KNN (K近邻算法)✅
-4. 支持向量机✅
-5. 随机森林✅
-
-> 2 / 3 / 5 -> 吴恩达机器学习： https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
->
-> 1 / 4 -> 白板推导： https://www.bilibili.com/video/BV1aE411o7qd/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 3. 规划类模型
 
-1. 线性规划✅
-2. 整数规划✅
-3. 非线性规划✅
+1. 线性规划📌✅
+2. 整数规划📌✅
+3. 非线性规划📌✅
 4. 动态规划✅
 5. 多目标规划✅
 
@@ -51,32 +51,45 @@ date: 2025-06-01 17:56:45
 
 #### 4. 评价类模型
 
-1. 层次分析法、熵权法✅
+1. 层次分析法、熵权法📌✅
 2. 模糊综合评价法✅
-3. TOPSIS综合评价算法✅
-4. 主成分分析✅
+3. TOPSIS综合评价算法📌✅
+4. 主成分分析📌✅
 4. 秩和比评价模型❌
 
 > 1 / 2 / 3 / 4：https://www.bilibili.com/video/BV1bc411n7yv/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 5. 预测类模型
 
+**回归:**
+
 1. 线性回归✅
 2. 逻辑回归✅
 3. 非线性回归✅
-4. 灰色预测✅
-5. ARIMA时间序列预测✅
-4. 神经网络预测✅
+4. 神经网络预测❄️✅
 
-> 1 / 3 / 4 / 5：https://www.bilibili.com/video/BV1bc411n7yv/?p=36&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
-> 1 / 2 / 3 / 6 -> 吴恩达机器学习：https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+**时间序列预测:**
+
+5. 灰色预测✅
+6. ARIMA时间序列预测✅
+
+**分类:**
+7. 朴素贝叶斯✅
+8. 决策树📌✅
+9. KNN (K近邻算法)📌✅
+10. SVM (支持向量机)📌✅
+11. 随机森林✅
+
+> 1 / 2 / 3 / 4 / 8 / 9 / 11 -> 吴恩达机器学习：https://www.bilibili.com/video/BV1Bq421A74G/?p=42&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 1 / 3 / 5 / 6：https://www.bilibili.com/video/BV1bc411n7yv/?p=36&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 7 / 10 -> 白板推导： https://www.bilibili.com/video/BV1aE411o7qd/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 6. 智能优化模型
 
 1. 图论搜索算法✅
-2. 遗传算法、改进遗传算法
-3. 粒子群算法与蚁群算法
-4. NSGA-II算法
+2. 遗传算法、改进遗传算法📌
+3. 粒子群算法与蚁群算法❄️
+4. NSGA-II算法❄️
 
 ***
 ### 一些资源
