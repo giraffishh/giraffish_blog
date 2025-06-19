@@ -19,16 +19,22 @@ date: 2025-06-01 17:56:45
 2.  面向对象📌✅
 3.  numpy / panda / Matplotlib📌✅
 
-> https://www.bilibili.com/video/BV1Ex411L7oT/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
-> https://www.bilibili.com/video/BV1wN4y1T7K9/?p=2&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 3：https://www.bilibili.com/video/BV1Ex411L7oT/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+> 3：https://www.bilibili.com/video/BV1wN4y1T7K9/?p=2&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 1. 数据处理
 
-1. 数据清洗与数据集成📌
-2. 数据规约📌
-3. 数据转换与数据降维📌
+1. 数据清洗与数据集成📌✅
+2. 数据规约📌✅
+3. 数据转换与数据降维📌✅
 4. Apriori算法❄️（数据挖掘题）
 5. FP-growth算法❄️（数据挖掘题）
+
+> 数据清洗：https://www.bilibili.com/video/BV1qb411M7ew/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> 预处理：https://www.bilibili.com/video/BV1kC4y1a7Ee/?p=23&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> 降维 PCA / t-SNE / UMAP：https://www.bilibili.com/video/BV1dpStYvEh8/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 2. 数据检验
 
@@ -54,7 +60,7 @@ date: 2025-06-01 17:56:45
 1. 层次分析法、熵权法📌✅
 2. 模糊综合评价法✅
 3. TOPSIS综合评价算法📌✅
-4. 主成分分析📌✅
+4. PCA主成分分析📌✅
 4. 秩和比评价模型❌
 
 > 1 / 2 / 3 / 4：https://www.bilibili.com/video/BV1bc411n7yv/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
