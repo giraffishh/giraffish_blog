@@ -68,7 +68,7 @@ markdown:
 index_generator:
   path: ''
   per_page: 10
-  order_by: -date
+  order_by: -updated
 
 # Category & Tag
 default_category: uncategorized
@@ -103,6 +103,9 @@ ignore:
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
 theme: fluid
+
+plugins:
+  - hexo-fold
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
