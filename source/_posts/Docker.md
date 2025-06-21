@@ -3,8 +3,8 @@ title: win11安装Docker并使用阿里云镜像
 comments: true
 index_img: 'https://s1.imagehub.cc/images/2024/11/11/180e0a10f532121ae32a86b7c5ab0820.jpeg'
 abbrlink: 806475f8
-date: 2024-11-11 14:15:05
-updated: 2024-11-11 16:29:44
+date: 2024-11-11 09:29:40
+updated: 2025-03-28 17:20:56
 ---
 
 ## 📌 安装 Docker

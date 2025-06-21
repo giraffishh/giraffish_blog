@@ -3,8 +3,8 @@ title: 在 Linux 服务器中设置 v2ray 代理
 comments: true
 index_img: 'https://s1.imagehub.cc/images/2024/11/11/3fe7f27999a9761146e8719ad5639b5e.png'
 abbrlink: 35f1330a
-date: 2024-11-11 14:15:05
-updated: 2024-11-11 16:29:44
+date: 2024-11-11 09:29:40
+updated: 2025-03-28 17:20:56
 ---
 
 > [v2ray 的手册 ](https://www.atzlinux.com/doc/v/v2ray/)
