@@ -64,7 +64,11 @@ hexo.extend.console.register('force-git-dates', 'Force update ALL dates from git
           console.log(`   🔄 updated: "${result.oldUpdated}" → "${result.newUpdated}"`);
         }
       } else {
-        console.log(`⚠️  No Git history found for ${relativePath}`);
+        if (result.noGitHistory) {
+          console.log(`⚠️  No Git history found for ${relativePath}`);
+        } else {
+          console.log(`✓ No changes needed for ${relativePath} (timestamps already match)`);
+        }
       }
       
     } catch (error) {
@@ -105,6 +109,39 @@ hexo.extend.console.register('force-git-dates', 'Force update ALL dates from git
   }
 });
 
+// 辅助函数：将日期字符串转换为moment对象进行比较
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  
+  // 尝试多种可能的日期格式
+  const formats = [
+    'YYYY-MM-DD HH:mm:ss',
+    'YYYY-MM-DD HH:mm',
+    'YYYY-MM-DD',
+    moment.ISO_8601
+  ];
+  
+  for (const format of formats) {
+    const parsed = moment.tz(dateStr, format, 'Asia/Shanghai');
+    if (parsed.isValid()) {
+      return parsed;
+    }
+  }
+  
+  return null;
+}
+
+// 辅助函数：比较两个日期是否相同（精确到秒）
+function datesAreEqual(date1, date2) {
+  const parsed1 = parseDate(date1);
+  const parsed2 = parseDate(date2);
+  
+  if (!parsed1 || !parsed2) return false;
+  
+  // 比较到秒级别
+  return parsed1.format('YYYY-MM-DD HH:mm:ss') === parsed2.format('YYYY-MM-DD HH:mm:ss');
+}
+
 function forceUpdateGitDates(filePath, options = {}) {
   const content = fs.readFileSync(filePath, 'utf8');
   
@@ -139,6 +176,7 @@ function forceUpdateGitDates(filePath, options = {}) {
   if (!gitCreateDate && !gitUpdateDate) {
     return {
       hasChanges: false,
+      noGitHistory: true,
       dateChanged: false,
       updatedChanged: false,
       oldDate,
@@ -154,40 +192,60 @@ function forceUpdateGitDates(filePath, options = {}) {
   let newDate = oldDate;
   let newUpdated = oldUpdated;
   
-  // Force update date field
+  // 检查并更新 date 字段
   if (gitCreateDate && !options.updatedOnly) {
-    newDate = gitCreateDate.format('YYYY-MM-DD HH:mm:ss');
+    const gitDateString = gitCreateDate.format('YYYY-MM-DD HH:mm:ss');
     
-    if (dateMatch) {
-      newFrontMatter = newFrontMatter.replace(/^date:\s*.*$/m, `date: ${newDate}`);
-    } else {
-      // Add after abbrlink if exists, otherwise at the end
-      const abbrRegex = /^(abbrlink:\s*.*)$/m;
-      if (abbrRegex.test(newFrontMatter)) {
-        newFrontMatter = newFrontMatter.replace(abbrRegex, `$1\ndate: ${newDate}`);
+    // 使用专门的日期比较函数
+    if (!datesAreEqual(gitDateString, oldDate)) {
+      newDate = gitDateString;
+      
+      if (dateMatch) {
+        newFrontMatter = newFrontMatter.replace(/^date:\s*.*$/m, `date: ${newDate}`);
       } else {
-        newFrontMatter += `\ndate: ${newDate}`;
+        // Add after abbrlink if exists, otherwise at the end
+        const abbrRegex = /^(abbrlink:\s*.*)$/m;
+        if (abbrRegex.test(newFrontMatter)) {
+          newFrontMatter = newFrontMatter.replace(abbrRegex, `$1\ndate: ${newDate}`);
+        } else {
+          newFrontMatter += `\ndate: ${newDate}`;
+        }
       }
+      dateChanged = true;
+      
+      console.log(`   🔍 Date comparison details:`);
+      console.log(`      Git date: "${gitDateString}"`);
+      console.log(`      Old date: "${oldDate}"`);
+      console.log(`      Dates equal: ${datesAreEqual(gitDateString, oldDate)}`);
     }
-    dateChanged = true;
   }
   
-  // Force update updated field
+  // 检查并更新 updated 字段
   if (gitUpdateDate && !options.dateOnly) {
-    newUpdated = gitUpdateDate.format('YYYY-MM-DD HH:mm:ss');
+    const gitUpdatedString = gitUpdateDate.format('YYYY-MM-DD HH:mm:ss');
     
-    if (updatedMatch) {
-      newFrontMatter = newFrontMatter.replace(/^updated:\s*.*$/m, `updated: ${newUpdated}`);
-    } else {
-      // Add after date if exists, otherwise at the end
-      const dateRegex = /^(date:\s*.*)$/m;
-      if (dateRegex.test(newFrontMatter)) {
-        newFrontMatter = newFrontMatter.replace(dateRegex, `$1\nupdated: ${newUpdated}`);
+    // 使用专门的日期比较函数
+    if (!datesAreEqual(gitUpdatedString, oldUpdated)) {
+      newUpdated = gitUpdatedString;
+      
+      if (updatedMatch) {
+        newFrontMatter = newFrontMatter.replace(/^updated:\s*.*$/m, `updated: ${newUpdated}`);
       } else {
-        newFrontMatter += `\nupdated: ${newUpdated}`;
+        // Add after date if exists, otherwise at the end
+        const dateRegex = /^(date:\s*.*)$/m;
+        if (dateRegex.test(newFrontMatter)) {
+          newFrontMatter = newFrontMatter.replace(dateRegex, `$1\nupdated: ${newUpdated}`);
+        } else {
+          newFrontMatter += `\nupdated: ${newUpdated}`;
+        }
       }
+      updatedChanged = true;
+      
+      console.log(`   🔍 Updated comparison details:`);
+      console.log(`      Git updated: "${gitUpdatedString}"`);
+      console.log(`      Old updated: "${oldUpdated}"`);
+      console.log(`      Dates equal: ${datesAreEqual(gitUpdatedString, oldUpdated)}`);
     }
-    updatedChanged = true;
   }
   
   // Write file
@@ -199,6 +257,7 @@ function forceUpdateGitDates(filePath, options = {}) {
   
   return {
     hasChanges,
+    noGitHistory: false,
     dateChanged,
     updatedChanged,
     oldDate,
@@ -247,7 +306,7 @@ function getGitCreateDate(filePath) {
       .filter(line => line)
       .map(line => {
         const [timestamp, message] = line.split('|');
-        return { timestamp: parseInt(timestamp, 10), message };
+        return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
       .filter(commit => !commit.message.startsWith(AUTO_UPDATE_PREFIX) && !isNaN(commit.timestamp));
     
@@ -279,7 +338,7 @@ function getGitUpdateDate(filePath) {
       .filter(line => line)
       .map(line => {
         const [timestamp, message] = line.split('|');
-        return { timestamp: parseInt(timestamp, 10), message };
+        return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
       .filter(commit => !commit.message.startsWith(AUTO_UPDATE_PREFIX) && !isNaN(commit.timestamp));
     
