@@ -39,7 +39,7 @@ comments: true
 
 ## 运算符
 
-与c++同理，详情见[c++笔记基础篇](https://blog.giraffish.site/post/6befaffc/#3-%E8%BF%90%E7%AE%97%E7%AC%A6)
+与c++同理，详情见[c++笔记基础篇](https://blog.giraffish.me/post/6befaffc/#3-%E8%BF%90%E7%AE%97%E7%AC%A6)
 
 ## 常用input与output
 

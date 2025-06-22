@@ -401,8 +401,10 @@ cdnPath: "https://blog.jsdmirror.com/gh/{GitHub用户名}/live2d_api@master/"
 
 写了个脚本，可以按照git历史自动覆盖更新文章头部[Front-matter](https://hexo.io/zh-cn/docs/front-matter)中的文章创建日期和更新日期
 
+`update-dates.js`
+
 ```python
-/* global hexo */
+#!/usr/bin/env node
 'use strict';
 
 const { execSync } = require('child_process');
@@ -415,28 +417,102 @@ moment.tz.setDefault('Asia/Shanghai');
 // 特定的提交消息前缀，用于标记自动更新时间的提交
 const AUTO_UPDATE_PREFIX = '[AUTO-UPDATE-TIME]';
 
-hexo.extend.console.register('git-dates', 'Force update ALL dates from git history', {
-  options: [
-    { name: '--dry', desc: 'Show what would be updated without making changes' },
-    { name: '--date-only', desc: 'Only update date field' },
-    { name: '--updated-only', desc: 'Only update updated field' },
-    { name: '--no-commit', desc: 'Do not auto-commit after updates' }
-  ]
-}, function(args) {
+// 默认配置
+const DEFAULT_CONFIG = {
+  postsDir: './_posts',  // 默认文章目录
+  sourceDir: '.',        // 默认源码目录
+  dryRun: false,
+  dateOnly: false,
+  updatedOnly: false,
+  noCommit: false
+};
+
+function printUsage() {
+  console.log(`
+Usage: node update-dates.js [options]
+
+Options:
+  --posts-dir <dir>    Posts directory (default: ./_posts)
+  --source-dir <dir>   Source directory (default: .)
+  --dry                Show what would be updated without making changes
+  --date-only          Only update date field
+  --updated-only       Only update updated field
+  --no-commit          Do not auto-commit after updates
+  --help               Show this help message
+
+Examples:
+  node update-git-dates.js
+  node update-git-dates.js --dry
+  node update-git-dates.js --posts-dir ./source/_posts
+  node update-git-dates.js --date-only --no-commit
+`);
+}
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const config = { ...DEFAULT_CONFIG };
   
-  const dryRun = args['dry'];
-  const dateOnly = args['date-only'];
-  const updatedOnly = args['updated-only'];
-  const noCommit = args['no-commit'];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    switch (arg) {
+      case '--help':
+      case '-h':
+        printUsage();
+        process.exit(0);
+        break;
+      case '--posts-dir':
+        config.postsDir = args[++i];
+        break;
+      case '--source-dir':
+        config.sourceDir = args[++i];
+        break;
+      case '--dry':
+        config.dryRun = true;
+        break;
+      case '--date-only':
+        config.dateOnly = true;
+        break;
+      case '--updated-only':
+        config.updatedOnly = true;
+        break;
+      case '--no-commit':
+        config.noCommit = true;
+        break;
+      default:
+        console.error(`Unknown option: ${arg}`);
+        printUsage();
+        process.exit(1);
+    }
+  }
+  
+  return config;
+}
+
+function main() {
+  const config = parseArgs();
   
   console.log('🚀 Force updating ALL dates from Git history...');
-  console.log(`   Mode: ${dryRun ? 'DRY RUN' : 'ACTUAL UPDATE'}`);
-  console.log(`   Scope: ${dateOnly ? 'DATE ONLY' : updatedOnly ? 'UPDATED ONLY' : 'BOTH FIELDS'}`);
+  console.log(`   Mode: ${config.dryRun ? 'DRY RUN' : 'ACTUAL UPDATE'}`);
+  console.log(`   Scope: ${config.dateOnly ? 'DATE ONLY' : config.updatedOnly ? 'UPDATED ONLY' : 'BOTH FIELDS'}`);
+  console.log(`   Posts directory: ${config.postsDir}`);
+  console.log(`   Source directory: ${config.sourceDir}`);
   
-  const postsDir = path.join(hexo.source_dir, '_posts');
+  const postsDir = path.resolve(config.postsDir);
+  const sourceDir = path.resolve(config.sourceDir);
   
   if (!fs.existsSync(postsDir)) {
-    console.log('❌ _posts directory not found');
+    console.log(`❌ Posts directory not found: ${postsDir}`);
+    console.log('💡 Use --posts-dir to specify the correct path');
+    return;
+  }
+  
+  // 检查是否在 Git 仓库中
+  try {
+    execSync('git rev-parse --git-dir', { cwd: sourceDir, stdio: 'ignore' });
+  } catch (error) {
+    console.log(`❌ Not in a Git repository: ${sourceDir}`);
+    console.log('💡 Use --source-dir to specify the correct Git repository path');
     return;
   }
   
@@ -448,18 +524,22 @@ hexo.extend.console.register('git-dates', 'Force update ALL dates from git histo
   const updatedFiles = [];
   
   files.forEach(file => {
-    const relativePath = path.relative(hexo.source_dir, file);
+    const relativePath = path.relative(sourceDir, file);
     processedCount++;
     
     console.log(`📄 Processing: ${relativePath}`);
     
     try {
-      const result = forceUpdateGitDates(file, { dryRun, dateOnly, updatedOnly });
+      const result = forceUpdateGitDates(file, sourceDir, { 
+        dryRun: config.dryRun, 
+        dateOnly: config.dateOnly, 
+        updatedOnly: config.updatedOnly 
+      });
       
       if (result.hasChanges) {
         updatedCount++;
         updatedFiles.push(relativePath);
-        console.log(`✅ ${dryRun ? 'Would update' : 'Updated'} ${relativePath}:`);
+        console.log(`✅ ${config.dryRun ? 'Would update' : 'Updated'} ${relativePath}:`);
         
         if (result.dateChanged) {
           console.log(`   📅 date: "${result.oldDate}" → "${result.newDate}"`);
@@ -483,18 +563,18 @@ hexo.extend.console.register('git-dates', 'Force update ALL dates from git histo
   });
   
   // 自动提交更新的文件
-  if (!dryRun && !noCommit && updatedFiles.length > 0) {
+  if (!config.dryRun && !config.noCommit && updatedFiles.length > 0) {
     try {
       console.log('🔄 Auto-committing updated files...');
       
       // 添加所有更新的文件到暂存区
       updatedFiles.forEach(file => {
-        execSync(`git add "${file}"`, { cwd: hexo.source_dir });
+        execSync(`git add "${file}"`, { cwd: sourceDir });
       });
       
       // 提交，使用特定前缀标记
       const commitMessage = `${AUTO_UPDATE_PREFIX} Update timestamps for ${updatedFiles.length} files`;
-      execSync(`git commit -m "${commitMessage}"`, { cwd: hexo.source_dir });
+      execSync(`git commit -m "${commitMessage}"`, { cwd: sourceDir });
       
       console.log(`✅ Auto-committed ${updatedFiles.length} files with message: ${commitMessage}`);
     } catch (error) {
@@ -504,14 +584,14 @@ hexo.extend.console.register('git-dates', 'Force update ALL dates from git histo
   
   console.log(`📊 Summary:`);
   console.log(`   Processed: ${processedCount} files`);
-  console.log(`   ${dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
+  console.log(`   ${config.dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
   
-  if (dryRun) {
-    console.log(`\n💡 This was a dry run. Use 'hexo git-dates' to actually update files.`);
+  if (config.dryRun) {
+    console.log(`\n💡 This was a dry run. Run without --dry to actually update files.`);
   } else {
-    console.log(`\n🎉 Done! Run 'hexo clean && hexo generate' to see the changes.`);
+    console.log(`\n🎉 Done! You may need to regenerate your site to see the changes.`);
   }
-});
+}
 
 // 辅助函数：将日期字符串转换为moment对象进行比较
 function parseDate(dateStr) {
@@ -546,7 +626,7 @@ function datesAreEqual(date1, date2) {
   return parsed1.format('YYYY-MM-DD HH:mm:ss') === parsed2.format('YYYY-MM-DD HH:mm:ss');
 }
 
-function forceUpdateGitDates(filePath, options = {}) {
+function forceUpdateGitDates(filePath, sourceDir, options = {}) {
   const content = fs.readFileSync(filePath, 'utf8');
   
   // Parse Front Matter
@@ -567,8 +647,8 @@ function forceUpdateGitDates(filePath, options = {}) {
   const oldUpdated = updatedMatch ? updatedMatch[1].trim().replace(/['"]/g, '') : null;
   
   // Get Git times (excluding auto-update commits)
-  const gitCreateDate = getGitCreateDate(filePath);
-  const gitUpdateDate = getGitUpdateDate(filePath);
+  const gitCreateDate = getGitCreateDate(filePath, sourceDir);
+  const gitUpdateDate = getGitUpdateDate(filePath, sourceDir);
   
   console.log(`   📋 Current Front-matter:`);
   console.log(`      date: "${oldDate}"`);
@@ -693,14 +773,14 @@ function getMarkdownFiles(dir) {
   return files;
 }
 
-function getGitCreateDate(filePath) {
+function getGitCreateDate(filePath, sourceDir) {
   try {
     // 排除自动更新时间的提交
     const cmd = `git log --follow --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
       timeout: 10000,
-      cwd: process.cwd()
+      cwd: sourceDir
     }).trim();
     
     if (!output) return null;
@@ -725,14 +805,14 @@ function getGitCreateDate(filePath) {
   }
 }
 
-function getGitUpdateDate(filePath) {
+function getGitUpdateDate(filePath, sourceDir) {
   try {
     // 排除自动更新时间的提交，获取最新的非自动更新提交
     const cmd = `git log --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
       timeout: 10000,
-      cwd: process.cwd()
+      cwd: sourceDir
     }).trim();
     
     if (!output) return null;
@@ -756,6 +836,19 @@ function getGitUpdateDate(filePath) {
     return null;
   }
 }
+
+// 如果是直接运行此脚本（而不是被 require）
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  main,
+  forceUpdateGitDates,
+  getMarkdownFiles,
+  getGitCreateDate,
+  getGitUpdateDate
+};
 ```
 
 > 在运行脚本前应先将git仓库中修改过的文章提交，脚本在更新后会自动完成一个新的单独的commit并附上标记防止重复更新出错
@@ -763,20 +856,26 @@ function getGitUpdateDate(filePath) {
 **用法:**
 
 ```cmd
-# 直接自动更新
-hexo git-dates
+# 基本使用
+node update-dates.js
 
-# 预览更新结果
-hexo git-dates --dry
+# 指定自定义目录
+node update-dates.js --posts-dir ./source/_posts --source-dir ./
 
-# 只更新创建日期
-hexo git-dates --date-only
+# 干运行（预览）
+node update-dates.js --dry
 
-# 只更新修改日期
-hexo git-dates --updated-only
+# 只更新创建时间
+node update-dates.js --date-only
 
-# 更新但不自动提交（不建议）
-hexo git-dates --no-commit
+# 只更新修改时间
+node update-dates.js --updated-only
+
+# 不自动提交
+node update-dates.js --no-commit
+
+# 查看帮助
+node update-dates.js --help
 ```
 
 
