@@ -11,16 +11,16 @@ moment.tz.setDefault('Asia/Shanghai');
 // 特定的提交消息前缀，用于标记自动更新时间的提交
 const AUTO_UPDATE_PREFIX = '[AUTO-UPDATE-TIME]';
 
-hexo.extend.console.register('force-git-dates', 'Force update ALL dates from git history', {
+hexo.extend.console.register('git-dates', 'Force update ALL dates from git history', {
   options: [
-    { name: '--dry-run', desc: 'Show what would be updated without making changes' },
+    { name: '--dry', desc: 'Show what would be updated without making changes' },
     { name: '--date-only', desc: 'Only update date field' },
     { name: '--updated-only', desc: 'Only update updated field' },
     { name: '--no-commit', desc: 'Do not auto-commit after updates' }
   ]
 }, function(args) {
   
-  const dryRun = args['dry-run'];
+  const dryRun = args['dry'];
   const dateOnly = args['date-only'];
   const updatedOnly = args['updated-only'];
   const noCommit = args['no-commit'];
@@ -103,7 +103,7 @@ hexo.extend.console.register('force-git-dates', 'Force update ALL dates from git
   console.log(`   ${dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
   
   if (dryRun) {
-    console.log(`\n💡 This was a dry run. Use 'hexo force-git-dates' to actually update files.`);
+    console.log(`\n💡 This was a dry run. Use 'hexo git-dates' to actually update files.`);
   } else {
     console.log(`\n🎉 Done! Run 'hexo clean && hexo generate' to see the changes.`);
   }
