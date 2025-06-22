@@ -13,7 +13,7 @@ const AUTO_UPDATE_PREFIX = '[AUTO-UPDATE-TIME]';
 
 // 默认配置
 const DEFAULT_CONFIG = {
-  postsDir: './_posts',  // 默认文章目录
+  postsDir: './source/_posts',  // 默认文章目录
   sourceDir: '.',        // 默认源码目录
   dryRun: false,
   dateOnly: false,
