@@ -332,9 +332,6 @@ function main() {
   console.log(`   Processed: ${processedCount} files`);
   console.log(`   ${config.dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
   console.log(`   No changes needed: ${noChangeCount} files`);
-  if (hasPreCommit) {
-    console.log(`   Pre-commit: Yes`);
-  }
   
   if (config.dryRun) {
     console.log(`\n💡 This was a dry run. Run without --dry to actually update files.`);
