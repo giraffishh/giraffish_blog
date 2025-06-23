@@ -146,7 +146,7 @@ function commitWorkingChanges(sourceDir) {
     execSync('git add .', { cwd: sourceDir });
     
     // 提交更改，使用简单消息
-    execSync('git commit -m "Save working changes before date update"', { cwd: sourceDir });
+    execSync('git commit -m "[AUTO-PRECOMMIT]"', { cwd: sourceDir });
     
     console.log(`✅ Pre-update commit completed (${changedFiles.length} files)`);
     return true;

@@ -441,6 +441,13 @@ Options:
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates (default: push enabled)
   --help               Show this help message
+
+Examples:
+  node upload                    # Update dates and push to remote
+  node upload --dry              # Dry run (Update dates)
+  node upload --no-push          # Update dates but don't push
+  node upload --date-only        # Only update date field and push
+  node upload --no-commit        # Update dates but don't commit or push
 `);
 }
 
@@ -545,7 +552,7 @@ function commitWorkingChanges(sourceDir) {
     execSync('git add .', { cwd: sourceDir });
     
     // 提交更改，使用简单消息
-    execSync('git commit -m "Save working changes before date update"', { cwd: sourceDir });
+    execSync('git commit -m "[AUTO-PRECOMMIT]"', { cwd: sourceDir });
     
     console.log(`✅ Pre-update commit completed (${changedFiles.length} files)`);
     return true;
@@ -691,15 +698,6 @@ function main() {
       console.error(`📄 ${displayPath} - ❌ Error: ${error.message}`);
     }
   });
-  
-  // 显示更新摘要
-  if (updatedFiles.length > 0) {
-    console.log(`\n📋 Date Updates Summary:`);
-    dateUpdates.forEach(update => {
-      console.log(`   ${update.file}: ${update.field} = "${update.newValue}"`);
-    });
-    console.log('');
-  }
   
   // 自动提交更新的文件
   if (!config.dryRun && !config.noCommit && updatedFiles.length > 0) {
