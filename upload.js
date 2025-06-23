@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
 
 function printUsage() {
   console.log(`
-Usage: node upload.js [options]
+Usage: node update-dates.js [options]
 
 Options:
   --posts-dir <dir>    Posts directory (default: ./source/_posts)
@@ -35,6 +35,13 @@ Options:
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates (default: push enabled)
   --help               Show this help message
+
+Examples:
+  node update-dates.js                    # Update dates and push to remote
+  node update-dates.js --dry              # Dry run
+  node update-dates.js --no-push          # Update dates but don't push
+  node update-dates.js --date-only        # Only update date field and push
+  node update-dates.js --no-commit        # Update dates but don't commit or push
 `);
 }
 
@@ -200,6 +207,9 @@ function main() {
     return;
   }
   
+  // 跟踪是否有预提交发生
+  let hasPreCommit = false;
+  
   // 如果不是干跑模式，检查工作区状态并提交现有更改
   if (!config.dryRun) {
     const gitStatus = checkGitStatus(sourceDir);
@@ -211,6 +221,7 @@ function main() {
         console.log('❌ Failed to commit working changes. Aborting to avoid conflicts.');
         return;
       }
+      hasPreCommit = true;
       console.log('');
     } else {
       console.log('✅ Working directory is clean, proceeding...\n');
@@ -309,8 +320,10 @@ function main() {
     }
   }
   
-  // 推送到远端（默认启用，除非指定 --no-push）
-  if (!config.dryRun && !config.noPush && !config.noCommit && updatedFiles.length > 0) {
+  // 推送到远端逻辑：只要有预提交或者有日期更新，就push
+  const shouldPush = !config.dryRun && !config.noPush && !config.noCommit && (hasPreCommit || updatedFiles.length > 0);
+  
+  if (shouldPush) {
     console.log('');
     pushToRemote(sourceDir);
   }
@@ -319,19 +332,22 @@ function main() {
   console.log(`   Processed: ${processedCount} files`);
   console.log(`   ${config.dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
   console.log(`   No changes needed: ${noChangeCount} files`);
+  if (hasPreCommit) {
+    console.log(`   Pre-commit: Yes`);
+  }
   
   if (config.dryRun) {
     console.log(`\n💡 This was a dry run. Run without --dry to actually update files.`);
   } else {
     console.log(`\n🎉 Done! You may need to regenerate your site to see the changes.`);
-    if (!config.noPush && !config.noCommit && updatedFiles.length > 0) {
+    if (shouldPush) {
       console.log(`📡 Changes have been pushed to remote repository.`);
     } else if (config.noPush) {
       console.log(`💡 Changes were not pushed (--no-push specified).`);
     } else if (config.noCommit) {
       console.log(`💡 Changes were not committed or pushed (--no-commit specified).`);
-    } else if (updatedFiles.length === 0) {
-      console.log(`💡 No files were updated, so nothing to push.`);
+    } else if (!hasPreCommit && updatedFiles.length === 0) {
+      console.log(`💡 No commits were made, so nothing to push.`);
     }
   }
 }
