@@ -35,13 +35,6 @@ Options:
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates (default: push enabled)
   --help               Show this help message
-
-Examples:
-  node update-dates.js                    # Update dates and push to remote
-  node update-dates.js --dry              # Dry run
-  node update-dates.js --no-push          # Update dates but don't push
-  node update-dates.js --date-only        # Only update date field and push
-  node update-dates.js --no-commit        # Update dates but don't commit or push
 `);
 }
 
@@ -142,7 +135,7 @@ function commitWorkingChanges(sourceDir) {
     execSync('git add .', { cwd: sourceDir });
     
     // 提交更改，使用简单消息
-    execSync('git commit -m "Save working changes before date update"', { cwd: sourceDir });
+    execSync('git commit -m "[AUTO-PREUPLOAD"', { cwd: sourceDir });
     
     console.log(`✅ Pre-update commit completed (${changedFiles.length} files)`);
     return true;
