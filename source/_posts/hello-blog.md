@@ -1,7 +1,7 @@
 ---
 title: 从零开始搭建个人博客网站(hexo-fluid+netlify+cloudflare)
 date: 2023-11-04 22:13:41
-updated: 2025-06-22 18:03:11
+updated: 2025-06-23 11:54:53
 comments: true
 abbrlink: 8810fcc3
 index_img: https://s1.imagehub.cc/images/2024/07/31/2233ea3abe314e3053c55d6e33b0fb49.jpg
