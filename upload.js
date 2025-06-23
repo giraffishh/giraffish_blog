@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
 
 function printUsage() {
   console.log(`
-Usage: node update-dates.js [options]
+Usage: node upload [options]
 
 Options:
   --posts-dir <dir>    Posts directory (default: ./source/_posts)
@@ -35,6 +35,13 @@ Options:
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates (default: push enabled)
   --help               Show this help message
+
+Examples:
+  node upload                    # Update dates and push to remote
+  node upload --dry              # Dry run (Update dates)
+  node upload --no-push          # Update dates but don't push
+  node upload --date-only        # Only update date field and push
+  node upload --no-commit        # Update dates but don't commit or push
 `);
 }
 
@@ -84,10 +91,11 @@ function parseArgs() {
 
 function checkGitStatus(sourceDir) {
   try {
-    const status = execSync('git status --porcelain', { 
+    // 使用 -z 选项获取以空字符分隔的输出，避免文件名中的特殊字符问题
+    const status = execSync('git status --porcelain -z', { 
       cwd: sourceDir, 
       encoding: 'utf8' 
-    }).trim();
+    });
     return status;
   } catch (error) {
     throw new Error(`Failed to check git status: ${error.message}`);
@@ -97,9 +105,9 @@ function checkGitStatus(sourceDir) {
 function parseGitStatus(statusOutput) {
   if (!statusOutput) return [];
   
-  return statusOutput.split('\n')
-    .map(line => line.trim())
-    .filter(line => line)
+  // 使用空字符分割，过滤空字符串
+  return statusOutput.split('\0')
+    .filter(line => line.trim())
     .map(line => {
       const status = line.substring(0, 2);
       const filePath = line.substring(3);
@@ -112,7 +120,10 @@ function parseGitStatus(statusOutput) {
       else if (status.includes('??')) statusDesc = 'Untracked';
       else statusDesc = 'Changed';
       
-      return { status: statusDesc, path: filePath };
+      // 规范化路径分隔符，统一使用正斜杠显示
+      const normalizedPath = filePath.replace(/\\/g, '/');
+      
+      return { status: statusDesc, path: normalizedPath };
     });
 }
 
@@ -135,7 +146,7 @@ function commitWorkingChanges(sourceDir) {
     execSync('git add .', { cwd: sourceDir });
     
     // 提交更改，使用简单消息
-    execSync('git commit -m "[AUTO-PREUPLOAD"', { cwd: sourceDir });
+    execSync('git commit -m "Save working changes before date update"', { cwd: sourceDir });
     
     console.log(`✅ Pre-update commit completed (${changedFiles.length} files)`);
     return true;
@@ -207,7 +218,7 @@ function main() {
   if (!config.dryRun) {
     const gitStatus = checkGitStatus(sourceDir);
     
-    if (gitStatus) {
+    if (gitStatus.trim()) {
       console.log('\n📋 Working directory has uncommitted changes');
       
       if (!commitWorkingChanges(sourceDir)) {
@@ -232,6 +243,8 @@ function main() {
   
   files.forEach(file => {
     const relativePath = path.relative(sourceDir, file);
+    // 规范化路径显示，统一使用正斜杠
+    const displayPath = relativePath.replace(/\\/g, '/');
     processedCount++;
     
     try {
@@ -245,13 +258,13 @@ function main() {
         updatedCount++;
         updatedFiles.push(relativePath);
         
-        console.log(`📄 ${relativePath}`);
+        console.log(`📄 ${displayPath}`);
         console.log(`   ✅ ${config.dryRun ? 'Would update' : 'Updated'}:`);
         
         if (result.dateChanged) {
           console.log(`      📅 date: "${result.oldDate || 'none'}" → "${result.newDate}"`);
           dateUpdates.push({
-            file: relativePath,
+            file: displayPath,
             field: 'date',
             oldValue: result.oldDate || 'none',
             newValue: result.newDate
@@ -260,7 +273,7 @@ function main() {
         if (result.updatedChanged) {
           console.log(`      🔄 updated: "${result.oldUpdated || 'none'}" → "${result.newUpdated}"`);
           dateUpdates.push({
-            file: relativePath,
+            file: displayPath,
             field: 'updated',
             oldValue: result.oldUpdated || 'none',
             newValue: result.newUpdated
@@ -270,13 +283,13 @@ function main() {
       } else {
         noChangeCount++;
         if (result.noGitHistory) {
-          console.log(`📄 ${relativePath} - ⚠️  No Git history`);
+          console.log(`📄 ${displayPath} - ⚠️  No Git history`);
         }
         // 对于不需要更新的文件，不显示任何信息以保持简洁
       }
       
     } catch (error) {
-      console.error(`📄 ${relativePath} - ❌ Error: ${error.message}`);
+      console.error(`📄 ${displayPath} - ❌ Error: ${error.message}`);
     }
   });
   
@@ -295,7 +308,9 @@ function main() {
       console.log('🔄 Auto-committing updated files...');
       console.log('   Files to be committed:');
       updatedFiles.forEach(file => {
-        console.log(`      Modified: ${file}`);
+        // 显示时使用正斜杠，但提交时使用原始路径
+        const displayPath = file.replace(/\\/g, '/');
+        console.log(`      Modified: ${displayPath}`);
       });
       
       // 添加所有更新的文件到暂存区
