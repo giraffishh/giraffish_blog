@@ -18,7 +18,8 @@ const DEFAULT_CONFIG = {
   dryRun: false,
   dateOnly: false,
   updatedOnly: false,
-  noCommit: false
+  noCommit: false,
+  push: false
 };
 
 function printUsage() {
@@ -26,19 +27,21 @@ function printUsage() {
 Usage: node update-dates.js [options]
 
 Options:
-  --posts-dir <dir>    Posts directory (default: ./_posts)
+  --posts-dir <dir>    Posts directory (default: ./source/_posts)
   --source-dir <dir>   Source directory (default: .)
   --dry                Show what would be updated without making changes
   --date-only          Only update date field
   --updated-only       Only update updated field
   --no-commit          Do not auto-commit after updates
+  --push               Push to remote after updating dates
   --help               Show this help message
 
 Examples:
-  node update-git-dates.js
-  node update-git-dates.js --dry
-  node update-git-dates.js --posts-dir ./source/_posts
-  node update-git-dates.js --date-only --no-commit
+  node update-dates.js
+  node update-dates.js --dry
+  node update-dates.js --posts-dir ./source/_posts
+  node update-dates.js --date-only --no-commit
+  node update-dates.js --push
 `);
 }
 
@@ -73,6 +76,9 @@ function parseArgs() {
       case '--no-commit':
         config.noCommit = true;
         break;
+      case '--push':
+        config.push = true;
+        break;
       default:
         console.error(`Unknown option: ${arg}`);
         printUsage();
@@ -83,6 +89,62 @@ function parseArgs() {
   return config;
 }
 
+function checkGitStatus(sourceDir) {
+  try {
+    const status = execSync('git status --porcelain', { 
+      cwd: sourceDir, 
+      encoding: 'utf8' 
+    }).trim();
+    return status;
+  } catch (error) {
+    throw new Error(`Failed to check git status: ${error.message}`);
+  }
+}
+
+function commitWorkingChanges(sourceDir) {
+  try {
+    console.log('📝 Committing existing working directory changes...');
+    
+    // 添加所有更改到暂存区
+    execSync('git add .', { cwd: sourceDir });
+    
+    // 提交更改，使用空消息或简单消息
+    execSync('git commit -m "Save working changes before date update"', { cwd: sourceDir });
+    
+    console.log('✅ Pre-update commit completed');
+    return true;
+  } catch (error) {
+    console.error(`❌ Error committing working changes: ${error.message}`);
+    return false;
+  }
+}
+
+function pushToRemote(sourceDir) {
+  try {
+    console.log('🚀 Pushing to remote repository...');
+    
+    // 获取当前分支名
+    const currentBranch = execSync('git branch --show-current', { 
+      cwd: sourceDir, 
+      encoding: 'utf8' 
+    }).trim();
+    
+    if (!currentBranch) {
+      throw new Error('Could not determine current branch');
+    }
+    
+    // 推送到远端
+    execSync(`git push origin ${currentBranch}`, { cwd: sourceDir });
+    
+    console.log(`✅ Successfully pushed to remote branch: ${currentBranch}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Error pushing to remote: ${error.message}`);
+    console.log('💡 You may need to manually push the changes later');
+    return false;
+  }
+}
+
 function main() {
   const config = parseArgs();
   
@@ -91,6 +153,8 @@ function main() {
   console.log(`   Scope: ${config.dateOnly ? 'DATE ONLY' : config.updatedOnly ? 'UPDATED ONLY' : 'BOTH FIELDS'}`);
   console.log(`   Posts directory: ${config.postsDir}`);
   console.log(`   Source directory: ${config.sourceDir}`);
+  console.log(`   Auto-commit: ${config.noCommit ? 'DISABLED' : 'ENABLED'}`);
+  console.log(`   Push to remote: ${config.push ? 'ENABLED' : 'DISABLED'}`);
   
   const postsDir = path.resolve(config.postsDir);
   const sourceDir = path.resolve(config.sourceDir);
@@ -108,6 +172,25 @@ function main() {
     console.log(`❌ Not in a Git repository: ${sourceDir}`);
     console.log('💡 Use --source-dir to specify the correct Git repository path');
     return;
+  }
+  
+  // 如果不是干跑模式，检查工作区状态并提交现有更改
+  if (!config.dryRun) {
+    const gitStatus = checkGitStatus(sourceDir);
+    
+    if (gitStatus) {
+      console.log('\n📋 Working directory has uncommitted changes:');
+      console.log(gitStatus);
+      console.log('');
+      
+      if (!commitWorkingChanges(sourceDir)) {
+        console.log('❌ Failed to commit working changes. Aborting to avoid conflicts.');
+        return;
+      }
+      console.log('');
+    } else {
+      console.log('✅ Working directory is clean, proceeding...\n');
+    }
   }
   
   const files = getMarkdownFiles(postsDir);
@@ -176,7 +259,13 @@ function main() {
     }
   }
   
-  console.log(`📊 Summary:`);
+  // 推送到远端（如果启用）
+  if (!config.dryRun && config.push && (updatedFiles.length > 0 || !config.noCommit)) {
+    console.log('');
+    pushToRemote(sourceDir);
+  }
+  
+  console.log(`\n📊 Summary:`);
   console.log(`   Processed: ${processedCount} files`);
   console.log(`   ${config.dryRun ? 'Would update' : 'Updated'}: ${updatedCount} files`);
   
@@ -184,6 +273,11 @@ function main() {
     console.log(`\n💡 This was a dry run. Run without --dry to actually update files.`);
   } else {
     console.log(`\n🎉 Done! You may need to regenerate your site to see the changes.`);
+    if (config.push) {
+      console.log(`📡 Changes have been pushed to remote repository.`);
+    } else {
+      console.log(`💡 Use --push option to automatically push changes to remote.`);
+    }
   }
 }
 
@@ -369,7 +463,7 @@ function getMarkdownFiles(dir) {
 
 function getGitCreateDate(filePath, sourceDir) {
   try {
-    // 排除自动更新时间的提交
+    // 只排除自动更新时间的提交
     const cmd = `git log --follow --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
@@ -386,7 +480,10 @@ function getGitCreateDate(filePath, sourceDir) {
         const [timestamp, message] = line.split('|');
         return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
-      .filter(commit => !commit.message.startsWith(AUTO_UPDATE_PREFIX) && !isNaN(commit.timestamp));
+      .filter(commit => 
+        !commit.message.startsWith(AUTO_UPDATE_PREFIX) && 
+        !isNaN(commit.timestamp)
+      );
     
     if (commits.length === 0) return null;
     
@@ -401,7 +498,7 @@ function getGitCreateDate(filePath, sourceDir) {
 
 function getGitUpdateDate(filePath, sourceDir) {
   try {
-    // 排除自动更新时间的提交，获取最新的非自动更新提交
+    // 只排除自动更新时间的提交，获取最新的非自动更新提交
     const cmd = `git log --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
@@ -418,7 +515,10 @@ function getGitUpdateDate(filePath, sourceDir) {
         const [timestamp, message] = line.split('|');
         return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
-      .filter(commit => !commit.message.startsWith(AUTO_UPDATE_PREFIX) && !isNaN(commit.timestamp));
+      .filter(commit => 
+        !commit.message.startsWith(AUTO_UPDATE_PREFIX) && 
+        !isNaN(commit.timestamp)
+      );
     
     if (commits.length === 0) return null;
     
@@ -441,5 +541,8 @@ module.exports = {
   forceUpdateGitDates,
   getMarkdownFiles,
   getGitCreateDate,
-  getGitUpdateDate
+  getGitUpdateDate,
+  checkGitStatus,
+  commitWorkingChanges,
+  pushToRemote
 };
