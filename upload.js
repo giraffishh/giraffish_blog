@@ -293,15 +293,6 @@ function main() {
     }
   });
   
-  // 显示更新摘要
-  if (updatedFiles.length > 0) {
-    console.log(`\n📋 Date Updates Summary:`);
-    dateUpdates.forEach(update => {
-      console.log(`   ${update.file}: ${update.field} = "${update.newValue}"`);
-    });
-    console.log('');
-  }
-  
   // 自动提交更新的文件
   if (!config.dryRun && !config.noCommit && updatedFiles.length > 0) {
     try {
