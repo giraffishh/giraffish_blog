@@ -8,8 +8,9 @@ const fs = require('fs');
 
 moment.tz.setDefault('Asia/Shanghai');
 
-// 特定的提交消息前缀，用于标记自动更新时间的提交
+// 特定的提交消息前缀，用于标记自动更新的提交
 const AUTO_UPDATE_PREFIX = '[AUTO-UPDATE-TIME]';
+const AUTO_UPDATE_CDN_PREFIX = '[AUTO-UPDATE-CDN]';
 
 // 默认配置
 const DEFAULT_CONFIG = {
@@ -381,6 +382,12 @@ function datesAreEqual(date1, date2) {
   return parsed1.format('YYYY-MM-DD HH:mm:ss') === parsed2.format('YYYY-MM-DD HH:mm:ss');
 }
 
+// 检查提交是否应该被排除
+function shouldExcludeCommit(commitMessage) {
+  return commitMessage.startsWith(AUTO_UPDATE_PREFIX) || 
+         commitMessage.startsWith(AUTO_UPDATE_CDN_PREFIX);
+}
+
 function forceUpdateGitDates(filePath, sourceDir, options = {}) {
   const content = fs.readFileSync(filePath, 'utf8');
   
@@ -511,7 +518,7 @@ function getMarkdownFiles(dir) {
 
 function getGitCreateDate(filePath, sourceDir) {
   try {
-    // 只排除自动更新时间的提交
+    // 排除自动更新时间和CDN的提交
     const cmd = `git log --follow --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
@@ -529,7 +536,7 @@ function getGitCreateDate(filePath, sourceDir) {
         return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
       .filter(commit => 
-        !commit.message.startsWith(AUTO_UPDATE_PREFIX) && 
+        !shouldExcludeCommit(commit.message) && 
         !isNaN(commit.timestamp)
       );
     
@@ -546,7 +553,7 @@ function getGitCreateDate(filePath, sourceDir) {
 
 function getGitUpdateDate(filePath, sourceDir) {
   try {
-    // 只排除自动更新时间的提交，获取最新的非自动更新提交
+    // 排除自动更新时间和CDN的提交，获取最新的非自动更新提交
     const cmd = `git log --format="%ct|%s" -- "${filePath}"`;
     const output = execSync(cmd, { 
       encoding: 'utf8', 
@@ -564,7 +571,7 @@ function getGitUpdateDate(filePath, sourceDir) {
         return { timestamp: parseInt(timestamp, 10), message: message || '' };
       })
       .filter(commit => 
-        !commit.message.startsWith(AUTO_UPDATE_PREFIX) && 
+        !shouldExcludeCommit(commit.message) && 
         !isNaN(commit.timestamp)
       );
     
