@@ -119,7 +119,7 @@ function decideCachingStrategy(url, request) {
   }
 
   // Image files: Cache-first, but only from allowed hosts
-  if (path.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|bmp)$/i)) {
+  if (path.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|bmp|webm)$/i)) {
     if (ALLOWED_IMAGE_HOSTS.includes(hostname)) {
       return CACHE_STRATEGIES.CACHE_FIRST;
     } else {
