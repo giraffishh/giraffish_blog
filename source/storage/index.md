@@ -35,6 +35,8 @@ date: 2025-06-01 17:56:45
 > 预处理：https://www.bilibili.com/video/BV1kC4y1a7Ee/?p=23&share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 >
 > 降维 PCA / t-SNE / UMAP：https://www.bilibili.com/video/BV1dpStYvEh8/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> UMAP详解：https://www.bilibili.com/video/BV1qB4y1p7CF/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 #### 2. 数据检验
 
