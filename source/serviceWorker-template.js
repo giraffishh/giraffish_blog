@@ -49,9 +49,9 @@ const initialCacheFiles = [
 ];
 
 // Maximum cache items
-const MAX_CACHE_ITEMS = 500;
+const MAX_CACHE_ITEMS = 250;
 // Threshold to trigger cleanup
-const CACHE_CLEANUP_THRESHOLD = 450;
+const CACHE_CLEANUP_THRESHOLD = 200;
 // Percentage to clean up at a time
 const CACHE_CLEANUP_PERCENT = 0.1;
 
