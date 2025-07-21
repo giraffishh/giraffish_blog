@@ -88,7 +88,15 @@ date: 2025-06-01 17:56:45
 2. 逻辑回归✅
 3. 非线性回归✅
 4. 神经网络预测✅
-5. 梯度提升树（XGBoost/LightGBM）
+5. 梯度提升树GBDT（XGBoost/LightGBM/CATBoost）✅
+
+> 学GBDT前应先学决策树&随机森林
+>
+> GBDT -> https://www.bilibili.com/video/BV1U5411n7vH/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> XGBoost -> https://www.bilibili.com/video/BV1yq4y1z7jK/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
+>
+> XGBoost推导 -> https://www.bilibili.com/video/BV1Zk4y1F7JE/?share_source=copy_web&vd_source=d8ddaf8c8f498cc1cdb5fb20b19e913c
 
 **时间序列预测:**
 
