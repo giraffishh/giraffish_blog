@@ -9,8 +9,8 @@ tags:
   - 模型蒸馏
 comments: true
 abbrlink: 9d7503d7
-date: 2025-07-18 16:36:56
-updated: 2025-07-29 21:15:01
+date: 2025-09-22 00:55:53
+updated: 2025-09-22 00:55:53
 ---
 
 ## CLIP
