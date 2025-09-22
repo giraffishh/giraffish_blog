@@ -1,6 +1,6 @@
 ---
 index_img: 'https://origin.picgo.net/2025/09/21/25-09-21-17584556830165f89cdc8dfd4716f.webp'
-banner_img: 'https://cdn.giraffish.me/blog/25-05-31-1748684560329.webp'
+banner_img: 'https://img.picgo.net/2025/03/28/25-03-28-1743150706296586d07573c738663.webp'
 title: Text-to-Video Retrieval
 categories:
   - 学习笔记
@@ -70,3 +70,79 @@ CLIP4Clip: An Empirical Study of CLIP for End to End Video Clip Retrieval
 * 代码仓库：https://github.com/ArrowLuo/CLIP4Clip
 
 ![](https://origin.picgo.net/2025/09/21/25-09-21-175845721249375a1b7357fd61bb0.webp)
+
+### 核心架构组件
+
+1. **文本编码器 (Text Encoder)** - 基本不变
+
+这一部分与原始的 CLIP 架构完全相同
+
+- **模型**：直接采用 CLIP 预训练好的 **Transformer 文本编码器** 
+
+- **功能**：输入一段文字描述，输出一个代表该文字语义的**单一特征向量** (wj) 
+
+2. **视频编码器 (Video Encoder)** - 从单帧到序列
+
+这是第一个关键的改造点：CLIP 的图像编码器一次只能处理一张图片，而视频是连续的帧序列。
+
+CLIP4Clip 的处理方式是：
+
+- **模型骨干**：同样直接采用 CLIP 预训练好的**图像编码器 (ViT-B/32)** 
+
+- **处理流程**：
+	1. **帧采样**：从输入的视频中，首先采样出一系列有序的帧（即多张图片） 
+  
+	2. **逐帧编码**：将这些帧**一张一张地**送入 ViT 图像编码器
+  
+	3. **序列输出**：最终，视频编码器输出的不再是像 CLIP 那样的一个向量，而是**一个特征向量的序列** (`Zi={zi1,zi2,...,zi∣vi∣}`) 。序列中的每一个向量都代表了视频中对应帧的内容
+
+**核心区别**：CLIP 处理图片输出**一个**向量，CLIP4Clip 处理视频输出**一串**向量
+
+3. **相似度计算器 (Similarity Calculator)** - 核心创新
+
+如何比较一个“文本向量”和一串“视频帧向量”，并得出一个最终的相似度分数？这是 CLIP4Clip 架构最核心的创新和研究点。论文提出了三种不同的策略来解决这个问题：
+
+#### 策略 A: 无参数类型 (Parameter-free type)
+
+这种方法最简单，完全依赖 CLIP 预训练好的能力，不引入任何新的学习参数 
+
+> 当数据集较小时效果最好，因为在小型数据集上，引入新的、未初始化的参数（如序列类型中的 LSTM 或 Transformer）很难被有效训练，反而可能会损害从 CLIP 预训练模型中继承来的强大性能
+
+- **工作方式**：
+  1. 通过**平均池化 (Mean Pooling)** 将视频的所有帧特征向量聚合成一个能代表整个视频的“平均特征向量” 
+  2. 计算这个“平均视频向量”和“文本向量”之间的余弦相似度，作为最终得分 
+- **可以理解为**：把视频的所有精彩瞬间“平均”成一张综合的“代表图”，再用 CLIP 的方式去和文本匹配
+
+#### 策略 B: 序列类型 (Sequential type)
+
+这种方法认为视频帧的顺序很重要，不能简单求平均
+
+> 当数据集足够大时，模型才有能力去学习序列类型中引入的额外参数，从而更好地捕捉视频的帧间时序关系
+
+- **工作方式**：
+
+  1. 在求平均之前，先将视频帧的特征序列送入一个**序列模型（如 LSTM 或 Transformer Encoder）**，这个模型会学习帧与帧之间的时间依赖关系，输出一组包含了时序信息的新特征序列
+  2. 再对这组新的特征序列进行平均池化，最后计算余弦相似度 
+  
+- **可以理解为**：先“看完”整个视频的故事线（捕捉时序信息），形成一个整体理解，再用这个整体理解去和文本匹配
+
+#### 策略 C: 紧密类型 (Tight type)
+
+这种方法最为复杂，它试图让文本和视频的特征进行深度的跨模态融合
+
+> 实际效果最差，紧密类型引入了最多的新参数来进行跨模态交互，在没有足够数据的情况下，这个模块很难被有效学习
+
+- **工作方式**：
+  1. 将**文本特征向量**和**视频帧的特征序列**直接**拼接 (concatenate)** 在一起，形成一个统一的长序列
+  2. 将这个混合序列送入一个全新的 **Transformer Encoder** 中，让文本和视频的特征在内部充分交互、相互影响 
+  3. 最后通过一个线性层直接预测出相似度分数
+- **可以理解为**：让文本和视频的每一帧进行“对话和协商”，共同决定它们的匹配程度
+
+## TeachCLIP
+
+Holistic Features are almost Sufficient for Text-to-Video Retrieval
+
+* 论文地址：https://openaccess.thecvf.com/content/CVPR2024/papers/Tian_Holistic_Features_are_almost_Sufficient_for_Text-to-Video_Retrieval_CVPR_2024_paper.pdf
+* 代码仓库：https://github.com/ruc-aimc-lab/TeachCLIP?tab=readme-ov-file
+
+![](https://origin.picgo.net/2025/09/23/25-09-23-1758558026283b04e6e9d494cbc56.webp)
