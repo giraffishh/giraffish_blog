@@ -11,7 +11,7 @@ tags:
 comments: true
 abbrlink: 9d7503d7
 date: 2025-09-22 00:55:53
-updated: 2025-09-24 15:38:29
+updated: 2025-09-24 17:58:56
 
 ---
 
@@ -103,7 +103,9 @@ updated: 2025-09-24 15:38:29
 
 ![](https://origin.picgo.net/2025/09/24/25-09-24-175867771980194d15bbf3959b629.webp)
 
-encoder-decoder / Seq2Seq：N->M
+Encoder-Decoder / Seq2Seq：N->M
+
+> RNN擅长处理1->N, N->N, N->1的情况，但不擅长处理 N->M 的情况（可能需要用多个RNN堆叠），这种Encoder-Decoder架构会把其压缩成一个固定长度的中间向量，即**上下文向量（Context Vector）**，出现**信息瓶颈（Information Bottleneck）**的问题导致信息丢失
 
 ![](https://origin.picgo.net/2025/09/24/25-09-24-1758682223368f7f741c5c45dbbba.webp)
 
@@ -112,7 +114,57 @@ encoder-decoder / Seq2Seq：N->M
 图解参考：
 
 * https://www.bilibili.com/video/BV1xS4y1k7tn/?spm_id_from=333.788.videopod.sections&vd_source=d95f1f1b6e857449fcf25e43320f37da
+* https://www.bilibili.com/video/BV1G64y1S7bc/?spm_id_from=333.1387.upload.video_card.click&vd_source=d95f1f1b6e857449fcf25e43320f37da
 * https://blog.csdn.net/qq_42363032/article/details/124651978
+
+Attention机制的提出，就是为了解决上文中的**信息瓶颈**问题
+
+![](https://origin.picgo.net/2025/09/24/25-09-24-1758707045389754ab9ffd75a2417.webp)
+
+### Query (Q), Key (K), 和 Value (V)
+
+![](https://origin.picgo.net/2025/09/24/25-09-24-1758703985522b93602df00187117.webp)
+
+Attention机制引入了三个核心概念：**Query (Q)**, **Key (K)**, 和 **Value (V)**
+
+- **Query (Q)**: 代表当前的任务或焦点。在Decoder中，它通常是解码器上一步的隐藏状态，代表着“我接下来要生成什么词？”这个问题
+- **Key (K)**: 与输入序列中的每个元素相关联。它用于和Query进行匹配，以衡量该元素的重要性。可以理解为输入信息的“标签”
+- **Value (V)**: 也与输入序列中的每个元素相关联。它是该元素的实际内容。一旦通过Q-K匹配计算出权重，这个权重就会作用于V上
+
+在经典的Encoder-Decoder架构中，Q来自Decoder，而K和V都来自Encoder的所有时间步的输出向量（通常K和V是同一个向量）
+
+> 我们可以用一个生活中的例子来理解Attention：
+>
+> **场景：你在做一道阅读理解题**
+>
+> 题目问：“主角在文章结尾时的心情是怎样的？”
+>
+> 你不会把整篇文章从头到尾等同地看一遍，然后凭记忆回答。你的做法更可能是：
+>
+> 1. 带着问题（“主角结尾的心情”）去文章中寻找线索
+> 2. 你的目光会快速扫过不相关的段落，而在描述主角最后行为和心理活动的句子上**重点关注**
+> 3. 最后，你根据这些**重点信息**，综合得出答案
+>
+> 这个过程就是Attention。
+>
+> - **问题 “主角结尾的心情”** 就是**查询（Query）**
+> - **文章中的每一句话** 都可以看作是信息**键值对（Key-Value Pair）**，其中“键”是句子的概括，“值”是句子的具体内容
+> - 你将你的问题（Query）与文章中每句话的概括（Key）进行匹配，找到最相关的句子
+> - 你给予这些相关句子更高的**权重（Attention Weight）**，并最终结合这些高权重的句子内容（Value）来得出答案
+
+### Self-Attention
+
+self-attention只关注输入序列元素之间的关系，即**每个输入元素都有它自己的Q、K、V**，也方便了并行化计算
+
+![](https://origin.picgo.net/2025/09/24/25-09-24-17587072428369b7bfe25bdfebd0d.png)
+
+![](https://origin.picgo.net/2025/09/24/25-09-24-17587078050390a138d30b4ed0ffa.webp)
+
+### Mult-head Attention 多头注意力机制
+
+在自注意力的基础上，使用多种变换生成的Q、K、V进行计算，即叠加使用self-attention从而增强注意力效果
+
+![](https://origin.picgo.net/2025/09/24/25-09-24-17587077972927e011ec4fdbb8411.webp)
 
 ## Transformer
 
