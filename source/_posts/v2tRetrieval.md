@@ -11,7 +11,7 @@ tags:
 comments: true
 abbrlink: 9d7503d7
 date: 2025-09-22 00:55:53
-updated: 2025-10-18 01:56:57
+updated: 2025-11-12 09:48:40
 
 ---
 
@@ -265,6 +265,24 @@ Learning Transferable Visual Models From Natural Language Supervision
 
 ![](https://origin.picgo.net/2025/09/22/25-09-22-17584720224735adc63e5fb736e0c.webp)
 
+### 模型大小
+
+| name         | params (M) | FLOPs (B) |
+|--------------|------------|-----------|
+| **ViT Models** |            |           |
+| ViT-L-14-336  | 427.94     | 395.22    |
+| ViT-L-14     | 427.62     | 175.33    |
+| ViT-B-16     | 149.62     | 41.09     |
+| ViT-B-32     | 151.28     | 14.78     |
+| **ResNet Models** |            |           |
+| RN50x64      | 623.26     | 552.65    |
+| RN50x16      | 290.98     | 162.69    |
+| RN50x4       | 178.3      | 51.82     |
+| RN101        | 119.69     | 25.5      |
+| RN50         | 102.01     | 18.18     |
+
+> 数据来源：[OpenClip的基准测试](https://github.com/mlfoundations/open_clip/blob/main/docs/openclip_results.csv)
+
 ### 核心架构组件
 
 **图像编码器 (Image Encoder)：**
@@ -283,6 +301,8 @@ Learning Transferable Visual Models From Natural Language Supervision
 
 ### 训练过程：对比式预训练 (Contrastive Pre-training)
 
+> 训练数据：OpenAi收集了400 million 的数据文本对，称为WIT（私有数据集）
+
 **对比学习**具体步骤如下:
 
 1. **构建批次 (Batch)**：从数据集中随机抽取一批 `N` 个 (图像, 文本) 对 。例如，(图片A, "描述A")，(图片B, "描述B")，...，(图片N, "描述N")
@@ -296,7 +316,7 @@ Learning Transferable Visual Models From Natural Language Supervision
 
 4. **学习目标**：
    - **最大化** `N` 个**正确配对**（对角线上的 I1⋅T1, I2⋅T2 等）的余弦相似度 
-   - **最小化** N2−N 个**错误配对**（所有非对角线上的组合，如 I1⋅T2, I2⋅T1 等）的余弦相似度 
+   - **最小化** `N2−N` 个**错误配对**（所有非对角线上的组合，如 I1⋅T2, I2⋅T1 等）的余弦相似度 
 
 ### 应用：零样本预测 (Zero-Shot Prediction)
 
@@ -347,7 +367,7 @@ CLIP4Clip 的处理方式是：
 
 #### 策略 A: 无参数类型 (Parameter-free type)
 
-这种方法最简单，完全依赖 CLIP 预训练好的能力，不引入任何新的学习参数 
+这种方法最简单，完全依赖 CLIP 预训练好的能力，不引入任何新的学习参数
 
 > 当数据集较小时效果最好，因为在小型数据集上，引入新的、未初始化的参数（如序列类型中的 LSTM 或 Transformer）很难被有效训练，反而可能会损害从 CLIP 预训练模型中继承来的强大性能
 
@@ -389,3 +409,75 @@ Holistic Features are almost Sufficient for Text-to-Video Retrieval
 * 代码仓库：https://github.com/ruc-aimc-lab/TeachCLIP?tab=readme-ov-file
 
 ![](https://origin.picgo.net/2025/09/23/25-09-23-1758558026283b04e6e9d494cbc56.webp)
+
+### 模型架构
+
+Backbone: **CLIP(ViT-B/32)**
+
+The key data flow of the visual side of the student network is expressed as follows:
+$$
+\begin{cases} 
+\{f_1, \ldots, f_m\} & \leftarrow \text{video-to-frames}(x), \\
+\{v_1, \ldots, v_m\} & \leftarrow \text{ViT}(\{f_1, \ldots, f_m\}), \\
+\{\phi_1, \ldots, \phi_m\} & \leftarrow \text{Transformers} \times 4(\{v_1, \ldots, v_m\}), \\
+\{w_1, \ldots, w_m\} & \leftarrow \text{AFA}(\{\phi_1, \ldots, \phi_m\}), \\
+\phi(x) & \leftarrow \sum_{i=1}^m w_i \phi_i. 
+\end{cases}
+$$
+
+####  Loss组成
+
+1. **$l_{IN}$ (常规训练损失)**
+
+与Clip中相同，跨模态匹配中的标准训练损失。目标是拉近匹配的视频-文本对的相似度，推远不匹配的视频-文本对的相似度
+
+2.  **$l_{CgT}$ (视频级粗粒度教学损失)**
+
+最小化学生和教师网络输出之间的**皮尔逊距离**$d_p$ （或等效地，最大化皮尔逊相关系数），使学生能够**模仿教师输出排序**。因此选择使用 $d_p$ 作为粗粒度教学损失 $l_{CgT}$。对于视频 $x_i$，损失计算为
+$$
+d_p(\sigma(B_{i,\cdot}),\sigma(y_c(v_i,\cdot)))
+$$
+
+* $\sigma$ 是 softmax
+* $B_{i,\cdot}$：代表学生网络计算的相似度矩阵的第 $i$ 行。它表示的是第 $i$ 个视频 $x_i$ 与批次中*所有*文本 $(t_1, t_2, \dots, t_b)$ 的相似度分数向量 
+* $y_c(v_i,\cdot)$：代表教师网络计算的第 $i$ 个视频 $v_i$ 与批次中*所有*文本的相似度分数向量
+
+以类似的方式，文本 $t_j$ 的损失计算为 $d_p(\sigma(B_{\cdot,j}),\sigma(y_c(\cdot,t_j)))$
+
+因此，$l_{CgT}$ 定义为以下批次级别的对称损失：
+$$
+l_{CgT} := \frac{1}{b}\sum_{i=1}^{b} d_{p}(\sigma(B_{i,\cdot}),\sigma(y_c(v_i,\cdot))) + \frac{1}{b}\sum_{j=1}^{b} d_{p}(\sigma(B_{\cdot,j}),\sigma(y_c(\cdot,t_j)))
+$$
+
+3. $l_{FgT}$ (帧级细粒度教学损失)
+
+在**帧级别**进行监督，论文为学生网络增加了一个“注意力帧特征聚合 (AFA)”模块，该模块会为视频的每一帧生成一个注意力权重 $w$ ，教师网络会提供每个单独的帧 $f_k$ 与文本 $t$ 之间的相关性分数 $y_f$ （可以理解为教师给出的帧权重）。$l_{FgT}$ 通过计算学生AFA模块生成的帧权重 $w$ 与教师提供的帧-文本相似度 $y_f$ (作为软标签) 之间的**交叉熵损失 (Cross-Entropy, CE) **来实现。直观上，如果教师认为某一帧很重要，学生网络也应该为该帧分配更高的权重
+
+$$
+l_{FgT} := -\frac{1}{b}\sum_{i=1}^{b}\sum_{k=1}^{m} y_f(f_{i,k}, t_i) \log w_{i,k}.
+$$
+
+- **$y_f(f_{i,k}, t_i)$**：就是老师给的权重
+- **$w_{i,k}$**：就是学生给的权重
+- **$\log w_{i,k}$**：学生越不自信（$w$ 越小，$\log w$ 越负），惩罚越大
+- **$y_f \log w$**：交叉熵的核心。如果 $y_f$ 很大（老师说很重要）而 $w$ 很小（学生说不重要），$\log w$ 是一个很大的负数，再乘上 $y_f$ 和公式前面的负号，就变成一个巨大的正损失
+
+## ConvNeXt
+
+A ConvNet for the 2020s
+
+* 论文地址：https://arxiv.org/pdf/2201.03545
+* 代码仓库： https://github.com/facebookresearch/ConvNeXt
+
+<img src="https://origin.picgo.net/2025/10/25/25-10-25-1761395395885455150014897d8e5.png" style="zoom: 67%;" />
+
+##  ConvNext v2
+
+Co-designing and Scaling ConvNets with Masked Autoencoders
+
+* 论文地址：https://arxiv.org/pdf/2301.00808
+* 代码仓库： https://github.com/facebookresearch/ConvNeXt-V2
+
+## OpenClip_ConvNextv2
+
+用ConvNeXtv2代替Clip中的图像编码器主干，魔改自[OpenClip](https://github.com/giraffishh/open_clip_ConvNeXt_v2)
