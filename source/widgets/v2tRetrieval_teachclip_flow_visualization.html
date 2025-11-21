@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeachCLIP 数据流可视化: 视频特征聚合过程</title>
+    <!-- MathJax for LaTeX rendering -->
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      }
+    };
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-radius: 12px;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-hover: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e1e4e8;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        code {
+            background: #f1f3f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            color: #d63384;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            border: 1px solid #e1e4e8;
+        }
+
+        input[type=range] {
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(74, 144, 226, 0.3);
+        }
+
+        button:hover {
+            background-color: #357abd;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(74, 144, 226, 0.4);
+        }
+
+        .step-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            border: 1px solid #e1e4e8;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .step-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background: var(--primary-color);
+        }
+
+        .step-card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .step-title {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+
+        .tensor-label {
+            font-size: 0.85em;
+            color: #888;
+            font-weight: 600;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        .step-desc {
+            font-size: 1em;
+            color: #555;
+            margin-bottom: 25px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #cbd5e0;
+            line-height: 1.7;
+        }
+
+        .matrix-container {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 15px 5px;
+            align-items: center;
+            min-height: 120px;
+        }
+        
+        .matrix-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .matrix-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .matrix-container::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        .matrix-container::-webkit-scrollbar-thumb:hover {
+            background: #bbb;
+        }
+
+        .tensor-box {
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 15px;
+            background: #ffffff;
+            min-width: 140px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .tensor-box .tensor-label {
+            margin-bottom: 10px;
+            width: 100%;
+            text-align: center;
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.85em;
+            margin: 0 auto;
+        }
+
+        td, th {
+            border: 1px solid #e9ecef;
+            padding: 6px 10px;
+            text-align: center;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        tr:first-child th:first-child { border-top-left-radius: 6px; }
+        tr:first-child th:last-child { border-top-right-radius: 6px; }
+        tr:last-child td:first-child { border-bottom-left-radius: 6px; }
+        tr:last-child td:last-child { border-bottom-right-radius: 6px; }
+
+        .highlight {
+            background-color: #fff3cd;
+            transition: background-color 0.5s;
+        }
+
+        .arrow {
+            font-size: 24px;
+            color: #a0aec0;
+            padding: 0 10px;
+            align-self: center;
+            font-weight: 300;
+        }
+
+        .math-block {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            overflow-x: auto;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.02);
+        }
+
+        .sub-step {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px dashed #d1d5db;
+        }
+        
+        .sub-step-title {
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sub-step-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .attn-map {
+            display: grid;
+            gap: 2px;
+            background: #e2e8f0;
+            border: 1px solid #cbd5e0;
+            padding: 2px;
+            border-radius: 4px;
+        }
+        .attn-cell {
+            background: white;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65em;
+            border-radius: 2px;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .matrix-container {
+                padding-bottom: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="controls">
+        <div>
+            <label>帧数 (N): <span id="frame-count-display">4</span></label>
+            <input type="range" id="frame-count" min="2" max="6" value="4">
+        </div>
+        <div>
+            <label>特征维 (D): <span id="dim-count-display">4</span></label>
+            <input type="range" id="dim-count" min="3" max="6" value="4">
+        </div>
+        <button id="btn-reset">重置 / 生成数据</button>
+    </div>
+
+    <!-- Step 1: Input -->
+    <div class="step-card active" id="step-1">
+        <div class="step-header">
+            <div class="step-title">1. 输入: ViT 提取的帧特征</div>
+            <div class="tensor-label">Shape: [B=1, N, D]</div>
+        </div>
+        <div class="step-desc">
+            这是从 CLIP Visual Encoder (ViT) 输出的原始特征。每一行代表视频中的一帧。
+            <br>代码对应: <code>visual_output = self.clip.encode_image(video)</code>
+        </div>
+        <div class="matrix-container" id="container-step-1">
+            <!-- Content generated by JS -->
+        </div>
+    </div>
+
+    <!-- Step 2: Temporal Modeling -->
+    <div class="step-card" id="step-2">
+        <div class="step-header">
+            <div class="step-title">2. 时序建模 (Transformer x 4 Layers)</div>
+            <div class="tensor-label">Shape: [B, N, D] &harr; [N, B, D]</div>
+        </div>
+        <div class="step-desc">
+            使用 <code>module_cross.py</code> 中的 <code>Transformer</code> 类进行时序交互。
+            <br>代码对应:
+            <pre style="background:#f1f3f5; padding:10px; border-radius:4px; overflow-x:auto; font-size:0.85em;">
+# Sequential type: Time Transformer Encoder
+seq_length = visual_output.size(1)
+position_ids = torch.arange(seq_length, dtype=torch.long, device=visual_output.device)
+position_ids = position_ids.unsqueeze(0).expand(visual_output.size(0), -1)
+frame_position_embeddings = self.frame_position_embeddings(position_ids)
+visual_output = visual_output + frame_position_embeddings
+
+extended_video_mask = (1.0 - video_mask.unsqueeze(1)) * -1000000.0
+extended_video_mask = extended_video_mask.expand(-1, video_mask.size(1), -1)
+visual_output = visual_output.permute(1, 0, 2)  # NLD -> LND
+visual_output = self.transformerClip(visual_output, extended_video_mask)
+visual_output = visual_output.permute(1, 0, 2)  # LND -> NLD
+visual_output = visual_output + visual_output_original</pre>
+            <br><b>注意：</b> 根据配置文件 (<code>msrvtt-7k.yaml</code>)，这里堆叠了 <b>4层</b> Transformer Block。
+            <br>单层步骤：Pre-LN &rarr; Self-Attention &rarr; Residual &rarr; Pre-LN &rarr; MLP (QuickGELU) &rarr; Residual。
+            <br><b>初始化技巧：</b> 为了防止深层网络数值爆炸，Attention 和 MLP 的输出投影层权重被缩放了 $1/\sqrt{2L}$ (约 0.35)。
+            <br>下方展示的是第 1 层的内部细节，以及经过 4 层处理后的最终输出。
+        </div>
+        
+        <div class="sub-step">
+            <div class="sub-step-title">2.1 位置编码 (Positional Encoding)</div>
+            <div class="matrix-container" id="container-step-2a"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">2.2 Layer 1: Self-Attention 细节</div>
+            <div class="matrix-container" id="container-step-2b"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">2.3 Layer 1: FFN (Feed-Forward Network) & Residual</div>
+            <div class="step-desc" style="font-size: 0.9em; margin-bottom: 10px;">
+                <b>架构说明 (Pre-LN):</b> 本模型使用的是 <b>Pre-LN</b> 结构，与原始 Transformer 的 "Add & Norm" (Post-LN) 不同。
+                <br>流程: Input $\xrightarrow{Norm}$ FFN $\xrightarrow{Add}$ Output
+                <br>即: $x = x + \text{FFN}(\text{LayerNorm}(x))$
+                <br>这里的 MLP (Multi-Layer Perceptron) 即为标准 Transformer 中的 <b>FFN</b> 部分。
+            </div>
+            <div id="container-step-2c"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">2.4 Layer 2-4: 循环处理 (最终输出)</div>
+            <div class="step-desc" style="font-size: 0.85em; margin-bottom: 5px;">
+                数据继续经过 3 层相同的 Transformer Block 处理...
+            </div>
+            <div class="matrix-container" id="container-step-2d"></div>
+        </div>
+    </div>
+
+    <!-- Step 3: Frame Weight Prediction -->
+    <div class="step-card" id="step-3">
+        <div class="step-header">
+            <div class="step-title">3. 帧权重预测 (Frame Weight Predict Module V2)</div>
+            <div class="tensor-label">Shape: [B, N, 1]</div>
+        </div>
+        <div class="step-desc">
+            基于 Transformer 输出的特征，通过 MLP 预测每一帧的重要性权重。
+            <br>代码对应:
+            <pre style="background:#f1f3f5; padding:10px; border-radius:4px; overflow-x:auto; font-size:0.85em;">
+# Frame Weight Predict Module V2
+Frameweight = self.frameLinear(visual_output)
+Frameweight = torch.nn.functional.relu(Frameweight)
+Frameweight = self.frameLinear2(Frameweight)</pre>
+            <br>公式: $W_{raw} = \text{Linear}_2(\text{ReLU}(\text{Linear}_1(V_{trans})))$
+            <br>其中:
+            <ul>
+                <li>$V_{trans}$: Transformer 输出的特征 (Shape: [N, D])</li>
+                <li>$\text{Linear}_1$: 线性层 (D &rarr; D)</li>
+                <li>$\text{ReLU}$: 激活函数 $\max(0, x)$</li>
+                <li>$\text{Linear}_2$: 线性层 (D &rarr; 1)，输出每一帧的原始权重分数</li>
+            </ul>
+        </div>
+        
+        <div class="sub-step">
+            <div class="sub-step-title">3.1 Linear 1 & ReLU</div>
+            <div class="matrix-container" id="container-step-3a"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">3.2 Linear 2 (Raw Weights)</div>
+            <div class="matrix-container" id="container-step-3b"></div>
+        </div>
+    </div>
+
+    <!-- Step 4: Aggregation -->
+    <div class="step-card" id="step-4">
+        <div class="step-header">
+            <div class="step-title">4. 加权聚合 (Weighted Aggregation)</div>
+            <div class="tensor-label">Shape: [B, D]</div>
+        </div>
+        <div class="step-desc">
+            将预测的权重经过 Softmax 归一化后，对 L2 归一化后的帧特征进行加权求和。
+            <br>代码对应:
+            <pre style="background:#f1f3f5; padding:10px; border-radius:4px; overflow-x:auto; font-size:0.85em;">
+visual_output = visual_output / visual_output.norm(dim=-1, keepdim=True)
+# ...
+if return_fine:
+    visual_output_adapt = (visual_output * Frameweight.div(0.1).softmax(1)).sum(1)</pre>
+            <br>公式: $V_{agg} = \sum_{i=1}^{N} \alpha_i \cdot \hat{v}_i$
+            <br>其中:
+            <ul>
+                <li>$\hat{v}_i = \frac{v_i}{\|v_i\|_2}$: L2 归一化后的第 $i$ 帧特征</li>
+                <li>$\alpha_i = \text{softmax}(\frac{w_i}{0.1})$: 第 $i$ 帧的最终权重 (Temperature=0.1)</li>
+            </ul>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">4.1 特征归一化 (L2 Norm)</div>
+            <div class="matrix-container" id="container-step-4a"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">4.2 权重 Softmax (Temp=0.1)</div>
+            <div class="matrix-container" id="container-step-4b"></div>
+        </div>
+
+        <div class="sub-step">
+            <div class="sub-step-title">4.3 加权求和结果</div>
+            <div class="matrix-container" id="container-step-4c"></div>
+        </div>
+    </div>
+
+    <!-- Step 5: Normalization -->
+    <div class="step-card" id="step-5">
+        <div class="step-header">
+            <div class="step-title">5. 最终归一化 (Final L2 Normalization)</div>
+            <div class="tensor-label">Shape: [B, D]</div>
+        </div>
+        <div class="step-desc">
+            对聚合后的视频向量进行 L2 归一化，得到最终的语义空间向量。
+            <br>代码对应:
+            <pre style="background:#f1f3f5; padding:10px; border-radius:4px; overflow-x:auto; font-size:0.85em;">
+visual_output_adapt = visual_output_adapt / visual_output_adapt.norm(dim=-1, keepdim=True)</pre>
+            <br>公式: $V_{final} = \frac{V_{agg}}{\|V_{agg}\|_2}$
+        </div>
+        <div class="matrix-container" id="container-step-5">
+            <!-- Content generated by JS -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // State
+    let currentStep = 1;
+    const totalSteps = 5;
+    let N = 4;
+    let D = 4;
+    let data = {};
+
+    // DOM Elements
+    const steps = [
+        document.getElementById('step-1'),
+        document.getElementById('step-2'),
+        document.getElementById('step-3'),
+        document.getElementById('step-4'),
+        document.getElementById('step-5')
+    ];
+    const containers = [
+        document.getElementById('container-step-1'),
+        document.getElementById('container-step-2'),
+        document.getElementById('container-step-3'),
+        document.getElementById('container-step-4'),
+        document.getElementById('container-step-5')
+    ];
+
+    // Utils
+    function randomMatrix(rows, cols) {
+        return Array.from({length: rows}, () => 
+            Array.from({length: cols}, () => Math.random() * 2 - 1)
+        );
+    }
+
+    // LayerNorm: (x - mean) / std
+    function layerNorm(row) {
+        let mean = row.reduce((a, b) => a + b, 0) / row.length;
+        let variance = row.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / row.length;
+        let std = Math.sqrt(variance + 1e-6);
+        return row.map(v => (v - mean) / std);
+    }
+
+    // QuickGELU: x * sigmoid(1.702 * x)
+    function quickGELU(x) {
+        return x * (1 / (1 + Math.exp(-1.702 * x)));
+    }
+
+    // ReLU: max(0, x)
+    function relu(x) {
+        return Math.max(0, x);
+    }
+
+    // L2 Normalize a vector
+    function l2Normalize(row) {
+        let sumSq = row.reduce((a, b) => a + b*b, 0);
+        let norm = Math.sqrt(sumSq + 1e-8);
+        return row.map(v => v / norm);
+    }
+
+    function createTable(matrix, headers = null, rowLabels = null, highlightRow = -1) {
+        let html = '<table>';
+        if (headers) {
+            html += '<thead><tr><th></th>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead>';
+        }
+        html += '<tbody>';
+        matrix.forEach((row, i) => {
+            const label = rowLabels ? rowLabels[i] : '';
+            const bgClass = (i === highlightRow) ? 'highlight' : '';
+            html += `<tr class="${bgClass}"><th>${label}</th>`;
+            row.forEach(val => {
+                const color = val >= 0 ? `rgba(52, 152, 219, ${Math.min(Math.abs(val), 1)})` : `rgba(231, 76, 60, ${Math.min(Math.abs(val), 1)})`;
+                html += `<td style="background-color:${color}20">${val.toFixed(2)}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+    }
+
+    function renderTensorBox(title, contentHtml) {
+        return `
+            <div class="tensor-box">
+                <div class="tensor-label">${title}</div>
+                ${contentHtml}
+            </div>
+        `;
+    }
+
+    // Logic
+    function initData() {
+        // 1. Input
+        data.input = randomMatrix(N, D);
+
+        // 2. Transformer Logic Simulation
+        
+        // 2.1 Positional Encoding (Simulated by adding small increasing values)
+        data.pos_encoded = data.input.map((row, i) => 
+            row.map((val, j) => val + (i * 0.1))
+        );
+
+        // Simulate 4 Layers of Transformer
+        let current_features = JSON.parse(JSON.stringify(data.pos_encoded));
+        
+        // We will store Layer 1 details for visualization
+        data.layer1 = {};
+
+        // Initialization Scaling Factor
+        // In module_cross.py: proj_std = (width^-0.5) * ((2 * layers)^-0.5)
+        // This scales down the output of Attention and MLP to prevent variance explosion in deep Pre-LN transformers.
+        // For 4 layers, scale is approx 1 / sqrt(8) = 0.35
+        const init_scale = 1 / Math.sqrt(2 * 4);
+
+        for (let layer = 0; layer < 4; layer++) {
+            // Pre-LN: Apply LayerNorm before Attention
+            let ln1_features = current_features.map(row => layerNorm(row));
+
+            // A. Self-Attention
+            // Q, K, V projection simulation (using LN features)
+            let attn_scores = Array.from({length: N}, (_, i) => 
+                Array.from({length: N}, (_, j) => {
+                    let dot = ln1_features[i].reduce((sum, v, k) => sum + v * ln1_features[j][k], 0);
+                    return dot / Math.sqrt(D);
+                })
+            );
+
+            // Softmax
+            let attn_map = attn_scores.map(row => {
+                let max = Math.max(...row);
+                let exps = row.map(v => Math.exp(v - max));
+                let sum = exps.reduce((a, b) => a + b, 0);
+                return exps.map(v => v / sum);
+            });
+
+            // Attention Output
+            let attn_output = Array.from({length: N}, (_, i) => {
+                let newRow = Array(D).fill(0);
+                for(let j=0; j<N; j++) {
+                    let weight = attn_map[i][j];
+                    for(let k=0; k<D; k++) {
+                        newRow[k] += weight * ln1_features[j][k];
+                    }
+                }
+                return newRow;
+            });
+
+            // Apply Init Scaling to Attention Output
+            attn_output = attn_output.map(row => row.map(v => v * init_scale));
+
+            // B. Residual 1 (Add input to attn output)
+            let res1 = attn_output.map((row, i) => 
+                row.map((val, j) => val + current_features[i][j])
+            );
+
+            // Pre-LN: Apply LayerNorm before MLP
+            let ln2_features = res1.map(row => layerNorm(row));
+
+            // C. MLP (Simulate: Linear -> QuickGELU -> Linear)
+            // 1. Linear Expansion (D -> 4D)
+            // We simulate expansion by repeating the vector 4 times with some variations
+            let mlp_expanded = ln2_features.map(row => {
+                let expanded = [];
+                // Block 1: Original
+                row.forEach(v => expanded.push(v));
+                // Block 2: Negative
+                row.forEach(v => expanded.push(-v));
+                // Block 3: Scaled
+                row.forEach(v => expanded.push(v * 0.5));
+                // Block 4: Scaled Negative
+                row.forEach(v => expanded.push(v * -0.5));
+                return expanded;
+            });
+
+            // 2. QuickGELU
+            let gelu_out = mlp_expanded.map(row => row.map(v => quickGELU(v)));
+
+            // 3. Linear Projection (4D -> D)
+            // Simulate projection by averaging the 4 blocks
+            let mlp_projected = gelu_out.map(row => {
+                let projected = [];
+                for (let k = 0; k < D; k++) {
+                    // Sum corresponding elements from the 4 blocks
+                    let sum = row[k] + row[k+D] + row[k+2*D] + row[k+3*D];
+                    projected.push(sum);
+                }
+                return projected;
+            });
+
+            // Apply Init Scaling to MLP Output
+            let mlp_output = mlp_projected.map(row => row.map(v => v * init_scale));
+
+            // D. Residual 2 (Add res1 to mlp output)
+            let res2 = mlp_output.map((row, i) => 
+                row.map((val, j) => val + res1[i][j])
+            );
+
+            // Update current features for next layer
+            current_features = res2;
+
+            // Store Layer 1 data
+            if (layer === 0) {
+                data.layer1.attn_map = attn_map;
+                data.layer1.attn_output = attn_output; // Scaled
+                data.layer1.res1 = res1;
+                data.layer1.ln2 = ln2_features;
+                data.layer1.mlp_expanded = mlp_expanded;
+                data.layer1.mlp_gelu = gelu_out;
+                data.layer1.mlp_projected = mlp_projected;
+                data.layer1.mlp_output = mlp_output; // Scaled
+                data.layer1.output = res2;
+            }
+        }
+
+        // Final output after 4 layers + Original Input Residual (from modeling.py line 565: visual_output = visual_output + visual_output_original)
+        // Note: The code says `visual_output = visual_output + visual_output_original` AFTER the transformer block.
+        // So we add the original input (before pos encoding) to the transformer output.
+        data.transformed = current_features.map((row, i) => 
+            row.map((val, j) => val + data.input[i][j])
+        );
+
+        // 3. Frame Weight Prediction Logic (Detailed)
+        // Formula: W = Linear2(ReLU(Linear1(V)))
+        
+        // 3.1 Linear 1 (D -> D) Simulation
+        // We simulate weights for Linear1. Let's say W1 is identity * 0.5 + bias 0.1 for simplicity in viz
+        data.step3_linear1 = data.transformed.map(row => row.map(v => v * 0.5 + 0.1));
+
+        // 3.2 ReLU
+        data.step3_relu = data.step3_linear1.map(row => row.map(v => Math.max(0, v)));
+
+        // 3.3 Linear 2 (D -> 1) Simulation
+        // Simulate projection to scalar. Sum of row * 0.2
+        data.step3_raw_weights = data.step3_relu.map(row => {
+            let sum = row.reduce((a, b) => a + b, 0);
+            return [sum * 0.2]; // Shape [1]
+        });
+
+        // 4. Aggregation Logic
+        // 4.1 Normalize Features (L2)
+        data.step4_norm_features = data.transformed.map(row => {
+            let norm = Math.sqrt(row.reduce((s, v) => s + v*v, 0));
+            return row.map(v => v / (norm + 1e-6));
+        });
+
+        // 4.2 Softmax Weights (Temp=0.1)
+        let raw_flat = data.step3_raw_weights.map(r => r[0]);
+        let temp = 0.1;
+        let scaled = raw_flat.map(w => w / temp);
+        let max_s = Math.max(...scaled);
+        let exps = scaled.map(s => Math.exp(s - max_s));
+        let sum_exps = exps.reduce((a, b) => a + b, 0);
+        data.step4_softmax = exps.map(e => e / sum_exps);
+        
+        // Store intermediate for display
+        data.step4_scaled_logits = scaled;
+
+        // 4.3 Weighted Sum
+        data.step4_agg = Array(D).fill(0);
+        for(let i=0; i<N; i++) {
+            let w = data.step4_softmax[i];
+            for(let j=0; j<D; j++) {
+                data.step4_agg[j] += w * data.step4_norm_features[i][j];
+            }
+        }
+        data.step4_agg = [data.step4_agg]; // Shape [1, D]
+
+        // 5. Final Norm
+        let finalNorm = Math.sqrt(data.step4_agg[0].reduce((s, v) => s + v*v, 0));
+        data.step5_final = [data.step4_agg[0].map(v => v / (finalNorm + 1e-6))];
+    }
+
+    function renderStep1() {
+        const rowLabels = Array.from({length: N}, (_, i) => `F${i+1}`);
+        const headers = Array.from({length: D}, (_, i) => `D${i+1}`);
+        containers[0].innerHTML = renderTensorBox("Input [B, N, D]", createTable(data.input, headers, rowLabels));
+    }
+
+    function renderStep2() {
+        const rowLabels = Array.from({length: N}, (_, i) => `F${i+1}`);
+        const headers = Array.from({length: D}, (_, i) => `D${i+1}`);
+        
+        // 2.1 Permute
+        let html2a = renderTensorBox("Input [B, N, D]", createTable(data.input, null, rowLabels));
+        html2a += '<div class="arrow">&rarr;</div>';
+        html2a += renderTensorBox("PosEmb [N, B, D]", createTable(data.pos_encoded, null, rowLabels));
+        document.getElementById('container-step-2a').innerHTML = html2a;
+
+        // 2.2 Attention (Layer 1)
+        let attnHtml = `<div class="attn-map" style="grid-template-columns: repeat(${N}, 1fr);">`;
+        data.layer1.attn_map.forEach((row, i) => {
+            row.forEach(val => {
+                let color = Math.floor(255 * (1 - val));
+                attnHtml += `<div class="attn-cell" style="background-color: rgb(${color}, ${color}, 255); color: ${val>0.5?'white':'black'}">${val.toFixed(2)}</div>`;
+            });
+        });
+        attnHtml += '</div>';
+        
+        let html2b = renderTensorBox("Q &times; K<sup>T</sup>", createTable(data.pos_encoded, null, rowLabels));
+        html2b += '<div class="arrow">&rarr; Softmax &rarr;</div>';
+        html2b += renderTensorBox(`L1 Attn Map [${N}x${N}]`, attnHtml);
+        html2b += '<div class="arrow">&times; V &rarr;</div>';
+        html2b += renderTensorBox("L1 Attn Out [N, B, D]", createTable(data.layer1.attn_output, null, rowLabels));
+        document.getElementById('container-step-2b').innerHTML = html2b;
+
+        // 2.3 Residual & MLP (Layer 1)
+        // Structure: Res1 -> LN2 -> MLP(FC->GELU->Proj) -> Res2
+        
+        // Part 1: Residual 1 & LN2
+        let html2c = '<div class="matrix-container">';
+        html2c += renderTensorBox("L1 Attn Out", createTable(data.layer1.attn_output, null, rowLabels));
+        html2c += '<div class="arrow">+</div>';
+        html2c += renderTensorBox("L1 Input", createTable(data.pos_encoded, null, rowLabels));
+        html2c += '<div class="arrow">=</div>';
+        html2c += renderTensorBox("Res1 Out", createTable(data.layer1.res1, null, rowLabels));
+        html2c += '<div class="arrow">&rarr; LN &rarr;</div>';
+        html2c += renderTensorBox("LN2 Out", createTable(data.layer1.ln2, null, rowLabels));
+        html2c += '</div>';
+        
+        // Part 2: MLP
+        html2c += '<div class="sub-step-title" style="width:100%; margin-top:10px;">FFN (MLP) Detail (D &rarr; 4D &rarr; D)</div>';
+        html2c += '<div class="matrix-container">';
+        html2c += renderTensorBox("LN2 Out", createTable(data.layer1.ln2, null, rowLabels));
+        html2c += '<div class="arrow">&rarr; FC (4D) &rarr;</div>';
+        // Only show first few cols of 4D if too large? No, let's try showing all but maybe small font
+        html2c += renderTensorBox("Expanded [B, N, 4D]", createTable(data.layer1.mlp_expanded, null, rowLabels));
+        html2c += '<div class="arrow">&rarr; GELU &rarr;</div>';
+        html2c += renderTensorBox("GELU Out", createTable(data.layer1.mlp_gelu, null, rowLabels));
+        html2c += '<div class="arrow">&rarr; Proj (D) &rarr;</div>';
+        html2c += renderTensorBox("FFN Out (Scaled)", createTable(data.layer1.mlp_output, null, rowLabels));
+        html2c += '</div>';
+
+        // Part 3: Residual 2
+        html2c += '<div class="sub-step-title" style="width:100%; margin-top:10px;">Residual 2 (Add)</div>';
+        html2c += '<div class="matrix-container">';
+        html2c += renderTensorBox("FFN Out", createTable(data.layer1.mlp_output, null, rowLabels));
+        html2c += '<div class="arrow">+</div>';
+        html2c += renderTensorBox("Res1 Out", createTable(data.layer1.res1, null, rowLabels));
+        html2c += '<div class="arrow">=</div>';
+        html2c += renderTensorBox("L1 Final Output", createTable(data.layer1.output, headers, rowLabels));
+        html2c += '</div>';
+
+        document.getElementById('container-step-2c').innerHTML = html2c;
+
+        // 2.4 Final Output (After 4 Layers + Original Residual)
+        let html2d = renderTensorBox("L1 Output", createTable(data.layer1.output, null, rowLabels));
+        html2d += '<div class="arrow" style="font-size:14px;">&rarr; L2 &rarr; L3 &rarr; L4 &rarr;</div>';
+        html2d += renderTensorBox("Transformer Out", createTable(data.transformed, null, rowLabels)); // Note: data.transformed includes the final + original residual
+        html2d += '<div class="arrow" style="font-size:12px;">(+ Original Input)</div>';
+        
+        document.getElementById('container-step-2d').innerHTML = html2d;
+    }
+
+    function renderStep3() {
+        const rowLabels = Array.from({length: N}, (_, i) => `F${i+1}`);
+        const headers = Array.from({length: D}, (_, i) => `D${i+1}`);
+
+        // 3.1 Linear 1 & ReLU
+        let html3a = renderTensorBox("Transformer Out", createTable(data.transformed, null, rowLabels));
+        html3a += '<div class="arrow">&rarr; Linear1 &rarr;</div>';
+        html3a += renderTensorBox("Linear1 Out", createTable(data.step3_linear1, null, rowLabels));
+        html3a += '<div class="arrow">&rarr; ReLU &rarr;</div>';
+        html3a += renderTensorBox("ReLU Out", createTable(data.step3_relu, null, rowLabels));
+        document.getElementById('container-step-3a').innerHTML = html3a;
+
+        // 3.2 Linear 2
+        let html3b = renderTensorBox("ReLU Out", createTable(data.step3_relu, null, rowLabels));
+        html3b += '<div class="arrow">&rarr; Linear2 &rarr;</div>';
+        html3b += renderTensorBox("Raw Weights [B, N, 1]", createTable(data.step3_raw_weights, ["Val"], rowLabels));
+        document.getElementById('container-step-3b').innerHTML = html3b;
+    }
+
+    function renderStep4() {
+        const rowLabels = Array.from({length: N}, (_, i) => `F${i+1}`);
+        const headers = Array.from({length: D}, (_, i) => `D${i+1}`);
+
+        // 4.1 Norm Features
+        let html4a = renderTensorBox("Transformer Out", createTable(data.transformed, null, rowLabels));
+        html4a += '<div class="arrow">&rarr; L2 Norm &rarr;</div>';
+        html4a += renderTensorBox("Normalized Features", createTable(data.step4_norm_features, headers, rowLabels));
+        document.getElementById('container-step-4a').innerHTML = html4a;
+
+        // 4.2 Softmax
+        // Show table with: Raw Weight | Scaled (w/0.1) | Softmax
+        let weightTableData = data.step3_raw_weights.map((r, i) => {
+            return [r[0], data.step4_scaled_logits[i], data.step4_softmax[i]];
+        });
+        let weightHeaders = ["Raw", "w/0.1", "Softmax"];
+        
+        // Bar Chart Generation
+        // Fix: Use pixel height instead of percentage to avoid collapse in flex container
+        let barChartHtml = '<div style="display:flex; gap:10px; align-items:flex-end; height:150px; width:100%; min-width:250px; padding:15px 10px; background:#fff; border-radius:4px; box-sizing:border-box;">';
+        data.step4_softmax.forEach((w, i) => {
+            // w is 0.0 - 1.0. Map 1.0 to 100px height.
+            let h = Math.max(w * 100, 4); 
+            let color = '#e74c3c'; // Accent color
+            barChartHtml += `
+                <div style="display:flex; flex-direction:column; align-items:center; flex:1; min-width:30px;">
+                    <div style="font-size:0.8em; margin-bottom:6px; font-weight:bold; color:#333;">${(w*100).toFixed(1)}%</div>
+                    <div style="height:${h}px; width:100%; background:linear-gradient(to top, ${color}, #ff7675); border-radius:4px 4px 0 0; transition: height 0.5s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                    <div style="font-size:0.85em; margin-top:8px; color:#555; font-weight:600;">F${i+1}</div>
+                </div>
+            `;
+        });
+        barChartHtml += '</div>';
+
+        let html4b = renderTensorBox("Weight Calculation", createTable(weightTableData, weightHeaders, rowLabels));
+        html4b += '<div class="arrow">&rarr;</div>';
+        html4b += renderTensorBox("Softmax Distribution", barChartHtml);
+
+        document.getElementById('container-step-4b').innerHTML = html4b;
+
+        // 4.3 Aggregation
+        let html4c = renderTensorBox("Norm Features", createTable(data.step4_norm_features, null, rowLabels));
+        html4c += '<div class="arrow">&times; Softmax Weights &rarr; &#8721; &rarr;</div>';
+        html4c += renderTensorBox("Aggregated Vector", createTable(data.step4_agg, headers, ["Vid"]));
+        document.getElementById('container-step-4c').innerHTML = html4c;
+    }
+
+    function renderStep5() {
+        const headers = Array.from({length: D}, (_, i) => `D${i+1}`);
+        let html = renderTensorBox("Aggregated", createTable(data.step4_agg, headers, ["Vid"]));
+        html += '<div class="arrow">&rarr; L2 Norm &rarr;</div>';
+        html += renderTensorBox("Final Semantic Vector", createTable(data.step5_final, headers, ["Vid"]));
+        document.getElementById('container-step-5').innerHTML = html;
+    }
+
+    function updateUI() {
+        // Render content based on current step
+        renderStep1();
+        renderStep2();
+        renderStep3();
+        renderStep4();
+        renderStep5();
+        
+        // Re-render MathJax
+        if (window.MathJax) {
+            MathJax.typesetPromise();
+        }
+    }
+
+    function reset() {
+        N = parseInt(document.getElementById('frame-count').value);
+        D = parseInt(document.getElementById('dim-count').value);
+        initData();
+        updateUI();
+    }
+
+    // Event Listeners
+    document.getElementById('btn-reset').addEventListener('click', reset);
+    
+    document.getElementById('frame-count').addEventListener('input', (e) => {
+        document.getElementById('frame-count-display').innerText = e.target.value;
+        reset();
+    });
+    
+    document.getElementById('dim-count').addEventListener('input', (e) => {
+        document.getElementById('dim-count-display').innerText = e.target.value;
+        reset();
+    });
+
+    // Init
+    reset();
+
+</script>
+
+</body>
+</html>
