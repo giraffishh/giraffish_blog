@@ -8,13 +8,14 @@ tags:
   - 视频文本检索
   - 深度学习
   - 模型蒸馏
-  - 模型量化
 comments: true
 abbrlink: 9d7503d7
 date: 2025-09-22 00:55:53
-updated: 2025-11-21 23:21:07
+updated: 2025-12-02 09:58:44
 
 ---
+
+# 基础
 
 ## CNN 卷积神经网络
 
@@ -263,6 +264,36 @@ Transformer 的核心是自注意力机制（Self-Attention），它在处理单
 1. **线性层（Linear）**：一个简单的全连接神经网络，它将解码器输出的向量投影到一个非常大的向量上，这个向量的维度等于词汇表的大小。这个大向量被称为 logits 向量
 2. **Softmax 层**：Softmax 函数会将 logits 向量转换成一个概率分布。向量中的每个值都对应词汇表中的一个单词，表示该单词是下一个输出词的概率。通常，我们会选择概率最高的那个单词作为最终的输出
 
+# 视觉编码器
+
+## ViT
+
+An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale
+
+* 论文链接：https://arxiv.org/pdf/2010.11929
+* 代码仓库：https://github.com/google-research/vision_transformer
+
+![](https://origin.picgo.net/2025/12/02/25-12-02-176460728170288950f3f27a64dab.webp)
+
+## ConvNeXt
+
+A ConvNet for the 2020s
+
+* 论文地址：https://arxiv.org/pdf/2201.03545
+* 代码仓库： https://github.com/facebookresearch/ConvNeXt
+
+<img src="https://origin.picgo.net/2025/10/25/25-10-25-1761395395885455150014897d8e5.png" style="zoom: 67%;" />
+
+##  ConvNext v2
+
+Co-designing and Scaling ConvNets with Masked Autoencoders
+
+* 论文地址：https://arxiv.org/pdf/2301.00808
+* 代码仓库： https://github.com/facebookresearch/ConvNeXt-V2
+
+# 跨模态对齐
+
+
 ## CLIP
 
 Learning Transferable Visual Models From Natural Language Supervision
@@ -403,10 +434,21 @@ CLIP4Clip 的处理方式是：
 > 实际效果最差，紧密类型引入了最多的新参数来进行跨模态交互，在没有足够数据的情况下，这个模块很难被有效学习
 
 - **工作方式**：
-  1. 将**文本特征向量**和**视频帧的特征序列**直接**拼接 (concatenate)** 在一起，形成一个统一的长序列
+  1. 将**文本特征向量**和**视频帧的特征序列**直接拼接 (concatenate) 在一起，形成一个统一的长序列
   2. 将这个混合序列送入一个全新的 **Transformer Encoder** 中，让文本和视频的特征在内部充分交互、相互影响 
   3. 最后通过一个线性层直接预测出相似度分数
 - **可以理解为**：让文本和视频的每一帧进行“对话和协商”，共同决定它们的匹配程度
+
+## XCLIP
+
+X-CLIP: End-to-End Multi-grained Contrastive Learning for Video-Text Retrieval
+
+* 论文地址：hhttps://arxiv.org/pdf/2207.07285
+* 代码仓库：https://github.com/xuguohai/X-CLIP
+
+![](https://origin.picgo.net/2025/12/02/25-12-02-1764640531899bf91eaa772492255.webp)
+
+# 蒸馏 Distillation
 
 ## TeachCLIP
 
@@ -419,7 +461,7 @@ Holistic Features are almost Sufficient for Text-to-Video Retrieval
 
 ### 模型架构
 
-Backbone: **CLIP(ViT-B/32)**
+Backbone: **CLIP(ViT-B/32)** 或 **CLIP(ViT-B/16)**
 
 The key data flow of the visual side of the student network is expressed as follows:
 $$
@@ -478,20 +520,3 @@ $$
   frameborder="0"
   sandbox="allow-scripts allow-same-origin"
 ></iframe>
-
-
-## ConvNeXt
-
-A ConvNet for the 2020s
-
-* 论文地址：https://arxiv.org/pdf/2201.03545
-* 代码仓库： https://github.com/facebookresearch/ConvNeXt
-
-<img src="https://origin.picgo.net/2025/10/25/25-10-25-1761395395885455150014897d8e5.png" style="zoom: 67%;" />
-
-##  ConvNext v2
-
-Co-designing and Scaling ConvNets with Masked Autoencoders
-
-* 论文地址：https://arxiv.org/pdf/2301.00808
-* 代码仓库： https://github.com/facebookresearch/ConvNeXt-V2
