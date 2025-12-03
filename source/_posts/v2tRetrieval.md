@@ -11,11 +11,9 @@ tags:
 comments: true
 abbrlink: 9d7503d7
 date: 2025-09-22 00:55:53
-updated: 2025-12-02 09:58:44
+updated: 2025-12-03 23:40:20
 
 ---
-
-# 基础
 
 ## CNN 卷积神经网络
 
@@ -264,8 +262,6 @@ Transformer 的核心是自注意力机制（Self-Attention），它在处理单
 1. **线性层（Linear）**：一个简单的全连接神经网络，它将解码器输出的向量投影到一个非常大的向量上，这个向量的维度等于词汇表的大小。这个大向量被称为 logits 向量
 2. **Softmax 层**：Softmax 函数会将 logits 向量转换成一个概率分布。向量中的每个值都对应词汇表中的一个单词，表示该单词是下一个输出词的概率。通常，我们会选择概率最高的那个单词作为最终的输出
 
-# 视觉编码器
-
 ## ViT
 
 An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale
@@ -290,8 +286,6 @@ Co-designing and Scaling ConvNets with Masked Autoencoders
 
 * 论文地址：https://arxiv.org/pdf/2301.00808
 * 代码仓库： https://github.com/facebookresearch/ConvNeXt-V2
-
-# 跨模态对齐
 
 
 ## CLIP
@@ -447,8 +441,6 @@ X-CLIP: End-to-End Multi-grained Contrastive Learning for Video-Text Retrieval
 * 代码仓库：https://github.com/xuguohai/X-CLIP
 
 ![](https://origin.picgo.net/2025/12/02/25-12-02-1764640531899bf91eaa772492255.webp)
-
-# 蒸馏 Distillation
 
 ## TeachCLIP
 
