@@ -11,18 +11,22 @@ moment.tz.setDefault('Asia/Shanghai');
 // 特定的提交消息前缀，用于标记自动更新的提交
 const AUTO_UPDATE_PREFIX = '[AUTO-UPDATE-TIME]';
 const AUTO_UPDATE_CDN_PREFIX = '[AUTO-UPDATE-CDN]';
-const SKIP_UPDATE_PREFIX = '[SKIP]'; // 新增的、用于跳过更新的前缀
+const SKIP_UPDATE_PREFIX = '[SKIP]';
+
+// 判定为脚本自动修改的时间阈值（秒）
+// 如果文件修改时间与最后一次commit时间差小于此值，则认为是脚本自动操作导致的“假”修改
+const AUTO_MODIFICATION_THRESHOLD_SECONDS = 30;
 
 // 默认配置
 const DEFAULT_CONFIG = {
-  postsDir: './source/_posts',  // 默认文章目录
-  sourceDir: '.',        // 默认源码目录
+  postsDir: './source/_posts',
+  sourceDir: '.',
   dryRun: false,
   dateOnly: false,
   updatedOnly: false,
   noCommit: false,
   noPush: false,
-  message: '' // 新增: 用于存储提交信息
+  message: ''
 };
 
 function printUsage() {
@@ -39,16 +43,6 @@ Options:
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates
   --help               Show this help message
-
-Examples:
-  # 自动生成提交信息并提交
-  node upload.js
-
-  # 使用自定义提交信息
-  node upload.js -m "refactor: 重构文章结构"
-
-  # 仅预览日期更新，不实际修改文件或提交
-  node upload.js --dry
 `);
 }
 
@@ -191,6 +185,31 @@ function generateCommitMessage(changes) {
   return `chore: Batch update ${changes.length} file(s)`;
 }
 
+// 核心修复函数：判断是否应该忽略此次修改状态
+function shouldIgnoreModification(filePath, sourceDir) {
+  try {
+    // 1. 获取文件当前的修改时间 (mtime)
+    const stats = fs.statSync(filePath);
+    const fileMtime = moment(stats.mtime);
+
+    // 2. 获取 Git Log 中最后一次提交时间 (不过滤 Auto Update 前缀)
+    // 这里的逻辑是：如果文件最近一次是因为脚本自动更新而被修改并提交的，
+    // 那么文件的 mtime 应该和那次 commit 的时间非常接近。
+    const rawLastCommitTime = getRawGitCommitDate(filePath, sourceDir);
+
+    if (!rawLastCommitTime) return false;
+
+    // 3. 计算时间差 (秒)
+    const diffSeconds = Math.abs(fileMtime.diff(rawLastCommitTime, 'seconds'));
+
+    // 如果差异在阈值内，说明文件实际上并没有被用户修改，而是脚本上次提交产生的状态
+    return diffSeconds <= AUTO_MODIFICATION_THRESHOLD_SECONDS;
+  } catch (error) {
+    // 如果出错（例如文件不存在），则不忽略，按正常流程处理
+    return false;
+  }
+}
+
 function main() {
   const config = parseArgs();
   
@@ -227,7 +246,22 @@ function main() {
   
   allMarkdownFiles.forEach(file => {
     try {
-      const isStagedOrModified = userChangedFilesSet.has(file);
+      let isStagedOrModified = userChangedFilesSet.has(file);
+
+      // --- 核心修复逻辑开始 ---
+      // 如果 Git 认为文件已修改，我们进一步检查这是否是脚本造成的“假”修改
+      if (isStagedOrModified) {
+        if (shouldIgnoreModification(file, sourceDir)) {
+           // 如果判定为自动更新导致的差异，强制将其视为未修改
+           // 这样脚本就会去读取历史 Git 记录作为时间，而不是当前时间
+           isStagedOrModified = false;
+           if (config.dryRun) {
+             console.log(`   ⚠️  Detected script-induced modification for ${path.basename(file)}, ignoring current changes.`);
+           }
+        }
+      }
+      // --- 核心修复逻辑结束 ---
+
       const result = forceUpdateGitDates(file, sourceDir, { 
         dryRun: config.dryRun, 
         dateOnly: config.dateOnly, 
@@ -275,6 +309,11 @@ function main() {
           let commitMessage = config.message;
           if (!commitMessage) {
             commitMessage = generateCommitMessage(initialChanges);
+          }
+          
+          // 给自动生成的 commit 加上特殊前缀，以便下次识别
+          if (!commitMessage.startsWith(AUTO_UPDATE_PREFIX)) {
+             commitMessage = `${AUTO_UPDATE_PREFIX} ${commitMessage}`;
           }
 
           execSync('git add .', { cwd: sourceDir });
@@ -422,9 +461,10 @@ function getGitCreateDate(filePath, sourceDir) {
   }
 }
 
+// 获取最近的“真实”更新时间（会过滤掉 AUTO-UPDATE 等自动提交）
 function getGitUpdateDate(filePath, sourceDir) {
   try {
-    const cmd = `git log -1 --format="%ct|%s" -- "${filePath}"`;
+    const cmd = `git log --format="%ct|%s" -- "${filePath}"`; // 移除 -1，因为我们要找第一个非自动的
     const output = execSync(cmd, { encoding: 'utf8', cwd: sourceDir }).trim();
     if (!output) return null;
 
@@ -432,12 +472,32 @@ function getGitUpdateDate(filePath, sourceDir) {
       .map(line => {
         const [timestamp, message] = line.split('|');
         return { timestamp: parseInt(timestamp, 10), message: message || '' };
-      })
-      .filter(c => !shouldExcludeCommit(c.message) && !isNaN(c.timestamp));
+      });
+      
+    // 找到第一个 不是 自动更新的提交
+    const realCommit = commits.find(c => !shouldExcludeCommit(c.message) && !isNaN(c.timestamp));
 
-    if (commits.length === 0) return null;
+    if (!realCommit) return null;
     
-    return moment.unix(commits[0].timestamp).tz('Asia/Shanghai');
+    return moment.unix(realCommit.timestamp).tz('Asia/Shanghai');
+  } catch (error) {
+    return null;
+  }
+}
+
+// 新增：获取 git 记录中绝对最后一次提交时间（包括自动更新的）
+// 用于对比 mtime
+function getRawGitCommitDate(filePath, sourceDir) {
+  try {
+    // 只取最后一条，不管 message 是什么
+    const cmd = `git log -1 --format="%ct" -- "${filePath}"`;
+    const output = execSync(cmd, { encoding: 'utf8', cwd: sourceDir }).trim();
+    if (!output) return null;
+    
+    const timestamp = parseInt(output, 10);
+    if (isNaN(timestamp)) return null;
+
+    return moment.unix(timestamp).tz('Asia/Shanghai');
   } catch (error) {
     return null;
   }
@@ -446,4 +506,3 @@ function getGitUpdateDate(filePath, sourceDir) {
 if (require.main === module) {
   main();
 }
-
