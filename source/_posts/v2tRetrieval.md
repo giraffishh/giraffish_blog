@@ -11,7 +11,7 @@ tags:
 comments: true
 abbrlink: 9d7503d7
 date: 2025-09-22 00:55:53
-updated: 2025-12-03 23:40:23
+updated: 2025-12-14 16:21:37
 
 ---
 
@@ -442,6 +442,8 @@ X-CLIP: End-to-End Multi-grained Contrastive Learning for Video-Text Retrieval
 
 ![](https://origin.picgo.net/2025/12/02/25-12-02-1764640531899bf91eaa772492255.webp)
 
+### 模型架构
+
 ## TeachCLIP
 
 Holistic Features are almost Sufficient for Text-to-Video Retrieval
@@ -495,13 +497,15 @@ $$
 在**帧级别**进行监督，论文为学生网络增加了一个“注意力帧特征聚合 (AFA)”模块，该模块会为视频的每一帧生成一个注意力权重 $w$ ，教师网络会提供每个单独的帧 $f_k$ 与文本 $t$ 之间的相关性分数 $y_f$ （可以理解为教师给出的帧权重）。$l_{FgT}$ 通过计算学生AFA模块生成的帧权重 $w$ 与教师提供的帧-文本相似度 $y_f$ (作为软标签) 之间的**交叉熵损失 (Cross-Entropy, CE) **来实现。直观上，如果教师认为某一帧很重要，学生网络也应该为该帧分配更高的权重
 
 $$
-l_{FgT} := -\frac{1}{b}\sum_{i=1}^{b}\sum_{k=1}^{m} y_f(f_{i,k}, t_i) \log w_{i,k}.
+l_{FgT} := -\frac{1}{mb}\sum_{i=1}^{b}\sum_{k=1}^{m} y_f(f_{i,k}, t_i) \log w_{i,k}.
 $$
 
 - **$y_f(f_{i,k}, t_i)$**：就是老师给的权重
 - **$w_{i,k}$**：就是学生给的权重
 - **$\log w_{i,k}$**：学生越不自信（$w$ 越小，$\log w$ 越负），惩罚越大
 - **$y_f \log w$**：交叉熵的核心。如果 $y_f$ 很大（老师说很重要）而 $w$ 很小（学生说不重要），$\log w$ 是一个很大的负数，再乘上 $y_f$ 和公式前面的负号，就变成一个巨大的正损失
+
+> 关于交叉熵与KL散度的区别见文末
 
 #### 帧间注意力聚合
 
@@ -512,3 +516,64 @@ $$
   frameborder="0"
   sandbox="allow-scripts allow-same-origin"
 ></iframe>
+## 杂鱼 ❤~
+
+### 交叉熵与KL散度
+
+**交叉熵公式：**
+$$
+Loss_{CE} = - \sum_{i=1}^{N} P(x_i) \log Q(x_i)
+$$
+
+**KL 散度公式：**
+$$
+Loss_{KL} = \sum_{i=1}^{N} P(x_i) \log \frac{P(x_i)}{Q(x_i)}
+$$
+
+展开对数除法：
+
+$$
+Loss_{KL} = \sum_{i=1}^{N} P(x_i) (\log P(x_i) - \log Q(x_i))
+$$
+
+拆分成两项：
+
+$$
+Loss_{KL} = \underbrace{\sum_{i=1}^{N} P(x_i) \log P(x_i)}_{\text{- Entropy(Teacher)}} - \underbrace{\sum_{i=1}^{N} P(x_i) \log Q(x_i)}_{\text{Cross Entropy}}
+$$
+
+在**教师网络冻结**的前提下，对于**优化器**来说，KL 散度和交叉熵**没有实质性区别**
+
+优化器（SGD/Adam）只看**梯度**（导数），不看 Loss 的绝对值
+
+$$
+KL(P || Q) = \text{CrossEntropy}(P, Q) - \text{Entropy}(P)
+$$
+
+求导（针对学生参数 $\theta$）：
+
+$$
+\nabla_\theta KL = \nabla_\theta \text{CE} - \nabla_\theta \text{Entropy}(P)
+$$
+
+关键点：因为教师网络是冻结的，教师的分布 $P$ 是固定的，所以 $\text{Entropy}(P)$ 是一个常数。常数的导数为 0。
+
+$$
+\nabla_\theta KL = \nabla_\theta \text{CE} - 0
+$$
+
+$$
+\mathbf{\nabla_\theta KL = \nabla_\theta CE}
+$$
+
+**结论**：不管你选哪个，传回给学生网络的更新信号（梯度向量）是**完全重合**的。
+
+在 PyTorch 或 TensorFlow 中，交叉熵损失（Cross Entropy Loss, CE）针对 Logits（$z$）的梯度公式非常简洁：
+
+$$
+\frac{\partial Loss}{\partial z_i} = q_i - p_i
+$$
+
+- $z_i$：学生模型输出的 Logit（Softmax 之前的值）
+- $q_i$：学生模型输出的概率（$Softmax(z_i)$）
+- $p_i$：教师模型给出的目标概率
