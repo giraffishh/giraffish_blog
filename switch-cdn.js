@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 
 // CDN选项配置
 const CDN_OPTIONS = {
-  giraffish: 'https://cdn.giraffish.me/blog/',
+  giraffish: 'https://cdn.giraffish.top/blog/',
   jsdmirror: 'https://cdn.jsdmirror.com/gh/giraffishh/image-hosting@main/blog/',
   jsdelivr: 'https://fastly.jsdelivr.net/gh/giraffishh/image-hosting@main/blog/'
 };

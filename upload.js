@@ -15,7 +15,7 @@ const SKIP_UPDATE_PREFIX = '[SKIP]';
 
 // 判定为脚本自动修改的时间阈值（秒）
 // 如果文件修改时间与最后一次commit时间差小于此值，则认为是脚本自动操作导致的“假”修改
-const AUTO_MODIFICATION_THRESHOLD_SECONDS = 30;
+const AUTO_MODIFICATION_THRESHOLD_SECONDS = 15;
 
 // 默认配置
 const DEFAULT_CONFIG = {

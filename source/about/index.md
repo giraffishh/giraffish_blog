@@ -9,7 +9,7 @@ comments: true
 
 Giraffish，坐标广东，南方科技大学，大二
 
-<img src="https://cdn.giraffish.me/github-metrics.svg" alt="Metrics" style="float: left;">
+<img src="https://cdn.giraffish.top/github-metrics.svg" alt="Metrics" style="float: left;">
 
 <a href="https://github.com/ashutosh00710/github-readme-activity-graph">
   <picture>
