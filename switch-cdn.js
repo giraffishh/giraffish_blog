@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 
 // CDN选项配置
 const CDN_OPTIONS = {
-  giraffish: 'https://cdn.giraffish.top/blog/',
+  amazon: 'https://cdn.giraffish.top/blog/',
   jsdmirror: 'https://cdn.jsdmirror.com/gh/giraffishh/image-hosting@main/blog/',
   jsdelivr: 'https://fastly.jsdelivr.net/gh/giraffishh/image-hosting@main/blog/'
 };
@@ -24,6 +24,9 @@ const EXCLUDED_FILES = [
 
 // 支持的图片扩展名
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+
+// 定义需要特殊处理文件名（去后缀）的 PicGo 域名列表
+const PICGO_DOMAINS = ['img.picgo.net', 'origin.picgo.net'];
 
 // --- GIT HELPER FUNCTIONS (Modeled after upload.js) ---
 
@@ -114,13 +117,15 @@ function isFileExcluded(filePath, postsDir) {
 }
 
 /**
- * 从img.picgo.net URL中提取真实文件名
+ * 从 PicGo URL 中提取真实文件名（去除可能的后缀）
+ * 仅当 extractFilename 显式调用此函数时才执行
  * @param {string} filename - 原始文件名
  * @returns {string} - 处理后的文件名
  */
 function extractRealFilename(filename) {
   const ext = path.extname(filename);
   const basename = path.basename(filename, ext);
+  // 如果文件名特别长（通常是因为 PicGo 添加了时间戳后缀），尝试去除后16位
   if (basename.length > 16) {
     return basename.slice(0, -16) + ext;
   }
@@ -143,15 +148,20 @@ function isImageUrl(url) {
 
 /**
  * 从URL中提取文件名
+ * 逻辑：
+ * 1. 如果域名是 img.picgo.net 或 origin.picgo.net，去除可能的16位后缀。
+ * 2. 其他域名直接返回文件名，不修改。
  * @param {string} url - 图片URL
  * @returns {string} - 文件名
  */
 function extractFilename(url) {
   try {
     const urlObj = new URL(url);
-    if (urlObj.hostname === 'img.picgo.net') {
+    // 只有指定的 PicGo 域名才执行去后缀逻辑
+    if (PICGO_DOMAINS.includes(urlObj.hostname)) {
       return extractRealFilename(path.basename(urlObj.pathname));
     }
+    // 其他域名直接返回文件名
     return path.basename(urlObj.pathname);
   } catch {
     return '';
@@ -172,12 +182,16 @@ function replaceImageLinks(content, targetCdn) {
   const newContent = content.replace(imageRegex, (match, alt, url) => {
     const imageUrl = (alt !== undefined && url !== undefined) ? url : match;
     if (!isImageUrl(imageUrl)) return match;
+    
+    // 如果已经是目标 CDN，则跳过
     if (imageUrl.startsWith(targetCdn)) {
       skippedCount++;
       return match;
     }
+
     const filename = extractFilename(imageUrl);
     if (!filename) return match;
+    
     replacedCount++;
     const newUrl = targetCdn + filename;
     return (alt !== undefined && url !== undefined) ? `![${alt}](${newUrl})` : newUrl;
@@ -250,9 +264,9 @@ Available CDN options:
   ${Object.keys(CDN_OPTIONS).join(', ')}
 
 Options:
-  --no-git         Skip automatic git commit.
-  --debug-git      Show git repository detection debug info.
-  -h, --help       Show this help message.
+  --no-git          Skip automatic git commit.
+  --debug-git       Show git repository detection debug info.
+  -h, --help        Show this help message.
 
 Note: This script only commits changes, it does not push to remote.
 `);

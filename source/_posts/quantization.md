@@ -1,6 +1,6 @@
 ---
-index_img: 'https://origin.picgo.net/2025/10/18/25-10-18-1760720908524d55fa73ad1d982f7.png'
-banner_img: 'https://img.picgo.net/2025/03/28/25-03-28-17431514678427b2138c37794ab42.webp'
+index_img: 'https://cdn.giraffish.top/blog/25-10-18-1760720908524.png'
+banner_img: 'https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp'
 title: Quantization模型量化 
 categories:
   - 学习笔记
@@ -31,7 +31,7 @@ Accurate Post-Training Quantisation for Generative Pre-Trained Transformers
 * 论文地址：https://arxiv.org/pdf/2210.17323
 * 代码仓库：https://github.com/IST-DASLab/gptq
 
-![Screenshot 2025-11-19 214444](https://origin.picgo.net/2025/11/19/25-11-19-1763559987934c7cde1798bb12e05.webp)
+![Screenshot 2025-11-19 214444](https://cdn.giraffish.top/blog/25-11-19-1763559987934.webp)
 
 基于Optimal Brain Quantization（OBQ）理论，利用二阶信息（海森矩阵H的逆）来迭代地更新未量化的权重，以补偿量化当前权重所引入的误差。GPTQ能够将模型量化至3-bit或4-bit而保持极高的精度，但其算法依赖于权重的分组重排（Group Reordering），这在实际推理中可能导致不规则的内存访问，增加了工程实现的复杂度。
 
@@ -42,7 +42,7 @@ Activation-aware Weight Quantization For On-Device LLM Compression And Accelerat
 * 论文链接：https://arxiv.org/pdf/2306.00978
 * 仓库地址：https://github.com/mit-han-lab/llm-awq?tab=readme-ov-file
 
-![](https://origin.picgo.net/2025/11/19/25-11-19-176355710308084b8dd63e182beb2.webp)
+![](https://cdn.giraffish.top/blog/25-11-19-1763557103080.webp)
 
 AWQ（Activation-aware Weight Quantization）基于一个关键观察：并非所有权重都同等重要。权重的显著性（Salience）不应仅由其自身的幅度决定，而应结合其对应激活值的幅度来判断。AWQ通过观察少量校准数据中的激活分布，识别出那1%的显著权重，并在量化前对其进行放大（同时缩小对应的激活通道），从而在不改变计算结果的前提下保护了关键信息。AWQ的优势在于其不依赖梯度的反向传播或二阶矩阵计算，且不需要对权重进行重排，这使得其推理内核（Kernel）更容易优化，尤其是在vLLM等推理框架中，AWQ往往表现出比GPTQ更好的吞吐量稳定性。
 
