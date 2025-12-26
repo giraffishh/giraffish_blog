@@ -6,7 +6,8 @@ const { execSync } = require('child_process');
 const CDN_OPTIONS = {
   amazon: 'https://cdn.giraffish.top/blog/',
   jsdmirror: 'https://cdn.jsdmirror.com/gh/giraffishh/image-hosting@main/blog/',
-  jsdelivr: 'https://fastly.jsdelivr.net/gh/giraffishh/image-hosting@main/blog/'
+  jsdelivr: 'https://fastly.jsdelivr.net/gh/giraffishh/image-hosting@main/blog/',
+  sustech: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/'
 };
 
 // 需要排除的文章列表（支持文件名或相对路径）

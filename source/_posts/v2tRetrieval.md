@@ -1,6 +1,6 @@
 ---
-index_img: 'https://cdn.giraffish.top/blog/25-09-21-1758455683016.webp'
-banner_img: 'https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp'
+index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-21-1758455683016.webp'
+banner_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp'
 title: Text-to-Video Retrieval
 categories:
   - 学习笔记
@@ -22,7 +22,7 @@ updated: 2025-12-14 16:21:37
 * https://zhuanlan.zhihu.com/p/44464548
 * https://cloud.tencent.com/developer/article/2109487
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758676662447.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758676662447.webp)
 
 一个典型的 CNN 架构通常由以下几种层组合而成：
 
@@ -101,13 +101,13 @@ updated: 2025-12-14 16:21:37
 * https://www.bilibili.com/video/BV1z5411f7Bm?spm_id_from=333.788.videopod.sections&vd_source=d95f1f1b6e857449fcf25e43320f37da
 * https://zhuanlan.zhihu.com/p/1926356955993215273
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758677719801.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758677719801.webp)
 
 Encoder-Decoder / Seq2Seq：N->M
 
 > RNN擅长处理1->N, N->N, N->1的情况，但不擅长处理 N->M 的情况（可能需要用多个RNN堆叠），这种Encoder-Decoder架构会把其压缩成一个固定长度的中间向量，即**上下文向量（Context Vector）**，出现**信息瓶颈（Information Bottleneck）**的问题导致信息丢失
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758682223368.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758682223368.webp)
 
 ## Attention 注意力机制
 
@@ -119,11 +119,11 @@ Encoder-Decoder / Seq2Seq：N->M
 
 Attention机制的提出，就是为了解决上文中的**信息瓶颈**问题
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758707045389.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758707045389.webp)
 
 ### Query (Q), Key (K), 和 Value (V)
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758703985522.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758703985522.webp)
 
 Attention机制引入了三个核心概念：**Query (Q)**, **Key (K)**, 和 **Value (V)**
 
@@ -158,15 +158,15 @@ Attention机制引入了三个核心概念：**Query (Q)**, **Key (K)**, 和 **V
 
 self-attention只关注输入序列元素之间的关系，即**每个输入元素都有它自己的Q、K、V**，也方便了并行化计算
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758707242836.png)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758707242836.png)
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758707805039.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758707805039.webp)
 
 ### Mult-head Attention 多头注意力机制
 
 在自注意力的基础上，使用多种变换生成的Q、K、V进行计算，即每层都有多组Q、K、V权重，叠加使用self-attention从而增强注意力效果
 
-![](https://cdn.giraffish.top/blog/25-09-24-1758707797292.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758707797292.webp)
 
 ## Transformer
 
@@ -174,7 +174,7 @@ Attention is All You Need !!
 
 * 论文地址：https://arxiv.org/pdf/1706.03762
 
-<img src="https://cdn.giraffish.top/blog/25-09-24-1758682368130.webp" style="zoom: 80%;" />
+<img src="https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-24-1758682368130.webp" style="zoom: 80%;" />
 
 Transformer 遵循着一个常见于机器翻译等任务的 **编码器-解码器** 结构，左侧部分是编码器（Encoder），接收一个输入序列，并将其处理成一组富含上下文信息的连续表示；右侧部分是解码器（Decoder）它接收**编码器的输出**以及**已经生成的部分输出序列**，然后预测下一个词，循环往复，直到生成完整的输出序列
 
@@ -194,13 +194,13 @@ Transformer 的核心是自注意力机制（Self-Attention），它在处理单
 
 #### 1. **多头自注意力层（Multi-Head Attention）**
 
-![](https://cdn.giraffish.top/blog/25-09-26-1758901568380.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-26-1758901568380.webp)
 
 **自注意力（Self-Attention）**：当编码器处理输入序列中的某个单词时，自注意力机制允许它去关注输入序列中的所有其他单词，并计算出每个单词对于当前单词的重要性（权重）。这使得模型能够根据上下文更好地理解单词的含义。例如，在句子 "The animal didn't cross the street because it was too tired" 中，自注意力可以帮助模型理解 "it" 指的是 "The animal"
 
 **多头（Multi-Head）**：模型不会只进行一次注意力计算，而是将词向量投影到多个不同的“表示子空间”中（不同QKV），**即在一个transformer层中有多组QKV权重**，并行地计算多次注意力，这就是所谓的“多头”。这就像是用不同的视角去审视句子，有的头可能关注句法关系，有的头可能关注语义关系。最后，将所有头的注意力结果拼接并再次进行线性变换，得到最终的输出。这增强了模型捕捉不同方面信息的能力
 
-![](https://cdn.giraffish.top/blog/25-11-21-1763734661949.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-11-21-1763734661949.webp)
 
 #### 2. **前馈神经网络（Feed-Forward Network, FFN）**
 
@@ -210,7 +210,7 @@ Transformer 的核心是自注意力机制（Self-Attention），它在处理单
 
 但是，这些信息还是混合在一起的。前馈神经网络（FFN）的作用就像一个“**信息加工站**”。它接收这个富含上下文的向量，然后对其进行一次更复杂的加工和提炼
 
-![](https://cdn.giraffish.top/blog/25-11-21-1763734748911.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-11-21-1763734748911.webp)
 
 这个“加工站”内部有两道工序，对应着两个线性层（Linear layers）
 
@@ -233,7 +233,7 @@ Transformer 的核心是自注意力机制（Self-Attention），它在处理单
 
 **Norm（层归一化, Layer Normalization）**：在相加之后，对结果进行层归一化，这有助于稳定训练过程，加速收敛
 
-![](https://cdn.giraffish.top/blog/25-11-21-1763734773279.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-11-21-1763734773279.webp)
 
 ### 解码器（Decoder）
 
@@ -269,7 +269,7 @@ An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale
 * 论文链接：https://arxiv.org/pdf/2010.11929
 * 代码仓库：https://github.com/google-research/vision_transformer
 
-![](https://cdn.giraffish.top/blog/25-12-02-1764607281702.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-02-1764607281702.webp)
 
 ## ConvNeXt
 
@@ -278,7 +278,7 @@ A ConvNet for the 2020s
 * 论文地址：https://arxiv.org/pdf/2201.03545
 * 代码仓库： https://github.com/facebookresearch/ConvNeXt
 
-<img src="https://cdn.giraffish.top/blog/25-10-25-1761395395885.png" style="zoom: 67%;" />
+<img src="https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-10-25-1761395395885.png" style="zoom: 67%;" />
 
 ##  ConvNext v2
 
@@ -295,7 +295,7 @@ Learning Transferable Visual Models From Natural Language Supervision
 * 论文链接：https://arxiv.org/pdf/2103.00020
 * 代码仓库：https://github.com/OpenAI/CLIP
 
-![](https://cdn.giraffish.top/blog/25-09-22-1758472022473.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-22-1758472022473.webp)
 
 ### 模型大小
 
@@ -364,7 +364,7 @@ CLIP4Clip: An Empirical Study of CLIP for End to End Video Clip Retrieval
 * 论文链接：https://arxiv.org/pdf/2104.08860
 * 代码仓库：https://github.com/ArrowLuo/CLIP4Clip
 
-![](https://cdn.giraffish.top/blog/25-09-21-1758457212493.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-21-1758457212493.webp)
 
 ### 核心架构组件
 
@@ -440,7 +440,7 @@ X-CLIP: End-to-End Multi-grained Contrastive Learning for Video-Text Retrieval
 * 论文地址：hhttps://arxiv.org/pdf/2207.07285
 * 代码仓库：https://github.com/xuguohai/X-CLIP
 
-![](https://cdn.giraffish.top/blog/25-12-02-1764640531899.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-02-1764640531899.webp)
 
 ### 模型架构
 
@@ -451,7 +451,7 @@ Holistic Features are almost Sufficient for Text-to-Video Retrieval
 * 论文地址：https://openaccess.thecvf.com/content/CVPR2024/papers/Tian_Holistic_Features_are_almost_Sufficient_for_Text-to-Video_Retrieval_CVPR_2024_paper.pdf
 * 代码仓库：https://github.com/ruc-aimc-lab/TeachCLIP?tab=readme-ov-file
 
-![](https://cdn.giraffish.top/blog/25-09-23-1758558026283.webp)
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-09-23-1758558026283.webp)
 
 ### 模型架构
 
