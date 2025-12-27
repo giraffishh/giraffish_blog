@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dijkstra 算法可视化演示 (Pro)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --bg-canvas: #f8fafc;
+            --bg-panel: rgba(255, 255, 255, 0.95);
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 头部 --- */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: 50px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 50;
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f172a;
+        }
+        
+        .badge-start {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid #c7d2fe;
+        }
+
+        /* --- 主布局 --- */
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            flex-direction: column;
+        }
+
+        /* 上半部分：图表区 */
+        .panel-top {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background-color: #f1f5f9;
+            background-image: 
+                radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-color);
+            min-height: 0;
+        }
+
+        /* 下半部分：数据区 */
+        .panel-bottom {
+            flex: 1;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+            z-index: 40;
+            min-height: 0;
+        }
+
+        /* --- Canvas --- */
+        #canvas-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        canvas {
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            background: white;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; 
+        }
+
+        /* --- 悬浮图例 --- */
+        .legend-card {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-md);
+            font-size: 0.8rem;
+            z-index: 10;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-sub);
+            font-weight: 500;
+        }
+        .legend-item:last-child { margin-bottom: 0; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+
+        /* --- 悬浮控制栏 (右侧垂直) --- */
+        .controls-island {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .btn {
+            border: none;
+            background: transparent;
+            padding: 8px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 48px;
+        }
+        .btn span {
+            font-size: 0.7rem;
+        }
+        .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover { background: #dc2626; color: white; }
+
+        /* --- 下方数据面板 --- */
+        .panel-header {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #fff, #f8fafc);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
+        .status-text {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        /* 左右分块 */
+        .split-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            flex-direction: row;
+        }
+
+        .section-left {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .section-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .scroll-content {
+            flex: 1;
+            overflow-y: auto;
+            background: #fff;
+        }
+
+        .section-title {
+            padding: 10px 24px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* 表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .data-table td {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+        
+        /* 堆列表 */
+        .heap-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+        .heap-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: white;
+            transition: all 0.3s ease;
+        }
+        .heap-card.first {
+            border-color: #c7d2fe;
+            background: #eef2ff;
+        }
+        .heap-node {
+            width: 24px; height: 24px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+        }
+        .heap-card.first .heap-node { background: white; color: var(--primary); }
+        .heap-dist { font-family: 'JetBrains Mono'; font-weight: 600; color: var(--text-sub); font-size: 0.9rem; }
+        .heap-card.first .heap-dist { color: var(--primary); }
+
+        /* 动画 */
+        .anim-update { animation: highlight-pulse 1s; }
+        @keyframes highlight-pulse {
+            0% { background-color: #fef3c7; }
+            100% { background-color: transparent; }
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media (max-width: 600px) {
+            .split-container { flex-direction: column; }
+            .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
+            .section-right { height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            Dijkstra 动图详解
+        </div>
+        <div class="badge-start">Start: A</div>
+    </header>
+
+    <main>
+        <!-- 上半部分：图表 -->
+        <div class="panel-top">
+            <div class="legend-card">
+                <div class="legend-item"><span class="dot" style="background:#f1f5f9; border-color:#94a3b8;"></span>未访问</div>
+                <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#ca8a04;"></span>当前节点 (U)</div>
+                <div class="legend-item"><span class="dot" style="background:#bfdbfe; border-color:#2563eb;"></span>检查邻居 (V)</div>
+                <div class="legend-item"><span class="dot" style="background:#dcfce7; border-color:#16a34a;"></span>已确定路径</div>
+            </div>
+
+            <div id="canvas-wrapper">
+                <canvas id="graphCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="controls-island">
+                <button id="btnReset" class="btn" title="重置">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <span>重置</span>
+                </button>
+                <button id="btnPrev" class="btn" title="上一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>后退</span>
+                </button>
+                <button id="btnPlay" class="btn btn-primary" title="自动播放">
+                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>播放</span>
+                </button>
+                <button id="btnNext" class="btn" title="下一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <span>前进</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 下半部分：数据 -->
+        <div class="panel-bottom">
+            <div class="panel-header">
+                <div class="status-badge">
+                    <div class="pulse-dot"></div>
+                    <span>当前操作</span>
+                </div>
+                <div id="statusText" class="status-text">
+                    准备就绪。
+                </div>
+            </div>
+
+            <div class="split-container">
+                <!-- 左下：距离表 -->
+                <div class="section-left">
+                    <div class="section-title">距离表 (Distance)</div>
+                    <div class="scroll-content">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Node</th><th>Dist</th><th>Prev</th><th>State</th></tr>
+                            </thead>
+                            <tbody id="distTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 右下：最小堆 -->
+                <div class="section-right">
+                    <div class="section-title">优先队列 (Min-Heap)</div>
+                    <div class="scroll-content">
+                        <div id="heapContainer" class="heap-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Graph Data ---
+        const nodes = [
+            { id: 'A', x: 150, y: 300 },
+            { id: 'B', x: 300, y: 150 },
+            { id: 'C', x: 300, y: 450 },
+            { id: 'D', x: 500, y: 150 },
+            { id: 'E', x: 500, y: 450 },
+            { id: 'F', x: 650, y: 300 }
+        ];
+
+        const edges = [
+            { from: 'A', to: 'B', weight: 4 },
+            { from: 'A', to: 'C', weight: 2 },
+            { from: 'B', to: 'C', weight: 1 },
+            { from: 'B', to: 'D', weight: 5 },
+            { from: 'C', to: 'E', weight: 10 },
+            { from: 'C', to: 'D', weight: 8 },
+            { from: 'D', to: 'E', weight: 2 },
+            { from: 'D', to: 'F', weight: 6 },
+            { from: 'E', to: 'F', weight: 3 }
+        ];
+
+        // --- 2. Canvas Setup ---
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function setupCanvas() {
+            const container = document.getElementById('canvas-wrapper');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            
+            // Padding deduction
+            const w = rect.width - 40; 
+            const h = rect.height - 40;
+            
+            if (w <= 0 || h <= 0) return { width: 800, height: 600 };
+
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+
+            return { width: w, height: h };
+        }
+
+        function getScaleFactors(width, height) {
+            const scaleX = width / 800;
+            const scaleY = height / 600;
+            const scale = Math.min(scaleX, scaleY);
+            const offsetX = (width - 800 * scale) / 2;
+            const offsetY = (height - 600 * scale) / 2;
+            return { scale, offsetX, offsetY };
+        }
+
+        let canvasDims = { width: 800, height: 600 };
+        
+        // --- 3. Algorithm Logic ---
+        function generateSteps(startNodeId) {
+            const steps = [];
+            const dist = {};
+            const prev = {};
+            const visited = new Set();
+            const unvisited = new Set();
+            
+            nodes.forEach(n => {
+                dist[n.id] = Infinity;
+                prev[n.id] = null;
+                unvisited.add(n.id);
+            });
+            dist[startNodeId] = 0;
+
+            const getQueueState = () => Array.from(unvisited)
+                .map(id => ({ id, dist: dist[id] }))
+                .sort((a, b) => a.dist - b.dist);
+
+            steps.push({
+                type: 'INIT', msg: `初始化: 起点 ${startNodeId} dist=0`,
+                dist: {...dist}, prev: {...prev}, visited: new Set(visited),
+                currNode: null, checkNode: null, updatedNode: null, queue: getQueueState()
+            });
+
+            while (unvisited.size > 0) {
+                let u = null;
+                let minDist = Infinity;
+                unvisited.forEach(nodeId => {
+                    if (dist[nodeId] < minDist) { minDist = dist[nodeId]; u = nodeId; }
+                });
+
+                if (u === null || dist[u] === Infinity) break;
+
+                const visualVisited = new Set(visited);
+                visualVisited.add(u);
+
+                steps.push({
+                    type: 'PICK', msg: `提取最小节点: ${u} (dist=${dist[u]})`,
+                    dist: {...dist}, prev: {...prev}, 
+                    visited: visualVisited, 
+                    currNode: u, checkNode: null, updatedNode: null, queue: getQueueState()
+                });
+
+                unvisited.delete(u);
+                visited.add(u);
+
+                const neighbors = edges.filter(e => e.from === u || e.to === u)
+                    .map(e => ({ id: e.from === u ? e.to : e.from, weight: e.weight }))
+                    .sort((a,b) => a.id.localeCompare(b.id));
+
+                for (let neighbor of neighbors) {
+                    const v = neighbor.id;
+                    if (visited.has(v)) continue;
+
+                    steps.push({
+                        type: 'CHECK',
+                        msg: `检查邻居 ${v} (权重 ${neighbor.weight})。路径: ${dist[u]}+${neighbor.weight}=${dist[u]+neighbor.weight}`,
+                        dist: {...dist}, prev: {...prev}, visited: new Set(visited),
+                        currNode: u, checkNode: v, updatedNode: null, queue: getQueueState()
+                    });
+
+                    const alt = dist[u] + neighbor.weight;
+                    if (alt < dist[v]) {
+                        dist[v] = alt;
+                        prev[v] = u;
+                        steps.push({
+                            type: 'UPDATE', msg: `更新 ${v}: 距离更短 ${alt} < ${dist[v]===Infinity?'∞':dist[v]}`,
+                            dist: {...dist}, prev: {...prev}, visited: new Set(visited),
+                            currNode: u, checkNode: v, updatedNode: v, queue: getQueueState()
+                        });
+                    }
+                }
+            }
+
+            steps.push({
+                type: 'DONE', msg: `算法完成`,
+                dist: {...dist}, prev: {...prev}, visited: new Set(visited),
+                currNode: null, checkNode: null, updatedNode: null, queue: []
+            });
+            return steps;
+        }
+
+        // --- 4. Drawing (Beautified) ---
+        const steps = generateSteps('A');
+        let currentStepIndex = 0;
+        let animationInterval = null;
+
+        function drawGraph(state) {
+            const { width, height } = canvasDims;
+            const { scale, offsetX, offsetY } = getScaleFactors(width, height);
+            
+            ctx.clearRect(0, 0, width, height);
+
+            const tx = (val) => val * scale + offsetX;
+            const ty = (val) => val * scale + offsetY;
+
+            // Draw Edges
+            edges.forEach(edge => {
+                const n1 = nodes.find(n => n.id === edge.from);
+                const n2 = nodes.find(n => n.id === edge.to);
+                const x1 = tx(n1.x), y1 = ty(n1.y);
+                const x2 = tx(n2.x), y2 = ty(n2.y);
+
+                let isPath = false;
+                let isActive = false; 
+                // Check if edge is part of the established Shortest Path Tree
+                if (state.visited.has(edge.from) && state.visited.has(edge.to) && 
+                   (state.prev[edge.to]===edge.from || state.prev[edge.from]===edge.to)) isPath = true;
+                
+                // Check if currently being processed
+                if (state.currNode && state.checkNode) {
+                     if ((state.currNode === edge.from && state.checkNode === edge.to) || 
+                         (state.currNode === edge.to && state.checkNode === edge.from)) isActive = true;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                
+                if (isActive) { 
+                    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4 * scale; 
+                    ctx.shadowColor = 'rgba(59, 130, 246, 0.4)'; ctx.shadowBlur = 8;
+                } else if (isPath) { 
+                    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3 * scale; 
+                    ctx.shadowColor = 'transparent';
+                } else { 
+                    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2 * scale; 
+                    ctx.shadowColor = 'transparent';
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset shadow
+
+                // Weight Label
+                const midX = (x1 + x2) / 2; 
+                const midY = (y1 + y2) / 2;
+                const r = 15 * scale; // Increased Radius
+                ctx.beginPath(); ctx.arc(midX, midY, r, 0, Math.PI * 2);
+                ctx.fillStyle = isActive ? '#eff6ff' : 'white'; 
+                ctx.fill();
+                if (isActive) { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5; ctx.stroke(); }
+                
+                ctx.fillStyle = isActive ? '#1d4ed8' : '#94a3b8';
+                ctx.font = `700 ${20 * scale}px "Plus Jakarta Sans"`; // Increased Font Size
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(edge.weight, midX, midY);
+            });
+
+            // Draw Nodes
+            nodes.forEach(node => {
+                const x = tx(node.x), y = ty(node.y);
+                const r = 36 * scale; // Increased Radius
+                
+                let bg = 'white'; 
+                let border = '#cbd5e1'; 
+                let text = '#475569';
+                let shadowColor = 'rgba(0,0,0,0.05)';
+                let shadowSize = 10;
+
+                // Node States
+                if (state.currNode === node.id) { 
+                    bg = '#fffbeb'; border = '#f59e0b'; text = '#b45309';
+                    shadowColor = 'rgba(245, 158, 11, 0.4)'; shadowSize = 20;
+                } else if (state.checkNode === node.id) { 
+                    bg = '#eff6ff'; border = '#3b82f6'; text = '#1d4ed8';
+                    shadowColor = 'rgba(59, 130, 246, 0.4)'; shadowSize = 20;
+                } else if (state.visited.has(node.id)) { 
+                    bg = '#f0fdf4'; border = '#22c55e'; text = '#15803d';
+                }
+
+                // Shadow/Glow
+                ctx.shadowColor = shadowColor;
+                ctx.shadowBlur = shadowSize;
+                ctx.shadowOffsetY = 4;
+                
+                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = bg; ctx.fill();
+                
+                // Reset shadow for border
+                ctx.shadowColor = 'transparent';
+                ctx.lineWidth = (state.currNode === node.id) ? 3 : 2; 
+                ctx.strokeStyle = border; ctx.stroke();
+
+                // ID Text
+                ctx.fillStyle = text; 
+                ctx.font = `bold ${26 * scale}px "Plus Jakarta Sans"`; // Increased Font Size
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(node.id, x, y - 2 * scale);
+
+                // Distance Badge
+                const d = state.dist[node.id];
+                const dText = d === Infinity ? '∞' : d;
+                // 向下移动一点，给大圆圈留出空间 (y + r + 20)
+                const badgeY = y + r + 20 * scale; 
+                
+                // 字体调大到 18 (原 12)
+                ctx.font = `600 ${18 * scale}px "JetBrains Mono"`;
+                const metrics = ctx.measureText(dText);
+                
+                // 调整背景胶囊的大小 (宽度+16, 高度28)
+                const bw = Math.max(24 * scale, metrics.width + 16 * scale);
+                const bh = 28 * scale;
+                
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(x - bw/2, badgeY - bh/2, bw, bh, bh/2);
+                else ctx.rect(x - bw/2, badgeY - bh/2, bw, bh);
+                ctx.fill();
+                
+                ctx.fillStyle = '#f8fafc';
+                // 微调文字垂直居中
+                ctx.fillText(dText, x, badgeY + 2 * scale);
+            });
+        }
+
+        function updateUI(state) {
+            const statusEl = document.getElementById('statusText');
+            // Flash animation for text change
+            statusEl.style.opacity = 0.5;
+            setTimeout(() => {
+                statusEl.innerText = state.msg;
+                statusEl.style.opacity = 1;
+            }, 100);
+
+            // Table
+            const tbody = document.getElementById('distTableBody');
+            tbody.innerHTML = '';
+            nodes.forEach(node => {
+                const tr = document.createElement('tr');
+                const d = state.dist[node.id];
+                const dText = d === Infinity ? '∞' : d;
+                const isUpdated = state.updatedNode === node.id;
+                
+                if (isUpdated) tr.className = 'anim-update';
+                
+                // Row Highlights
+                let statusIcon = '';
+                if (state.visited.has(node.id)) statusIcon = '<span style="color:#10b981">●</span>';
+                else if (d !== Infinity) statusIcon = '<span style="color:#f59e0b">○</span>';
+                else statusIcon = '<span style="color:#cbd5e1">○</span>';
+
+                tr.innerHTML = `
+                    <td style="font-weight:600; color:#334155;">${node.id}</td>
+                    <td style="font-family:'JetBrains Mono'; ${isUpdated?'color:#dc2626; font-weight:bold;':''}">${dText}</td>
+                    <td style="color:#64748b;">${state.prev[node.id] || '-'}</td>
+                    <td>${statusIcon}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Heap
+            const heapContainer = document.getElementById('heapContainer');
+            heapContainer.innerHTML = '';
+            if (state.queue && state.queue.length > 0) {
+                state.queue.forEach((item, idx) => {
+                    const el = document.createElement('div');
+                    el.className = `heap-card ${idx===0 ? 'first' : ''} ${state.updatedNode===item.id ? 'anim-update' : ''}`;
+                    el.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div class="heap-node">${item.id}</div>
+                            ${idx===0 ? '<span style="font-size:10px; font-weight:700; color:#4f46e5;">MIN</span>' : ''}
+                        </div>
+                        <div class="heap-dist">${item.dist===Infinity?'∞':item.dist}</div>
+                    `;
+                    heapContainer.appendChild(el);
+                });
+            } else {
+                heapContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8; font-size:0.85rem;">队列为空</div>';
+            }
+            
+            // Buttons
+            document.getElementById('btnPrev').disabled = currentStepIndex === 0;
+            document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
+        }
+
+        function render() {
+            const state = steps[currentStepIndex];
+            requestAnimationFrame(() => {
+                drawGraph(state);
+                updateUI(state);
+            });
+        }
+
+        // --- Controls ---
+        const btnNext = document.getElementById('btnNext');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnReset = document.getElementById('btnReset');
+        const iconPlay = document.getElementById('iconPlay');
+
+        function nextStep() { if (currentStepIndex < steps.length - 1) { currentStepIndex++; render(); } else stopPlay(); }
+        function prevStep() { if (currentStepIndex > 0) { currentStepIndex--; render(); } }
+        function reset() { stopPlay(); currentStepIndex = 0; render(); }
+        
+        function togglePlay() {
+            if (animationInterval) { stopPlay(); } 
+            else {
+                if (currentStepIndex === steps.length - 1) currentStepIndex = 0;
+                btnPlay.classList.add('btn-danger');
+                btnPlay.classList.remove('btn-primary');
+                // 仅更新图标，保持布局一致
+                const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+                btnPlay.innerHTML = `${svg}<span>暂停</span>`;
+                
+                nextStep();
+                animationInterval = setInterval(nextStep, 1500);
+            }
+        }
+        function stopPlay() {
+            clearInterval(animationInterval); animationInterval = null;
+            btnPlay.classList.remove('btn-danger');
+            btnPlay.classList.add('btn-primary');
+            const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            btnPlay.innerHTML = `${svg}<span>播放</span>`;
+        }
+
+        btnNext.addEventListener('click', () => { stopPlay(); nextStep(); });
+        btnPrev.addEventListener('click', () => { stopPlay(); prevStep(); });
+        btnReset.addEventListener('click', reset);
+        btnPlay.addEventListener('click', togglePlay);
+
+        window.addEventListener('load', () => { canvasDims = setupCanvas(); render(); });
+        window.addEventListener('resize', () => { canvasDims = setupCanvas(); render(); });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kruskal 算法可视化演示 (Pro)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --bg-canvas: #f8fafc;
+            --bg-panel: rgba(255, 255, 255, 0.95);
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 头部 --- */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: 50px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 50;
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f172a;
+        }
+        
+        .badge-info {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid #c7d2fe;
+        }
+
+        /* --- 主布局 --- */
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            flex-direction: column; /* 垂直 50:50 */
+        }
+
+        /* 上半部分：图表区 */
+        .panel-top {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background-color: #f1f5f9;
+            background-image: 
+                radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-color);
+            min-height: 0;
+        }
+
+        /* 下半部分：数据区 */
+        .panel-bottom {
+            flex: 1;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+            z-index: 40;
+            min-height: 0;
+        }
+
+        /* --- Canvas --- */
+        #canvas-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        canvas {
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            background: white;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; 
+        }
+
+        /* --- 悬浮图例 --- */
+        .legend-card {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-md);
+            font-size: 0.8rem;
+            z-index: 10;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-sub);
+            font-weight: 500;
+        }
+        .legend-item:last-child { margin-bottom: 0; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+        .line-legend { width: 24px; height: 3px; border-radius: 2px; }
+
+        /* --- 悬浮控制栏 (右侧垂直) --- */
+        .controls-island {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .btn {
+            border: none;
+            background: transparent;
+            padding: 8px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 48px;
+        }
+        .btn span {
+            font-size: 0.7rem;
+        }
+        .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; color: white; }
+
+        /* --- 下方数据面板 --- */
+        .panel-header {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #fff, #f8fafc);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
+        .status-text {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        /* 左右分块容器 */
+        .split-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            flex-direction: row;
+        }
+
+        .section-left {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .section-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .scroll-content {
+            flex: 1;
+            overflow-y: auto;
+            background: #fff;
+        }
+
+        .section-title {
+            padding: 10px 24px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* 数据表 */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th {
+            text-align: left; padding: 8px 16px; font-size: 0.75rem; color: var(--text-sub);
+            background: white; border-bottom: 1px solid var(--border-color);
+            position: sticky; top: 0; z-index: 5;
+        }
+        .data-table td {
+            padding: 8px 16px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9;
+        }
+
+        /* 边列表 (Edge List) */
+        .edge-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+        .edge-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: white;
+            transition: all 0.3s ease;
+        }
+        .edge-card.current {
+            border-color: #93c5fd;
+            background: #eff6ff;
+            transform: scale(1.02);
+            box-shadow: 0 4px 6px -2px rgba(59, 130, 246, 0.1);
+        }
+        .edge-card.accepted {
+            border-color: #86efac;
+            background: #f0fdf4;
+            opacity: 0.7;
+        }
+        .edge-card.rejected {
+            border-color: #fca5a5;
+            background: #fef2f2;
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+        
+        .edge-info { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-main); }
+        .edge-weight { font-family: 'JetBrains Mono'; color: var(--text-sub); font-size: 0.9rem; }
+        .status-icon { width: 20px; text-align: center; font-weight: bold; }
+
+        /* 动画 */
+        .anim-update { animation: highlight-pulse 1s; }
+        @keyframes highlight-pulse { 0% { background-color: #fef3c7; } 100% { background-color: transparent; } }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media (max-width: 600px) {
+            .split-container { flex-direction: column; }
+            .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
+            .section-right { height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <path d="M3 3v18h18"/>
+                <circle cx="7" cy="18" r="2"/>
+                <circle cx="18" cy="7" r="2"/>
+                <path d="M7 18 18 7"/>
+            </svg>
+            Kruskal 动画详解
+        </div>
+        <div class="badge-info">最小生成树 (MST)</div>
+    </header>
+
+    <main>
+        <!-- 上半部分：图表 -->
+        <div class="panel-top">
+            <div class="legend-card">
+                <div class="legend-item"><span class="line-legend" style="background:#e2e8f0;"></span>普通边</div>
+                <div class="legend-item"><span class="line-legend" style="background:#3b82f6;"></span>检查中</div>
+                <div class="legend-item"><span class="line-legend" style="background:#10b981;"></span>已选 (MST)</div>
+                <div class="legend-item"><span class="line-legend" style="border-top: 3px dashed #ef4444; height:0; background:transparent;"></span>丢弃 (环)</div>
+            </div>
+
+            <div id="canvas-wrapper">
+                <canvas id="graphCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="controls-island">
+                <button id="btnReset" class="btn" title="重置">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <span>重置</span>
+                </button>
+                <button id="btnPrev" class="btn" title="上一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>后退</span>
+                </button>
+                <button id="btnPlay" class="btn btn-primary" title="自动播放">
+                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>播放</span>
+                </button>
+                <button id="btnNext" class="btn" title="下一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <span>前进</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 下半部分：数据 -->
+        <div class="panel-bottom">
+            <div class="panel-header">
+                <div class="status-badge">
+                    <div class="pulse-dot"></div>
+                    <span>当前状态</span>
+                </div>
+                <div id="statusText" class="status-text">
+                    准备就绪。所有边已按权重从小到大排序。
+                </div>
+            </div>
+
+            <div class="split-container">
+                <!-- 左下：并查集 -->
+                <div class="section-left">
+                    <div class="section-title">并查集 (Union-Find)</div>
+                    <div class="scroll-content">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>节点</th><th>父节点/根</th><th>集合ID</th></tr>
+                            </thead>
+                            <tbody id="ufTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 右下：边列表 -->
+                <div class="section-right">
+                    <div class="section-title">边列表 (按权重排序)</div>
+                    <div class="scroll-content">
+                        <div id="edgeListContainer" class="edge-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Graph Data ---
+        const nodes = [
+            { id: 'A', x: 150, y: 300 },
+            { id: 'B', x: 300, y: 150 },
+            { id: 'C', x: 300, y: 450 },
+            { id: 'D', x: 500, y: 150 },
+            { id: 'E', x: 500, y: 450 },
+            { id: 'F', x: 650, y: 300 }
+        ];
+
+        // 构造一个包含环的图来演示 Kruskal
+        const rawEdges = [
+            { u: 'A', v: 'B', w: 4 },
+            { u: 'A', v: 'C', w: 2 },
+            { u: 'B', v: 'C', w: 3 }, // 环
+            { u: 'B', v: 'D', w: 2 },
+            { u: 'C', v: 'D', w: 5 }, // 环
+            { u: 'C', v: 'E', w: 1 },
+            { u: 'D', v: 'E', w: 6 }, // 环
+            { u: 'D', v: 'F', w: 4 },
+            { u: 'E', v: 'F', w: 3 }
+        ];
+
+        // 为每条边增加唯一ID，方便追踪
+        const edges = rawEdges.map((e, i) => ({ ...e, id: i }));
+
+        // 节点颜色映射 (用于展示集合)
+        const setColors = {
+            'A': '#fca5a5', 'B': '#fdba74', 'C': '#fde047', 
+            'D': '#86efac', 'E': '#93c5fd', 'F': '#c4b5fd'
+        };
+
+        // --- 2. Canvas Setup ---
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        let canvasDims = { width: 800, height: 600 };
+
+        function setupCanvas() {
+            const container = document.getElementById('canvas-wrapper');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            const w = rect.width - 40; 
+            const h = rect.height - 40;
+            if (w <= 0 || h <= 0) return { width: 800, height: 600 };
+            canvas.width = w * dpr; canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+            return { width: w, height: h };
+        }
+
+        function getScaleFactors(width, height) {
+            const scaleX = width / 800; const scaleY = height / 600;
+            const scale = Math.min(scaleX, scaleY);
+            const offsetX = (width - 800 * scale) / 2;
+            const offsetY = (height - 600 * scale) / 2;
+            return { scale, offsetX, offsetY };
+        }
+
+        // --- 3. Kruskal Algorithm Logic ---
+        function generateSteps() {
+            const steps = [];
+            // 深拷贝一份边，用于排序
+            let sortedEdges = [...edges].sort((a, b) => a.w - b.w);
+            
+            // 并查集初始化
+            const parent = {};
+            nodes.forEach(n => parent[n.id] = n.id);
+            
+            // 查找根节点 (带路径压缩的简单模拟)
+            const find = (i, currentParentState) => {
+                if (currentParentState[i] === i) return i;
+                return find(currentParentState[i], currentParentState);
+            };
+
+            const getSetId = (nodeId, pState) => find(nodeId, pState);
+
+            // 初始状态
+            steps.push({
+                type: 'INIT',
+                msg: '初始化: 所有边按权重从小到大排序。每个节点自成一个集合。',
+                parent: {...parent},
+                edgesStatus: {}, // id -> 'accepted' | 'rejected' | 'checking'
+                currEdgeId: null,
+                mstCount: 0
+            });
+
+            let mstEdgesCount = 0;
+
+            for (let edge of sortedEdges) {
+                // Step: Pick Edge
+                steps.push({
+                    type: 'PICK',
+                    msg: `检查边 ${edge.u}-${edge.v} (权重: ${edge.w})。寻找两端点的根节点...`,
+                    parent: {...parent},
+                    edgesStatus: { ...steps[steps.length-1].edgesStatus, [edge.id]: 'checking' },
+                    currEdgeId: edge.id,
+                    mstCount: mstEdgesCount
+                });
+
+                const rootU = find(edge.u, parent);
+                const rootV = find(edge.v, parent);
+
+                if (rootU !== rootV) {
+                    // Union
+                    parent[rootV] = rootU; // Merge V into U
+                    mstEdgesCount++;
+                    
+                    const newStatus = { ...steps[steps.length-1].edgesStatus };
+                    newStatus[edge.id] = 'accepted';
+
+                    steps.push({
+                        type: 'MERGE',
+                        msg: `根节点不同 (${rootU} ≠ ${rootV})，不形成环。合并集合，加入 MST。`,
+                        parent: {...parent},
+                        edgesStatus: newStatus,
+                        currEdgeId: edge.id,
+                        mstCount: mstEdgesCount
+                    });
+                } else {
+                    // Reject
+                    const newStatus = { ...steps[steps.length-1].edgesStatus };
+                    newStatus[edge.id] = 'rejected';
+
+                    steps.push({
+                        type: 'REJECT',
+                        msg: `根节点相同 (${rootU})，形成环！丢弃该边。`,
+                        parent: {...parent},
+                        edgesStatus: newStatus,
+                        currEdgeId: edge.id,
+                        mstCount: mstEdgesCount
+                    });
+                }
+            }
+
+            steps.push({
+                type: 'DONE',
+                msg: `算法完成！最小生成树包含 ${mstEdgesCount} 条边。`,
+                parent: {...parent},
+                edgesStatus: steps[steps.length-1].edgesStatus,
+                currEdgeId: null,
+                mstCount: mstEdgesCount
+            });
+
+            return { steps, sortedEdges };
+        }
+
+        // --- 4. Drawing & Rendering ---
+        const { steps, sortedEdges } = generateSteps();
+        let currentStepIndex = 0;
+        let animationInterval = null;
+
+        function drawGraph(state) {
+            const { width, height } = canvasDims;
+            const { scale, offsetX, offsetY } = getScaleFactors(width, height);
+            const tx = (val) => val * scale + offsetX;
+            const ty = (val) => val * scale + offsetY;
+            
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Edges
+            // 先画普通边，再画特殊状态边，防止遮挡
+            const drawEdge = (edge, status) => {
+                const n1 = nodes.find(n => n.id === edge.u);
+                const n2 = nodes.find(n => n.id === edge.v);
+                const x1 = tx(n1.x), y1 = ty(n1.y);
+                const x2 = tx(n2.x), y2 = ty(n2.y);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+
+                if (status === 'checking') {
+                    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 5 * scale;
+                    ctx.setLineDash([]);
+                    ctx.shadowColor = 'rgba(59, 130, 246, 0.5)'; ctx.shadowBlur = 10;
+                } else if (status === 'accepted') {
+                    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4 * scale;
+                    ctx.setLineDash([]);
+                    ctx.shadowColor = 'transparent';
+                } else if (status === 'rejected') {
+                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2 * scale;
+                    ctx.setLineDash([10 * scale, 5 * scale]); // 虚线
+                    ctx.shadowColor = 'transparent';
+                } else {
+                    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2 * scale;
+                    ctx.setLineDash([]);
+                    ctx.shadowColor = 'transparent';
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset
+                ctx.shadowBlur = 0;
+
+                // Weight Badge
+                const midX = (x1 + x2) / 2; const midY = (y1 + y2) / 2;
+                const r = 15 * scale; // Increased radius
+                ctx.beginPath(); ctx.arc(midX, midY, r, 0, Math.PI * 2);
+                ctx.fillStyle = (status === 'checking') ? '#eff6ff' : 'white'; ctx.fill();
+                
+                if (status === 'checking') { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5; ctx.stroke(); }
+                
+                ctx.fillStyle = (status === 'checking') ? '#1d4ed8' : '#94a3b8';
+                ctx.font = `700 ${20 * scale}px "Plus Jakarta Sans"`; // Increased font size
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(edge.w, midX, midY);
+            };
+
+            // Order: Normal -> Rejected -> Accepted -> Checking (Top)
+            edges.forEach(e => { if(!state.edgesStatus[e.id]) drawEdge(e, null); });
+            edges.forEach(e => { if(state.edgesStatus[e.id] === 'rejected') drawEdge(e, 'rejected'); });
+            edges.forEach(e => { if(state.edgesStatus[e.id] === 'accepted') drawEdge(e, 'accepted'); });
+            if (state.currEdgeId !== null) {
+                const e = edges.find(ed => ed.id === state.currEdgeId);
+                drawEdge(e, 'checking');
+            }
+
+            // 2. Draw Nodes
+            // Helper to find root for coloring
+            const findRoot = (id) => {
+                let curr = id;
+                while (state.parent[curr] !== curr) curr = state.parent[curr];
+                return curr;
+            };
+
+            nodes.forEach(node => {
+                const x = tx(node.x), y = ty(node.y);
+                const r = 34 * scale; // Increased radius
+                
+                const rootId = findRoot(node.id);
+                const rootColor = setColors[rootId]; // 每个集合一种颜色
+
+                // Outer Ring (Set Color)
+                ctx.beginPath(); ctx.arc(x, y, r + 4 * scale, 0, Math.PI * 2);
+                ctx.fillStyle = rootColor; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
+
+                // Main Circle
+                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = 'white'; ctx.fill();
+                
+                // Border
+                ctx.strokeStyle = rootColor; ctx.lineWidth = 3 * scale; ctx.stroke();
+
+                // Text
+                ctx.fillStyle = '#1e293b'; 
+                ctx.font = `bold ${26 * scale}px "Plus Jakarta Sans"`; // Increased font size
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(node.id, x, y);
+            });
+        }
+
+        function updateUI(state) {
+            const statusEl = document.getElementById('statusText');
+            statusEl.innerText = state.msg;
+
+            // 1. Update Union-Find Table
+            const ufBody = document.getElementById('ufTableBody');
+            ufBody.innerHTML = '';
+            
+            // Helper to trace root
+            const findRoot = (id) => {
+                let curr = id;
+                while (state.parent[curr] !== curr) curr = state.parent[curr];
+                return curr;
+            };
+
+            nodes.forEach(node => {
+                const parent = state.parent[node.id];
+                const root = findRoot(node.id);
+                const tr = document.createElement('tr');
+                
+                // Highlight changed nodes if needed (simplified here)
+                const color = setColors[root];
+                
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${node.id}</td>
+                    <td>${parent} <span style="color:#94a3b8">→</span> <strong>${root}</strong></td>
+                    <td><span class="dot" style="background:${color}; display:inline-block; vertical-align:middle;"></span></td>
+                `;
+                ufBody.appendChild(tr);
+            });
+
+            // 2. Update Edge List
+            const listContainer = document.getElementById('edgeListContainer');
+            listContainer.innerHTML = '';
+            
+            sortedEdges.forEach(edge => {
+                const status = state.edgesStatus[edge.id];
+                const isCurr = state.currEdgeId === edge.id;
+                
+                const el = document.createElement('div');
+                let className = 'edge-card';
+                let icon = '<span style="color:#cbd5e1">○</span>'; // pending
+                
+                if (isCurr) {
+                    className += ' current';
+                    icon = '<span style="color:#3b82f6">●</span>'; // checking
+                } else if (status === 'accepted') {
+                    className += ' accepted';
+                    icon = '<span style="color:#10b981">✓</span>';
+                } else if (status === 'rejected') {
+                    className += ' rejected';
+                    icon = '<span style="color:#ef4444">×</span>';
+                }
+
+                el.className = className;
+                el.innerHTML = `
+                    <div class="edge-info">
+                        ${icon}
+                        <span>${edge.u} - ${edge.v}</span>
+                    </div>
+                    <div class="edge-weight">${edge.w}</div>
+                `;
+                
+                // Auto scroll to current (Fix: Only scroll the container, not the whole page)
+                if (isCurr) {
+                    setTimeout(() => {
+                        const container = listContainer.parentElement; // .scroll-content
+                        if (container) {
+                            // Calculate position relative to container
+                            const elRect = el.getBoundingClientRect();
+                            const containerRect = container.getBoundingClientRect();
+                            const relativeTop = elRect.top - containerRect.top;
+                            const currentScroll = container.scrollTop;
+                            
+                            // Center the element in the container
+                            container.scrollTo({
+                                top: currentScroll + relativeTop - (container.clientHeight / 2) + (elRect.height / 2),
+                                behavior: 'smooth'
+                            });
+                        }
+                    }, 10);
+                }
+                
+                listContainer.appendChild(el);
+            });
+
+            // Controls
+            document.getElementById('btnPrev').disabled = currentStepIndex === 0;
+            document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
+        }
+
+        function render() {
+            const state = steps[currentStepIndex];
+            requestAnimationFrame(() => {
+                drawGraph(state);
+                updateUI(state);
+            });
+        }
+
+        // --- Controls ---
+        const btnNext = document.getElementById('btnNext');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnReset = document.getElementById('btnReset');
+        const iconPlay = document.getElementById('iconPlay');
+
+        function nextStep() { if (currentStepIndex < steps.length - 1) { currentStepIndex++; render(); } else stopPlay(); }
+        function prevStep() { if (currentStepIndex > 0) { currentStepIndex--; render(); } }
+        function reset() { stopPlay(); currentStepIndex = 0; render(); }
+        
+        function togglePlay() {
+            if (animationInterval) { stopPlay(); } 
+            else {
+                if (currentStepIndex === steps.length - 1) currentStepIndex = 0;
+                btnPlay.classList.add('btn-danger');
+                btnPlay.classList.remove('btn-primary');
+                // Update icon + text for vertical layout
+                const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+                btnPlay.innerHTML = `${svg}<span>暂停</span>`;
+                
+                nextStep();
+                animationInterval = setInterval(nextStep, 1500);
+            }
+        }
+        function stopPlay() {
+            clearInterval(animationInterval); animationInterval = null;
+            btnPlay.classList.remove('btn-danger');
+            btnPlay.classList.add('btn-primary');
+            const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            btnPlay.innerHTML = `${svg}<span>播放</span>`;
+        }
+
+        btnNext.addEventListener('click', () => { stopPlay(); nextStep(); });
+        btnPrev.addEventListener('click', () => { stopPlay(); prevStep(); });
+        btnReset.addEventListener('click', reset);
+        btnPlay.addEventListener('click', togglePlay);
+
+        window.addEventListener('load', () => { canvasDims = setupCanvas(); render(); });
+        window.addEventListener('resize', () => { canvasDims = setupCanvas(); render(); });
+
+    </script>
+</body>
+</html>
