@@ -9,7 +9,7 @@ tags:
 comments: true
 abbrlink: a5c070b0
 date: 2025-09-22 00:55:53
-updated: 2025-12-27 23:35:25
+updated: 2025-12-28 01:26:42
 typora-root-url: ..
 
 ---
@@ -37,7 +37,132 @@ typora-root-url: ..
 
 ![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766848848137.png)
 
+### 堆的操作
 
+<iframe
+src="/widgets/dsaa_maxheap.html"
+width="100%"
+style="height: 75vh; border: 1px solid #e2e8f0; border-radius: 8px;"
+frameborder="0"
+sandbox="allow-scripts allow-same-origin"
+></iframe>
+#### 元素入堆
+
+时间复杂度为 $O(\log n)$
+
+```java
+/* 元素入堆 */
+void push(int val) {
+    // 添加节点
+    maxHeap.add(val);
+    // 从底至顶堆化
+    siftUp(size() - 1);
+}
+
+/* 从节点 i 开始，从底至顶堆化 */
+void siftUp(int i) {
+    while (true) {
+        // 获取节点 i 的父节点
+        int p = parent(i);
+        // 当“越过根节点”或“节点无须修复”时，结束堆化
+        if (p < 0 || maxHeap.get(i) <= maxHeap.get(p))
+            break;
+        // 交换两节点
+        swap(i, p);
+        // 循环向上堆化
+        i = p;
+    }
+}
+```
+
+#### 元素出堆
+
+时间复杂度为 $O(\log n)$
+
+```java
+/* 元素出堆 */
+int pop() {
+    // 判空处理
+    if (isEmpty())
+        throw new IndexOutOfBoundsException();
+    // 交换根节点与最右叶节点（交换首元素与尾元素）
+    swap(0, size() - 1);
+    // 删除节点
+    int val = maxHeap.remove(size() - 1);
+    // 从顶至底堆化
+    siftDown(0);
+    // 返回堆顶元素
+    return val;
+}
+
+/* 从节点 i 开始，从顶至底堆化 */
+void siftDown(int i) {
+    while (true) {
+        // 判断节点 i, l, r 中值最大的节点，记为 ma
+        int l = left(i), r = right(i), ma = i;
+        if (l < size() && maxHeap.get(l) > maxHeap.get(ma))
+            ma = l;
+        if (r < size() && maxHeap.get(r) > maxHeap.get(ma))
+            ma = r;
+        // 若节点 i 最大或索引 l, r 越界，则无须继续堆化，跳出
+        if (ma == i)
+            break;
+        // 交换两节点
+        swap(i, ma);
+        // 循环向下堆化
+        i = ma;
+    }
+}
+```
+
+#### Root-fix 建堆
+
+时间复杂度为 $O(n)$
+
+**证明如下：**假设树的高度为 $h$（即 $\log N$），总操作次数 $S$ 是每一层节点数乘以该层节点可能下沉的最大高度
+
+- 倒数第 1 层（叶子）：$2^h$ 个节点，下沉 0 层。
+- 倒数第 2 层：$2^{h-1}$ 个节点，下沉 1 层。
+- 倒数第 3 层：$2^{h-2}$ 个节点，下沉 2 层。
+- ...
+- 根节点：$2^0$ 个节点，下沉 $h$ 层。
+
+总工作量公式：
+
+$$
+S = \sum_{i=0}^{h} 2^i \cdot (h-i) = 2^0 \cdot h + 2^1 \cdot (h-1) + \dots + 2^{h-1} \cdot 1
+$$
+
+利用错位相减法求和，结果为：
+
+$$
+S = 2^{h+1} - h - 2
+$$
+
+因为 $N \approx 2^{h+1}$，所以：
+
+$$
+S \approx N - \log N - 2
+$$
+
+结论：
+
+$$
+S = O(N)
+$$
+
+```java
+MaxHeap(List<Integer> nums) {
+    // 将列表元素原封不动添加进堆
+    maxHeap = new ArrayList<>(nums);
+    // 堆化除叶节点以外的其他所有节点，第一个最右边非叶子节点是最后一个节点的父节点
+    for (int i = parent(size() - 1); i >= 0; i--) {
+        siftDown(i);
+    }
+}
+```
+
+## BST
 
 ## 图
 
@@ -74,7 +199,7 @@ $$
 - 将邻接矩阵的元素从 $1$ 和 $0$ 替换为权重，则可表示有权图
 - Space = O(|V|+|E|) 
 
-#### 邻接表（adjacency list）
+#### 邻接表
 
 **邻接表（adjacency list）** 使用 $n$ 个链表来表示图，链表节点表示顶点。第 $i$ 个链表对应顶点 $i$ ，其中存储了该顶点的所有邻接顶点（与该顶点相连的顶点）
 

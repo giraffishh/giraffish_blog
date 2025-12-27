@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最大堆 (Max Heap) 详解 - Pro</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary: #4f46e5;
+            --bg-canvas: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: 50px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+        }
+        .brand {
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 700; font-size: 1.1rem; color: #0f172a;
+        }
+        .badge-info {
+            background: #eef2ff; color: var(--primary);
+            padding: 4px 12px; border-radius: 99px;
+            font-size: 0.75rem; font-weight: 600;
+            font-family: 'JetBrains Mono'; border: 1px solid #c7d2fe;
+        }
+
+        /* --- Main Layout (50:50 Vertical) --- */
+        main {
+            flex: 1; display: flex; flex-direction: column;
+            overflow: hidden; position: relative;
+        }
+
+        .panel-top {
+            flex: 1;
+            position: relative;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 24px 24px;
+            border-bottom: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .panel-bottom {
+            flex: 1;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+            z-index: 40;
+        }
+
+        /* --- Canvas --- */
+        #canvas-wrapper {
+            flex: 1; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }
+        canvas {
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            background: white;
+            max-width: 100%; max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* --- Floating Playback Controls (Right) --- */
+        .controls-island {
+            position: absolute; top: 50%; right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 8px; border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column; gap: 12px;
+            z-index: 20;
+        }
+        .btn {
+            border: none; background: transparent;
+            padding: 8px; border-radius: 10px;
+            font-family: 'Plus Jakarta Sans'; font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; color: var(--text-sub);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            min-width: 48px; transition: all 0.2s;
+        }
+        .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn span { font-size: 0.7rem; }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3); }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        
+        /* --- Legend --- */
+        .legend-card {
+            position: absolute; top: 24px; left: 24px;
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(8px);
+            padding: 12px 16px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-lg); font-size: 0.8rem; z-index: 20;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 500; color: var(--text-sub); }
+        .legend-item:last-child { margin-bottom: 0; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+
+        /* --- Bottom Panel --- */
+        .panel-header {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #fff, #f8fafc);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.75rem; font-weight: 700; color: var(--primary);
+            text-transform: uppercase; margin-bottom: 4px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
+        .status-text { font-size: 0.9rem; font-weight: 500; line-height: 1.4; }
+
+        .split-container { flex: 1; display: flex; overflow: hidden; }
+        .section-left { flex: 2; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; min-width: 0; }
+        .section-right { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f8fafc; }
+        
+        .section-title {
+            padding: 10px 24px; background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem; font-weight: 700; color: var(--text-sub);
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .scroll-content { flex: 1; overflow-y: auto; background: white; padding: 20px; }
+
+        /* Array Visual */
+        .array-container {
+            display: flex; gap: 4px; align-items: flex-end; justify-content: center;
+            padding-top: 10px; flex-wrap: wrap;
+        }
+        .array-cell {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .cell-box {
+            width: 48px; height: 48px;
+            border: 2px solid #cbd5e1; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono'; font-weight: 700; font-size: 1.1rem;
+            background: white; color: var(--text-main);
+            position: relative;
+        }
+        .cell-index {
+            font-family: 'JetBrains Mono'; font-size: 0.75rem; color: #94a3b8;
+        }
+        
+        /* States for Array & Tree (Synchronized Colors) */
+        .cell-box.state-compare { background: #fef08a; border-color: #eab308; transform: scale(1.05); }
+        .cell-box.state-swap { background: #fca5a5; border-color: #ef4444; color: #7f1d1d; }
+        .cell-box.state-sorted { background: #dbeafe; border-color: #93c5fd; color: #1e40af; opacity: 0.6; }
+        .cell-box.state-target { background: #86efac; border-color: #22c55e; color: #14532d; }
+        .cell-box.state-add { background: #bfdbfe; border-color: #3b82f6; }
+        .cell-box.state-path { background: #c4b5fd; border-color: #8b5cf6; }
+        
+        .cell-box.state-focus {
+            border-color: #4f46e5 !important;
+            border-width: 3px;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.25);
+            z-index: 10;
+            transform: scale(1.1);
+        }
+
+        /* Action Buttons (Bottom Right) */
+        .action-grid {
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .btn-action {
+            padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            background: white; cursor: pointer; text-align: left;
+            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+            position: relative;
+        }
+        .btn-action:hover { border-color: var(--primary); background: #eef2ff; }
+        .btn-action.active {
+            border-color: var(--primary);
+            background: #eef2ff;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+        .btn-action.active::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--primary); border-top-left-radius: 8px; border-bottom-left-radius: 8px;
+        }
+        .btn-action svg { color: var(--primary); }
+        .btn-action div { display: flex; flex-direction: column; }
+        .action-title { font-weight: 700; font-size: 0.85rem; color: var(--text-main); }
+        .action-desc { font-size: 0.7rem; color: var(--text-sub); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <path d="M12 2L2 22h20L12 2z"/>
+                <circle cx="12" cy="14" r="3"/>
+                <path d="M12 2v6"/>
+            </svg>
+            最大堆 (Max Heap)
+        </div>
+        <div class="badge-info">完全二叉树 / 数组</div>
+    </header>
+
+    <main>
+        <div class="panel-top">
+            <div class="legend-card">
+                <div class="legend-item"><span class="dot" style="background:white; border-color:#cbd5e1;"></span>普通节点</div>
+                <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#eab308;"></span>比较 (Compare)</div>
+                <div class="legend-item"><span class="dot" style="background:#fca5a5; border-color:#ef4444;"></span>交换 (Swap)</div>
+                <div class="legend-item"><span class="dot" style="background:#86efac; border-color:#22c55e;"></span>目标/扫描 (Target)</div>
+                <div class="legend-item"><span class="dot" style="background:#bfdbfe; border-color:#3b82f6;"></span>插入 (Insert)</div>
+                <div class="legend-item"><span class="dot" style="background:#c4b5fd; border-color:#8b5cf6;"></span>路径 (Path)</div>
+            </div>
+
+            <div id="canvas-wrapper">
+                <canvas id="graphCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="controls-island">
+                <button id="btnReset" class="btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    <span>重置</span>
+                </button>
+                <button id="btnPrev" class="btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span>后退</span>
+                </button>
+                <button id="btnPlay" class="btn btn-primary">
+                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>播放</span>
+                </button>
+                <button id="btnNext" class="btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <span>前进</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="panel-bottom">
+            <div class="panel-header">
+                <div class="status-badge">
+                    <div class="pulse-dot"></div>
+                    <span>当前操作: <span id="currentOp">Build Heap</span></span>
+                </div>
+                <div id="statusText" class="status-text">
+                    准备就绪。选择右侧操作以开始演示。
+                </div>
+            </div>
+
+            <div class="split-container">
+                <div class="section-left">
+                    <div class="section-title">数组视图 (Array View)</div>
+                    <div class="scroll-content">
+                        <div id="arrayContainer" class="array-container"></div>
+                        <div style="margin-top:20px; font-size:0.85rem; color:#64748b; line-height:1.6;">
+                            <strong>索引映射关系：</strong><br>
+                            • 父节点: <code>floor((i-1)/2)</code><br>
+                            • 左孩子: <code>2*i + 1</code><br>
+                            • 右孩子: <code>2*i + 2</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-right">
+                    <div class="section-title">演示控制</div>
+                    <div class="action-grid">
+                        <button id="btn-build" class="btn-action" onclick="initBuildHeap()">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                            <div>
+                                <span class="action-title">Build Heap (Root-fix)</span>
+                                <span class="action-desc">自下而上的线性建堆 (Sift Down)</span>
+                            </div>
+                        </button>
+                        <button id="btn-insert" class="btn-action" onclick="initInsert()">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                            <div>
+                                <span class="action-title">Insert</span>
+                                <span class="action-desc">插入新元素并上浮 (Sift Up)</span>
+                            </div>
+                        </button>
+                        <button id="btn-extract" class="btn-action" onclick="initExtractMax()">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            <div>
+                                <span class="action-title">Extract Max</span>
+                                <span class="action-desc">删除根节点并下沉 (Sift Down)</span>
+                            </div>
+                        </button>
+                        <button id="btn-find" class="btn-action" onclick="initFindRightmost()">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <div>
+                                <span class="action-title">Find Rightmost Leaf</span>
+                                <span class="action-desc">O(log n) 二进制导航法</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Data Logic ---
+        let heapArr = [];
+        let steps = [];
+        let currentStepIndex = 0;
+        let animationInterval = null;
+        let currentOpName = "None";
+
+        // Initial Random Data (Increased to 10 nodes for Build Heap)
+        const initialData = [3, 12, 5, 20, 15, 8, 2, 28, 1, 10];
+
+        function clone(arr) { return [...arr]; }
+
+        // --- Step Generators ---
+
+        // 1. Build Heap (Root-fix / Sift Down from bottom non-leaf)
+        function generateBuildHeapSteps() {
+            heapArr = clone(initialData);
+            const steps = [];
+            const n = heapArr.length;
+            
+            // Logic Change: Find parent of the last node
+            const lastIndex = n - 1;
+            const startIdx = Math.floor((lastIndex - 1) / 2);
+            
+            // Indices greater than startIdx are leaves
+            const leafStart = startIdx + 1;
+
+            steps.push({ 
+                type: 'INIT', arr: clone(heapArr), 
+                msg: `初始化: 数组大小 n=${n} (10个节点)。准备自下而上建堆。`, 
+                hl: [], focus: -1, heapSize: n 
+            });
+
+            // Explain Logic
+            steps.push({ 
+                type: 'TARGET', arr: clone(heapArr), 
+                msg: `逻辑: 找到最后一个节点(索引 ${lastIndex})，其父节点(索引 ${startIdx})即为最后一个非叶子节点。从该节点开始倒序调整。`, 
+                hl: [lastIndex, startIdx], focus: startIdx, heapSize: n 
+            });
+
+            // Explain Leaf Nodes (Optional, but good for context)
+            const leaves = [];
+            for(let i=leafStart; i<n; i++) leaves.push(i);
+            steps.push({ 
+                type: 'SCAN', arr: clone(heapArr), 
+                msg: `观察: 索引 ${leafStart} 到 ${n-1} 的节点都是叶子节点，天然满足堆性质，无需操作。`, 
+                hl: leaves, focus: -1, heapSize: n 
+            });
+
+            // Loop from startIdx down to 0 (Optimized Build Heap)
+            for (let i = startIdx; i >= 0; i--) {
+                const left = 2 * i + 1;
+                const right = 2 * i + 2;
+                const children = [];
+                if (left < n) children.push(left);
+                if (right < n) children.push(right);
+
+                // Highlight current node and children
+                const hlIndices = [i, ...children];
+
+                steps.push({ 
+                    type: 'SCAN', 
+                    arr: clone(heapArr), 
+                    msg: `扫描非叶子节点 ${i} (值为 ${heapArr[i]})，检查是否需要下沉。`, 
+                    hl: hlIndices, 
+                    focus: i, 
+                    heapSize: n 
+                });
+                siftDown(heapArr, i, n, steps);
+            }
+
+            steps.push({ type: 'DONE', arr: clone(heapArr), msg: '建堆完成！所有子树都满足最大堆性质。', hl: [], focus: -1, heapSize: heapArr.length });
+            return steps;
+        }
+
+        // 2. Insert (Sift Up)
+        function generateInsertSteps() {
+            // Start with a valid heap of 10 nodes
+            heapArr = [50, 45, 40, 25, 35, 20, 30, 10, 5, 15]; 
+            const steps = [];
+            const val = Math.floor(Math.random() * 40) + 51; // Random large value > 50 to likely float up
+            
+            steps.push({ type: 'INIT', arr: clone(heapArr), msg: `初始最大堆状态 (10个节点)。准备插入值 ${val}。`, hl: [], focus: -1, heapSize: heapArr.length });
+            
+            // Add to end
+            heapArr.push(val);
+            let idx = heapArr.length - 1;
+            
+            steps.push({ type: 'ADD', arr: clone(heapArr), msg: `将 ${val} 添加到数组末尾（树的下一个空叶子位置）。`, hl: [idx], focus: idx, heapSize: heapArr.length });
+
+            // Sift Up
+            while (idx > 0) {
+                const parentIdx = Math.floor((idx - 1) / 2);
+                
+                steps.push({ type: 'COMPARE', arr: clone(heapArr), msg: `比较节点 ${heapArr[idx]} (idx ${idx}) 与父节点 ${heapArr[parentIdx]} (idx ${parentIdx})。`, hl: [idx, parentIdx], focus: idx, heapSize: heapArr.length });
+
+                if (heapArr[idx] > heapArr[parentIdx]) {
+                    [heapArr[idx], heapArr[parentIdx]] = [heapArr[parentIdx], heapArr[idx]];
+                    steps.push({ type: 'SWAP', arr: clone(heapArr), msg: `${heapArr[parentIdx]} > ${heapArr[idx]}，破坏堆性质。交换两者。`, hl: [idx, parentIdx], focus: parentIdx, heapSize: heapArr.length });
+                    idx = parentIdx;
+                } else {
+                    steps.push({ type: 'OK', arr: clone(heapArr), msg: `${heapArr[idx]} <= 父节点，位置正确。上浮结束。`, hl: [idx, parentIdx], focus: idx, heapSize: heapArr.length });
+                    break;
+                }
+            }
+            
+            steps.push({ type: 'DONE', arr: clone(heapArr), msg: '插入完成。', hl: [], focus: -1, heapSize: heapArr.length });
+            return steps;
+        }
+
+        // 3. Extract Max (Swap Root & Last, Sift Down)
+        function generateExtractMaxSteps() {
+            // Start with a valid heap of 10 nodes
+            heapArr = [60, 50, 40, 30, 45, 35, 20, 10, 5, 25]; 
+            const steps = [];
+            const size = heapArr.length;
+            
+            steps.push({ type: 'INIT', arr: clone(heapArr), msg: '初始最大堆 (10个节点)。准备删除根节点 (最大值)。', hl: [0], focus: 0, heapSize: size });
+
+            if (size === 0) return steps;
+
+            [heapArr[0], heapArr[size - 1]] = [heapArr[size - 1], heapArr[0]];
+            steps.push({ type: 'SWAP_ROOT', arr: clone(heapArr), msg: '将根节点 (最大值) 与最后一个叶子交换。', hl: [0, size-1], focus: size-1, heapSize: size });
+
+            const maxVal = heapArr.pop();
+            steps.push({ type: 'POP', arr: clone(heapArr), msg: `移除末尾节点 ${maxVal}。现在根节点破坏了堆性质，需要下沉。`, hl: [], focus: -1, heapSize: size - 1 });
+
+            if (heapArr.length > 0) {
+                siftDown(heapArr, 0, heapArr.length, steps);
+            }
+
+            steps.push({ type: 'DONE', arr: clone(heapArr), msg: '删除完成。', hl: [], focus: -1, heapSize: heapArr.length });
+            return steps;
+        }
+
+        // 4. Find Rightmost Leaf (O(log n) logic)
+        function generateFindSteps() {
+            heapArr = [20, 15, 8, 3, 12, 5, 2, 1, 0, 4]; // Size 10
+            const steps = [];
+            const n = heapArr.length;
+            
+            steps.push({ type: 'INIT', arr: clone(heapArr), msg: `堆大小 n = ${n}。目标是找到数组的最后一个元素 (Rightmost Leaf)。`, hl: [], focus: -1, heapSize: n });
+            
+            if (n === 0) return steps;
+
+            // 1. Convert to Binary
+            const binStr = n.toString(2);
+            steps.push({ type: 'INFO', arr: clone(heapArr), msg: `步骤 1: 将 n=${n} 转为二进制 => "${binStr}"。`, hl: [], focus: -1, heapSize: n });
+
+            // 2. Skip MSB
+            const navBits = binStr.substring(1);
+            steps.push({ type: 'INFO', arr: clone(heapArr), msg: `步骤 2: 忽略最高位 (MSB)。剩余导航位: "${navBits}"。从根节点开始。`, hl: [0], focus: 0, heapSize: n });
+
+            let currIdx = 0;
+            const path = [0];
+
+            // 3. Traverse
+            for (let i = 0; i < navBits.length; i++) {
+                const bit = navBits[i];
+                const direction = (bit === '0') ? '左 (0)' : '右 (1)';
+                
+                // Calculate next index based on 0-based array logic: Left=2i+1, Right=2i+2
+                const nextIdx = (bit === '0') ? (2 * currIdx + 1) : (2 * currIdx + 2);
+                
+                path.push(nextIdx);
+                
+                steps.push({ 
+                    type: 'PATH', 
+                    arr: clone(heapArr), 
+                    msg: `位是 '${bit}' -> 向${direction}走。索引 ${currIdx} -> ${nextIdx}。`, 
+                    hl: [...path], // Highlight path so far
+                    focus: nextIdx, 
+                    heapSize: n 
+                });
+                
+                currIdx = nextIdx;
+            }
+            
+            steps.push({ 
+                type: 'TARGET', 
+                arr: clone(heapArr), 
+                msg: `抵达目标！节点 ${heapArr[currIdx]} (索引 ${currIdx}) 即为最右叶子。耗时 O(log n)。`, 
+                hl: [...path], 
+                focus: currIdx, 
+                heapSize: n 
+            });
+            
+            return steps;
+        }
+
+        // Helper: Sift Down Logic with Step Recording
+        function siftDown(arr, idx, size, steps) {
+            let curr = idx;
+            while (true) {
+                let left = 2 * curr + 1;
+                let right = 2 * curr + 2;
+                let largest = curr;
+
+                if (left < size) {
+                    steps.push({ type: 'COMPARE', arr: clone(arr), msg: `比较节点 ${arr[curr]} 与左孩子 ${arr[left]}。`, hl: [curr, left], focus: curr, heapSize: size });
+                    if (arr[left] > arr[largest]) largest = left;
+                }
+
+                if (right < size) {
+                    steps.push({ type: 'COMPARE', arr: clone(arr), msg: `比较当前最大 ${arr[largest]} 与右孩子 ${arr[right]}。`, hl: [largest, right], focus: curr, heapSize: size });
+                    if (arr[right] > arr[largest]) largest = right;
+                }
+
+                if (largest !== curr) {
+                    [arr[curr], arr[largest]] = [arr[largest], arr[curr]];
+                    steps.push({ type: 'SWAP', arr: clone(arr), msg: `孩子节点 ${arr[curr]} 更大，交换下沉。`, hl: [curr, largest], focus: largest, heapSize: size });
+                    curr = largest;
+                } else {
+                    steps.push({ type: 'OK', arr: clone(arr), msg: `节点 ${arr[curr]} 位置正确 (比孩子大或无孩子)。`, hl: [curr], focus: curr, heapSize: size });
+                    break;
+                }
+            }
+        }
+
+        // --- 3. Rendering ---
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        let canvasDims = { width: 800, height: 600 };
+
+        function setupCanvas() {
+            const container = document.getElementById('canvas-wrapper');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            const w = rect.width; const h = rect.height;
+            if (w <= 0) return { width: 800, height: 600 };
+            canvas.width = w * dpr; canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+            return { width: w, height: h };
+        }
+
+        function drawTree(state) {
+            const { width, height } = canvasDims;
+            ctx.clearRect(0, 0, width, height);
+            
+            if (state.arr.length === 0) return;
+
+            const levels = Math.floor(Math.log2(state.arr.length)) + 1;
+            const startY = 60;
+            const levelHeight = Math.min(100, (height - 100) / levels);
+            
+            const getCoords = (i) => {
+                const level = Math.floor(Math.log2(i + 1));
+                const nodesInLevel = Math.pow(2, level);
+                const posInLevel = i - nodesInLevel + 1;
+                const totalWidth = width;
+                const x = (totalWidth / (nodesInLevel + 1)) * (posInLevel + 1);
+                const y = startY + level * levelHeight;
+                return { x, y };
+            };
+
+            // Edges
+            for (let i = 0; i < state.arr.length; i++) {
+                if (i > 0) {
+                    const parentIdx = Math.floor((i - 1) / 2);
+                    const p = getCoords(parentIdx);
+                    const c = getCoords(i);
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(c.x, c.y);
+                    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+
+            // Nodes
+            for (let i = 0; i < state.arr.length; i++) {
+                const { x, y } = getCoords(i);
+                const r = 24;
+                
+                let bg = 'white'; let border = '#cbd5e1'; let textCol = '#1e293b';
+                
+                if (state.hl.includes(i)) {
+                    if (state.type === 'COMPARE') { bg = '#fef08a'; border = '#eab308'; }
+                    else if (state.type === 'SWAP' || state.type === 'SWAP_ROOT') { bg = '#fca5a5'; border = '#ef4444'; }
+                    else if (state.type === 'TARGET' || state.type === 'SCAN') { bg = '#86efac'; border = '#22c55e'; }
+                    else if (state.type === 'ADD') { bg = '#bfdbfe'; border = '#3b82f6'; }
+                    else if (state.type === 'PATH') { bg = '#c4b5fd'; border = '#8b5cf6'; }
+                }
+                
+                if (state.focus === i) {
+                    ctx.shadowBlur = 15; ctx.shadowColor = 'rgba(79, 70, 229, 0.4)';
+                    border = '#4f46e5'; ctx.lineWidth = 3;
+                } else {
+                    ctx.shadowBlur = 0; ctx.lineWidth = 2;
+                }
+
+                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = bg; ctx.fill();
+                ctx.strokeStyle = border; ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = textCol; 
+                ctx.font = 'bold 18px "JetBrains Mono"';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(state.arr[i], x, y);
+                
+                ctx.fillStyle = '#94a3b8'; ctx.font = '12px "Plus Jakarta Sans"';
+                ctx.fillText(i, x, y - 36);
+            }
+        }
+
+        function updateArrayUI(state) {
+            const container = document.getElementById('arrayContainer');
+            container.innerHTML = '';
+            
+            state.arr.forEach((val, i) => {
+                const cell = document.createElement('div');
+                cell.className = 'array-cell';
+                
+                let boxClass = 'cell-box';
+                if (state.hl.includes(i)) {
+                    if (state.type === 'COMPARE') boxClass += ' state-compare';
+                    else if (state.type === 'SWAP' || state.type === 'SWAP_ROOT') boxClass += ' state-swap';
+                    else if (state.type === 'TARGET' || state.type === 'SCAN') boxClass += ' state-target';
+                    else if (state.type === 'ADD') boxClass += ' state-add'; // Now uses blue!
+                    else if (state.type === 'PATH') boxClass += ' state-path';
+                }
+                
+                // Add Focus Class (Synchronize with Tree View)
+                if (state.focus === i) {
+                    boxClass += ' state-focus';
+                }
+                
+                if (i >= state.heapSize) {
+                    boxClass += ' state-sorted';
+                }
+
+                cell.innerHTML = `<div class="${boxClass}">${val}</div><div class="cell-index">${i}</div>`;
+                container.appendChild(cell);
+            });
+        }
+
+        function updateUI(state) {
+            document.getElementById('statusText').innerText = state.msg;
+            document.getElementById('currentOp').innerText = currentOpName;
+            document.getElementById('btnPrev').disabled = currentStepIndex === 0;
+            document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
+            updateArrayUI(state);
+        }
+
+        function render() {
+            if (!steps[currentStepIndex]) return;
+            const state = steps[currentStepIndex];
+            requestAnimationFrame(() => {
+                drawTree(state);
+                updateUI(state);
+            });
+        }
+
+        function loadSteps(newSteps, name) {
+            stopPlay();
+            steps = newSteps;
+            currentStepIndex = 0;
+            currentOpName = name;
+            render();
+        }
+
+        // Helper to manage active button state
+        function setActiveButton(id) {
+            document.querySelectorAll('.btn-action').forEach(btn => btn.classList.remove('active'));
+            if(id) document.getElementById(id).classList.add('active');
+        }
+
+        function initBuildHeap() { 
+            setActiveButton('btn-build');
+            loadSteps(generateBuildHeapSteps(), "Build Heap"); 
+        }
+        function initInsert() { 
+            setActiveButton('btn-insert');
+            loadSteps(generateInsertSteps(), "Insert"); 
+        }
+        function initExtractMax() { 
+            setActiveButton('btn-extract');
+            loadSteps(generateExtractMaxSteps(), "Extract Max"); 
+        }
+        function initFindRightmost() { 
+            setActiveButton('btn-find');
+            loadSteps(generateFindSteps(), "Find Rightmost"); 
+        }
+
+        const btnNext = document.getElementById('btnNext');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnReset = document.getElementById('btnReset');
+
+        function nextStep() { if (currentStepIndex < steps.length - 1) { currentStepIndex++; render(); } else stopPlay(); }
+        function prevStep() { if (currentStepIndex > 0) { currentStepIndex--; render(); } }
+        function reset() { stopPlay(); currentStepIndex = 0; render(); }
+        
+        function togglePlay() {
+            if (animationInterval) stopPlay();
+            else {
+                if (currentStepIndex === steps.length - 1) currentStepIndex = 0;
+                btnPlay.classList.add('btn-danger'); btnPlay.classList.remove('btn-primary');
+                btnPlay.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>暂停</span>`;
+                nextStep();
+                animationInterval = setInterval(nextStep, 1000);
+            }
+        }
+        function stopPlay() {
+            clearInterval(animationInterval); animationInterval = null;
+            btnPlay.classList.remove('btn-danger'); btnPlay.classList.add('btn-primary');
+            btnPlay.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>播放</span>`;
+        }
+
+        btnNext.addEventListener('click', () => { stopPlay(); nextStep(); });
+        btnPrev.addEventListener('click', () => { stopPlay(); prevStep(); });
+        btnReset.addEventListener('click', reset);
+        btnPlay.addEventListener('click', togglePlay);
+
+        window.addEventListener('load', () => { 
+            canvasDims = setupCanvas(); 
+            initBuildHeap(); // Default start
+        });
+        window.addEventListener('resize', () => { 
+            canvasDims = setupCanvas(); 
+            render(); 
+        });
+
+    </script>
+</body>
+</html>
