@@ -59,7 +59,7 @@
             color: #0f172a;
         }
         
-        .badge-info {
+        .badge-start {
             background: #eef2ff;
             color: var(--primary);
             padding: 4px 12px;
@@ -186,7 +186,9 @@
             gap: 4px;
             min-width: 48px;
         }
-        .btn span { font-size: 0.7rem; }
+        .btn span {
+            font-size: 0.7rem;
+        }
         .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
         .btn:active:not(:disabled) { transform: translateY(0); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -197,7 +199,12 @@
             box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
         }
         .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
-        .btn-danger { background: var(--danger); color: white; }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover { background: #dc2626; color: white; }
         .btn-danger:hover { background: #dc2626; color: white; }
 
         /* --- 下方数据面板 --- */
@@ -349,7 +356,7 @@
             </svg>
             Prim 动图详解
         </div>
-        <div class="badge-info">最小生成树 (MST)</div>
+        <div class="badge-start">最小生成树 (MST)</div>
     </header>
 
     <main>

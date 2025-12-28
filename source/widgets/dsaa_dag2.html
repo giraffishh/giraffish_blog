@@ -50,11 +50,15 @@
             display: flex; align-items: center; gap: 10px;
             font-weight: 700; font-size: 1.1rem; color: #0f172a;
         }
-        .badge-info {
-            background: #eef2ff; color: var(--primary);
-            padding: 4px 12px; border-radius: 99px;
-            font-size: 0.75rem; font-weight: 600;
-            font-family: 'JetBrains Mono'; border: 1px solid #c7d2fe;
+        .badge-start {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid #c7d2fe;
         }
 
         /* --- Main Layout --- */
@@ -100,32 +104,60 @@
             object-fit: contain;
         }
 
-        /* --- Controls --- */
+        /* --- 悬浮控制栏 (右侧垂直) --- */
         .controls-island {
-            position: absolute; top: 50%; right: 20px;
+            position: absolute;
+            top: 50%;
+            right: 20px;
             transform: translateY(-50%);
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            padding: 12px 8px; border-radius: 16px;
+            padding: 12px 8px;
+            border-radius: 16px;
             border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: var(--shadow-lg);
-            display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
             z-index: 20;
         }
+        
         .btn {
-            border: none; background: transparent;
-            padding: 8px; border-radius: 10px;
-            font-family: 'Plus Jakarta Sans'; font-weight: 600; font-size: 0.85rem;
-            cursor: pointer; color: var(--text-sub);
-            display: flex; flex-direction: column; align-items: center; gap: 4px;
-            min-width: 48px; transition: all 0.2s;
+            border: none;
+            background: transparent;
+            padding: 8px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 48px;
+        }
+        .btn span {
+            font-size: 0.7rem;
         }
         .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn span { font-size: 0.7rem; }
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3); }
-        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; }
-        .btn-danger { background: #ef4444; color: white; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover { background: #dc2626; color: white; }
         
         /* --- Legend --- */
         .legend-card {
@@ -247,7 +279,7 @@
             </svg>
             BFS 拓扑排序
         </div>
-        <div class="badge-info">Kahn 算法</div>
+        <div class="badge-start">Kahn 算法</div>
     </header>
 
     <main>
