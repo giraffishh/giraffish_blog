@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prim 算法可视化演示 (Pro)</title>
+    <title>Bellman-Ford 算法可视化演示</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
@@ -15,10 +15,6 @@
             --border-color: #e2e8f0;
             --text-main: #1e293b;
             --text-sub: #64748b;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            
             --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -59,7 +55,7 @@
             color: #0f172a;
         }
         
-        .badge-info {
+        .badge-start {
             background: #eef2ff;
             color: var(--primary);
             padding: 4px 12px;
@@ -76,7 +72,7 @@
             display: flex;
             overflow: hidden;
             position: relative;
-            flex-direction: column; /* 垂直 50:50 */
+            flex-direction: column;
         }
 
         /* 上半部分：图表区 */
@@ -150,6 +146,7 @@
         }
         .legend-item:last-child { margin-bottom: 0; }
         .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+        .line-legend { width: 24px; height: 3px; border-radius: 2px; }
 
         /* --- 悬浮控制栏 (右侧垂直) --- */
         .controls-island {
@@ -186,7 +183,9 @@
             gap: 4px;
             min-width: 48px;
         }
-        .btn span { font-size: 0.7rem; }
+        .btn span {
+            font-size: 0.7rem;
+        }
         .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
         .btn:active:not(:disabled) { transform: translateY(0); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -197,7 +196,11 @@
             box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
         }
         .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
-        .btn-danger { background: var(--danger); color: white; }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
         .btn-danger:hover { background: #dc2626; color: white; }
 
         /* --- 下方数据面板 --- */
@@ -226,7 +229,7 @@
             font-weight: 500;
         }
 
-        /* 左右分块容器 */
+        /* 左右分块 */
         .split-container {
             flex: 1;
             display: flex;
@@ -270,21 +273,32 @@
             z-index: 10;
         }
 
-        /* 数据表 */
-        .data-table { width: 100%; border-collapse: collapse; }
+        /* 表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
         .data-table th {
-            text-align: left; padding: 8px 16px; font-size: 0.75rem; color: var(--text-sub);
-            background: white; border-bottom: 1px solid var(--border-color);
-            position: sticky; top: 0; z-index: 5;
+            text-align: left;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 5;
         }
         .data-table td {
-            padding: 8px 16px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
         }
         .data-table tr:last-child td { border-bottom: none; }
-
-        /* 堆列表 */
-        .heap-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-        .heap-card {
+        
+        /* 边列表 */
+        .edge-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+        .edge-card {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -294,21 +308,38 @@
             background: white;
             transition: all 0.3s ease;
         }
-        .heap-card.first { border-color: #c7d2fe; background: #eef2ff; }
-        .heap-node {
-            width: 24px; height: 24px; background: #f1f5f9; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 0.75rem; color: var(--text-sub);
+        .edge-card.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            transform: translateX(4px);
         }
-        .heap-card.first .heap-node { background: white; color: var(--primary); }
-        .heap-dist { font-family: 'JetBrains Mono'; font-weight: 600; color: var(--text-sub); font-size: 0.9rem; }
-        .heap-card.first .heap-dist { color: var(--primary); }
+        .edge-card.updated {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+        .edge-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+        .edge-weight {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
 
         /* 动画 */
         .anim-update { animation: highlight-pulse 1s; }
-        @keyframes highlight-pulse { 0% { background-color: #fef3c7; } 100% { background-color: transparent; } }
+        @keyframes highlight-pulse {
+            0% { background-color: #fef3c7; }
+            100% { background-color: transparent; }
+        }
 
-        /* 滚动条 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
@@ -345,11 +376,12 @@
     <header>
         <div class="brand">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
             </svg>
-            Prim 动图详解
+            Bellman-Ford 动图详解
         </div>
-        <div class="badge-info">最小生成树 (MST)</div>
+        <div class="badge-start">Start: A</div>
     </header>
 
     <main>
@@ -358,9 +390,9 @@
             <div id="canvas-wrapper">
                 <div class="legend-card">
                     <div class="legend-item"><span class="dot" style="background:#f1f5f9; border-color:#94a3b8;"></span>未访问</div>
-                    <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#ca8a04;"></span>当前节点 (U)</div>
-                    <div class="legend-item"><span class="dot" style="background:#dcfce7; border-color:#16a34a;"></span>MST 节点</div>
-                    <div class="legend-item"><span class="dot" style="background:#bfdbfe; border-color:#2563eb;"></span>检查邻居 (V)</div>
+                    <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#ca8a04;"></span>当前节点</div>
+                    <div class="legend-item"><span class="line-legend" style="background:#3b82f6;"></span>检查边</div>
+                    <div class="legend-item"><span class="line-legend" style="background:#22c55e;"></span>松弛成功</div>
                 </div>
 
                 <canvas id="graphCanvas" width="800" height="600"></canvas>
@@ -391,32 +423,32 @@
             <div class="panel-header">
                 <div class="status-badge">
                     <div class="pulse-dot"></div>
-                    <span>当前状态</span>
+                    <span>当前操作</span>
                 </div>
                 <div id="statusText" class="status-text">
-                    准备就绪。从节点 A 开始构建最小生成树。
+                    准备就绪。
                 </div>
             </div>
 
             <div class="split-container">
-                <!-- 左下：节点花费表 -->
+                <!-- 左下：距离表 -->
                 <div class="section-left">
-                    <div class="section-title">节点表 (Cost & Parent)</div>
+                    <div class="section-title">距离表 (Distance)</div>
                     <div class="scroll-content">
                         <table class="data-table">
                             <thead>
-                                <tr><th>Node</th><th>Cost (Min Edge)</th><th>Parent</th><th>In MST?</th></tr>
+                                <tr><th>Node</th><th>Dist</th><th>Prev</th><th>State</th></tr>
                             </thead>
                             <tbody id="distTableBody"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- 右下：优先队列 -->
+                <!-- 右下：边列表 -->
                 <div class="section-right">
-                    <div class="section-title">优先队列 (按 Cost 排序)</div>
+                    <div class="section-title">边列表 (Relaxation Order)</div>
                     <div class="scroll-content">
-                        <div id="heapContainer" class="heap-list"></div>
+                        <div id="edgeListContainer" class="edge-list"></div>
                     </div>
                 </div>
             </div>
@@ -424,7 +456,7 @@
     </main>
 
     <script>
-        // --- 1. Graph Data (Undirected) ---
+        // --- 1. Graph Data ---
         const nodes = [
             { id: 'A', x: 150, y: 300 },
             { id: 'B', x: 300, y: 150 },
@@ -434,133 +466,122 @@
             { id: 'F', x: 650, y: 300 }
         ];
 
-        // Ensure edges are treated as undirected visually and logically
+        // 包含负权边的图
         const edges = [
-            { from: 'A', to: 'B', weight: 4 },
+            { from: 'A', to: 'B', weight: 5 },
             { from: 'A', to: 'C', weight: 2 },
-            { from: 'B', to: 'C', weight: 1 },
-            { from: 'B', to: 'D', weight: 5 },
-            { from: 'C', to: 'E', weight: 10 },
-            { from: 'C', to: 'D', weight: 8 },
-            { from: 'D', to: 'E', weight: 2 },
-            { from: 'D', to: 'F', weight: 6 },
-            { from: 'E', to: 'F', weight: 3 }
+            { from: 'B', to: 'D', weight: 1 },
+            { from: 'C', to: 'B', weight: 1 },
+            { from: 'C', to: 'D', weight: 4 },
+            { from: 'C', to: 'E', weight: 4 },
+            { from: 'D', to: 'E', weight: -1 }, // 负权边
+            { from: 'D', to: 'F', weight: 3 },
+            { from: 'E', to: 'F', weight: 1 }
         ];
 
         // --- 2. Canvas Setup ---
         const canvas = document.getElementById('graphCanvas');
         const ctx = canvas.getContext('2d');
-        let canvasDims = { width: 800, height: 600 };
-
+        
         function setupCanvas() {
             const container = document.getElementById('canvas-wrapper');
             const dpr = window.devicePixelRatio || 1;
             const rect = container.getBoundingClientRect();
+            
             const w = rect.width - 40; 
             const h = rect.height - 40;
+            
             if (w <= 0 || h <= 0) return { width: 800, height: 600 };
-            canvas.width = w * dpr; canvas.height = h * dpr;
+
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
             ctx.scale(dpr, dpr);
-            canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+
             return { width: w, height: h };
         }
 
         function getScaleFactors(width, height) {
-            const scaleX = width / 800; const scaleY = height / 600;
+            const scaleX = width / 800;
+            const scaleY = height / 600;
             const scale = Math.min(scaleX, scaleY);
             const offsetX = (width - 800 * scale) / 2;
             const offsetY = (height - 600 * scale) / 2;
             return { scale, offsetX, offsetY };
         }
 
-        // --- 3. Prim Algorithm Logic ---
+        let canvasDims = { width: 800, height: 600 };
+        
+        // --- 3. Algorithm Logic (Bellman-Ford) ---
         function generateSteps(startNodeId) {
             const steps = [];
-            
-            // Initialization
-            const cost = {}; // min edge weight to connect to MST
-            const parent = {};
-            const visited = new Set(); // nodes in MST
-            const unvisited = new Set(); // priority queue candidates
+            const dist = {};
+            const prev = {};
             
             nodes.forEach(n => {
-                cost[n.id] = Infinity;
-                parent[n.id] = null;
-                unvisited.add(n.id);
+                dist[n.id] = Infinity;
+                prev[n.id] = null;
             });
-            cost[startNodeId] = 0;
-
-            const getQueueState = () => Array.from(unvisited)
-                .map(id => ({ id, dist: cost[id] })) // reuse dist prop for layout consistency
-                .sort((a, b) => a.dist - b.dist);
+            dist[startNodeId] = 0;
 
             steps.push({
-                type: 'INIT', msg: `初始化: 起点 ${startNodeId} Cost=0, 其他 Cost=∞`,
-                cost: {...cost}, parent: {...parent}, visited: new Set(visited),
-                currNode: null, checkNode: null, updatedNode: null, queue: getQueueState()
+                type: 'INIT', msg: `初始化: 起点 ${startNodeId} dist=0`,
+                dist: {...dist}, prev: {...prev},
+                activeEdge: null, updatedNode: null, iteration: 0
             });
 
-            while (unvisited.size > 0) {
-                // Extract Min
-                let u = null;
-                let minCost = Infinity;
-                unvisited.forEach(nodeId => {
-                    if (cost[nodeId] < minCost) { minCost = cost[nodeId]; u = nodeId; }
-                });
-
-                if (u === null || cost[u] === Infinity) break;
-
-                // Visual trick: add u to visited immediately for the PICK step to show connection
-                const visualVisited = new Set(visited);
-                visualVisited.add(u);
-
+            // V-1 轮松弛
+            for (let i = 1; i < nodes.length; i++) {
+                let changed = false;
                 steps.push({
-                    type: 'PICK', msg: `选入最小 Cost 节点: ${u} (Cost=${cost[u]})`,
-                    cost: {...cost}, parent: {...parent}, visited: visualVisited,
-                    currNode: u, checkNode: null, updatedNode: null, queue: getQueueState()
+                    type: 'ITERATION_START', msg: `开始第 ${i} 轮松弛 (共 ${nodes.length-1} 轮)`,
+                    dist: {...dist}, prev: {...prev},
+                    activeEdge: null, updatedNode: null, iteration: i
                 });
 
-                unvisited.delete(u);
-                visited.add(u);
-
-                // Get neighbors (Undirected)
-                const neighbors = edges.filter(e => e.from === u || e.to === u)
-                    .map(e => ({ id: e.from === u ? e.to : e.from, weight: e.weight }))
-                    .sort((a,b) => a.id.localeCompare(b.id));
-
-                for (let neighbor of neighbors) {
-                    const v = neighbor.id;
-                    const weight = neighbor.weight;
-                    
-                    if (visited.has(v)) continue;
+                for (let j = 0; j < edges.length; j++) {
+                    const edge = edges[j];
+                    const u = edge.from;
+                    const v = edge.to;
+                    const w = edge.weight;
 
                     steps.push({
-                        type: 'CHECK',
-                        msg: `检查边 ${u}-${v} (权重 ${weight})。对比 Cost[${v}]=${cost[v]===Infinity?'∞':cost[v]}`,
-                        cost: {...cost}, parent: {...parent}, visited: new Set(visited),
-                        currNode: u, checkNode: v, updatedNode: null, queue: getQueueState()
+                        type: 'CHECK', 
+                        msg: `检查边 ${u} -> ${v} (权重 ${w})`,
+                        dist: {...dist}, prev: {...prev},
+                        activeEdge: j, updatedNode: null, iteration: i
                     });
 
-                    // Prim's Relaxation: Weight < Cost[v]
-                    if (weight < cost[v]) {
-                        cost[v] = weight;
-                        parent[v] = u;
+                    if (dist[u] !== Infinity && dist[u] + w < dist[v]) {
+                        dist[v] = dist[u] + w;
+                        prev[v] = u;
+                        changed = true;
                         
                         steps.push({
-                            type: 'UPDATE', msg: `更新 ${v}: 发现更短边 (${weight} < ${cost[v]===Infinity?'∞':cost[v]})`,
-                            cost: {...cost}, parent: {...parent}, visited: new Set(visited),
-                            currNode: u, checkNode: v, updatedNode: v, queue: getQueueState()
+                            type: 'UPDATE', 
+                            msg: `松弛成功: ${v} 的距离更新为 ${dist[v]} (来自 ${u})`,
+                            dist: {...dist}, prev: {...prev},
+                            activeEdge: j, updatedNode: v, iteration: i
                         });
                     }
+                }
+
+                if (!changed) {
+                    steps.push({
+                        type: 'BREAK', msg: `第 ${i} 轮未发生更新，算法提前结束`,
+                        dist: {...dist}, prev: {...prev},
+                        activeEdge: null, updatedNode: null, iteration: i
+                    });
+                    break;
                 }
             }
 
             steps.push({
-                type: 'DONE', msg: `算法完成! 最小生成树构建完毕。`,
-                cost: {...cost}, parent: {...parent}, visited: new Set(visited),
-                currNode: null, checkNode: null, updatedNode: null, queue: []
+                type: 'DONE', msg: `算法完成`,
+                dist: {...dist}, prev: {...prev},
+                activeEdge: null, updatedNode: null, iteration: nodes.length
             });
-
             return steps;
         }
 
@@ -572,31 +593,23 @@
         function drawGraph(state) {
             const { width, height } = canvasDims;
             const { scale, offsetX, offsetY } = getScaleFactors(width, height);
+            
             ctx.clearRect(0, 0, width, height);
 
             const tx = (val) => val * scale + offsetX;
             const ty = (val) => val * scale + offsetY;
 
             // Draw Edges
-            edges.forEach(edge => {
+            edges.forEach((edge, idx) => {
                 const n1 = nodes.find(n => n.id === edge.from);
                 const n2 = nodes.find(n => n.id === edge.to);
                 const x1 = tx(n1.x), y1 = ty(n1.y);
                 const x2 = tx(n2.x), y2 = ty(n2.y);
 
-                let isMST = false;
-                let isActive = false;
-
-                // Edge is in MST if one node is parent of other AND both are visited
-                if (state.visited.has(edge.from) && state.visited.has(edge.to) && 
-                   (state.parent[edge.to]===edge.from || state.parent[edge.from]===edge.to)) {
-                    isMST = true;
-                }
-
-                if (state.currNode && state.checkNode) {
-                     if ((state.currNode === edge.from && state.checkNode === edge.to) || 
-                         (state.currNode === edge.to && state.checkNode === edge.from)) isActive = true;
-                }
+                let isActive = (state.activeEdge === idx);
+                let isPath = false;
+                // Highlight path edges if algorithm is done or for updated nodes
+                if (state.prev[edge.to] === edge.from) isPath = true;
 
                 ctx.beginPath();
                 ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
@@ -604,7 +617,7 @@
                 if (isActive) { 
                     ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4 * scale; 
                     ctx.shadowColor = 'rgba(59, 130, 246, 0.4)'; ctx.shadowBlur = 8;
-                } else if (isMST) { 
+                } else if (isPath) { 
                     ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3 * scale; 
                     ctx.shadowColor = 'transparent';
                 } else { 
@@ -612,13 +625,15 @@
                     ctx.shadowColor = 'transparent';
                 }
                 ctx.stroke();
-                ctx.shadowBlur = 0; 
+                ctx.shadowBlur = 0;
 
                 // Weight Label
-                const midX = (x1 + x2) / 2; const midY = (y1 + y2) / 2;
+                const midX = (x1 + x2) / 2; 
+                const midY = (y1 + y2) / 2;
                 const r = 15 * scale;
                 ctx.beginPath(); ctx.arc(midX, midY, r, 0, Math.PI * 2);
-                ctx.fillStyle = isActive ? '#eff6ff' : 'white'; ctx.fill();
+                ctx.fillStyle = isActive ? '#eff6ff' : 'white'; 
+                ctx.fill();
                 if (isActive) { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5; ctx.stroke(); }
                 
                 ctx.fillStyle = isActive ? '#1d4ed8' : '#94a3b8';
@@ -632,40 +647,43 @@
                 const x = tx(node.x), y = ty(node.y);
                 const r = 36 * scale;
                 
-                let bg = 'white'; let border = '#cbd5e1'; let text = '#475569';
-                let shadowColor = 'rgba(0,0,0,0.05)'; let shadowSize = 10;
+                let bg = 'white'; 
+                let border = '#cbd5e1'; 
+                let text = '#475569';
+                let shadowColor = 'rgba(0,0,0,0.05)';
+                let shadowSize = 10;
 
-                if (state.currNode === node.id) { 
-                    bg = '#fffbeb'; border = '#f59e0b'; text = '#b45309';
-                    shadowColor = 'rgba(245, 158, 11, 0.4)'; shadowSize = 20;
-                } else if (state.checkNode === node.id) { 
-                    bg = '#eff6ff'; border = '#3b82f6'; text = '#1d4ed8';
-                    shadowColor = 'rgba(59, 130, 246, 0.4)'; shadowSize = 20;
-                } else if (state.visited.has(node.id)) { 
+                if (state.updatedNode === node.id) { 
                     bg = '#f0fdf4'; border = '#22c55e'; text = '#15803d';
+                    shadowColor = 'rgba(34, 197, 94, 0.4)'; shadowSize = 20;
+                } else if (state.dist[node.id] !== Infinity) {
+                    // Visited/Reachable
+                    bg = '#f8fafc'; border = '#94a3b8';
                 }
 
-                // Shadow/Glow
-                ctx.shadowColor = shadowColor; ctx.shadowBlur = shadowSize; ctx.shadowOffsetY = 4;
-                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = bg; ctx.fill();
+                ctx.shadowColor = shadowColor;
+                ctx.shadowBlur = shadowSize;
+                ctx.shadowOffsetY = 4;
+                
+                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = bg; ctx.fill();
                 
                 ctx.shadowColor = 'transparent';
-                ctx.lineWidth = (state.currNode === node.id) ? 3 : 2; 
+                ctx.lineWidth = 2; 
                 ctx.strokeStyle = border; ctx.stroke();
 
-                // ID
                 ctx.fillStyle = text; 
                 ctx.font = `bold ${26 * scale}px "Plus Jakarta Sans"`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(node.id, x, y - 2 * scale);
 
-                // Cost Badge
-                const c = state.cost[node.id];
-                const cText = c === Infinity ? '∞' : c;
+                // Distance Badge
+                const d = state.dist[node.id];
+                const dText = d === Infinity ? '∞' : d;
                 const badgeY = y + r + 20 * scale; 
                 
                 ctx.font = `600 ${18 * scale}px "JetBrains Mono"`;
-                const metrics = ctx.measureText(cText);
+                const metrics = ctx.measureText(dText);
                 const bw = Math.max(24 * scale, metrics.width + 16 * scale);
                 const bh = 28 * scale;
                 
@@ -676,55 +694,83 @@
                 ctx.fill();
                 
                 ctx.fillStyle = '#f8fafc';
-                ctx.fillText(cText, x, badgeY + 2 * scale);
+                ctx.fillText(dText, x, badgeY + 2 * scale);
             });
         }
 
         function updateUI(state) {
             const statusEl = document.getElementById('statusText');
-            statusEl.innerText = state.msg;
+            statusEl.style.opacity = 0.5;
+            setTimeout(() => {
+                statusEl.innerText = state.msg;
+                statusEl.style.opacity = 1;
+            }, 100);
 
             // Table
             const tbody = document.getElementById('distTableBody');
             tbody.innerHTML = '';
             nodes.forEach(node => {
                 const tr = document.createElement('tr');
-                const c = state.cost[node.id];
-                const cText = c === Infinity ? '∞' : c;
+                const d = state.dist[node.id];
+                const dText = d === Infinity ? '∞' : d;
                 const isUpdated = state.updatedNode === node.id;
+                
                 if (isUpdated) tr.className = 'anim-update';
                 
-                let statusIcon = state.visited.has(node.id) ? '<span style="color:#10b981">●</span>' : '<span style="color:#cbd5e1">○</span>';
+                let statusIcon = d !== Infinity ? '<span style="color:#10b981">●</span>' : '<span style="color:#cbd5e1">○</span>';
 
                 tr.innerHTML = `
                     <td style="font-weight:600; color:#334155;">${node.id}</td>
-                    <td style="font-family:'JetBrains Mono'; ${isUpdated?'color:#dc2626; font-weight:bold;':''}">${cText}</td>
-                    <td style="color:#64748b;">${state.parent[node.id] || '-'}</td>
+                    <td style="font-family:'JetBrains Mono'; ${isUpdated?'color:#dc2626; font-weight:bold;':''}">${dText}</td>
+                    <td style="color:#64748b;">${state.prev[node.id] || '-'}</td>
                     <td>${statusIcon}</td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            // Heap
-            const heapContainer = document.getElementById('heapContainer');
-            heapContainer.innerHTML = '';
-            if (state.queue && state.queue.length > 0) {
-                state.queue.forEach((item, idx) => {
-                    const el = document.createElement('div');
-                    el.className = `heap-card ${idx===0 ? 'first' : ''} ${state.updatedNode===item.id ? 'anim-update' : ''}`;
-                    el.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <div class="heap-node">${item.id}</div>
-                            ${idx===0 ? '<span style="font-size:10px; font-weight:700; color:#4f46e5;">MIN</span>' : ''}
-                        </div>
-                        <div class="heap-dist">${item.dist===Infinity?'∞':item.dist}</div>
-                    `;
-                    heapContainer.appendChild(el);
-                });
-            } else {
-                heapContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8; font-size:0.85rem;">队列为空</div>';
-            }
+            // Edge List
+            const edgeListContainer = document.getElementById('edgeListContainer');
+            edgeListContainer.innerHTML = '';
+            edges.forEach((edge, idx) => {
+                const el = document.createElement('div');
+                let className = 'edge-card';
+                if (state.activeEdge === idx) className += ' active';
+                if (state.activeEdge === idx && state.updatedNode) className += ' updated';
+                
+                el.className = className;
+                el.innerHTML = `
+                    <div class="edge-info">
+                        <span>${edge.from} → ${edge.to}</span>
+                        <span class="edge-weight">${edge.weight}</span>
+                    </div>
+                    ${state.activeEdge === idx ? (state.updatedNode ? '<span style="font-size:10px; color:#16a34a; font-weight:700;">UPDATE</span>' : '<span style="font-size:10px; color:#3b82f6; font-weight:700;">CHECK</span>') : ''}
+                `;
+                edgeListContainer.appendChild(el);
+            });
             
+            // Auto scroll to active edge
+            if (state.activeEdge !== null) {
+                const activeEl = edgeListContainer.children[state.activeEdge];
+                if (activeEl) {
+                    // Fix: Use container scroll to avoid whole page scrolling
+                    const container = edgeListContainer.parentElement;
+                    // Force layout update to ensure correct coordinates
+                    const elRect = activeEl.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const currentScroll = container.scrollTop;
+                    
+                    // Calculate target scroll position to center the element
+                    const relativeTop = elRect.top - containerRect.top;
+                    const targetRelativeTop = (container.clientHeight - activeEl.offsetHeight) / 2;
+                    
+                    container.scrollTo({
+                        top: currentScroll + (relativeTop - targetRelativeTop),
+                        behavior: 'smooth'
+                    });
+                }
+            }
+
+            // Buttons
             document.getElementById('btnPrev').disabled = currentStepIndex === 0;
             document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
         }
@@ -737,6 +783,7 @@
             });
         }
 
+        // --- Controls ---
         const btnNext = document.getElementById('btnNext');
         const btnPrev = document.getElementById('btnPrev');
         const btnPlay = document.getElementById('btnPlay');
@@ -754,8 +801,9 @@
                 btnPlay.classList.remove('btn-primary');
                 const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
                 btnPlay.innerHTML = `${svg}<span>暂停</span>`;
+                
                 nextStep();
-                animationInterval = setInterval(nextStep, 1500);
+                animationInterval = setInterval(nextStep, 1000); // 稍慢一点，因为步骤多
             }
         }
         function stopPlay() {

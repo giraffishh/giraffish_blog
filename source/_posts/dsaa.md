@@ -9,12 +9,123 @@ tags:
 comments: true
 abbrlink: a5c070b0
 date: 2025-09-22 00:55:53
-updated: 2025-12-28 14:37:35
+updated: 2025-12-28 15:47:33
 typora-root-url: ..
 
 ---
 
 > 部分笔记摘录自[hello-algo](https://www.hello-algo.com/)
+
+## 栈 & 队列
+
+双向队列
+
+```java
+/* 基于环形数组实现的双向队列 */
+class ArrayDeque {
+    private int[] nums; // 用于存储双向队列元素的数组
+    private int front; // 队首指针，指向队首元素
+    private int queSize; // 双向队列长度
+
+    /* 构造方法 */
+    public ArrayDeque(int capacity) {
+        this.nums = new int[capacity];
+        front = queSize = 0;
+    }
+
+    /* 获取双向队列的容量 */
+    public int capacity() {
+        return nums.length;
+    }
+
+    /* 获取双向队列的长度 */
+    public int size() {
+        return queSize;
+    }
+
+    /* 判断双向队列是否为空 */
+    public boolean isEmpty() {
+        return queSize == 0;
+    }
+
+    /* 计算环形数组索引 */
+    private int index(int i) {
+        // 通过取余操作实现数组首尾相连
+        // 当 i 越过数组尾部后，回到头部
+        // 当 i 越过数组头部后，回到尾部
+        return (i + capacity()) % capacity();
+    }
+
+    /* 队首入队 */
+    public void pushFirst(int num) {
+        if (queSize == capacity()) {
+            System.out.println("双向队列已满");
+            return;
+        }
+        // 队首指针向左移动一位
+        // 通过取余操作实现 front 越过数组头部后回到尾部
+        front = index(front - 1);
+        // 将 num 添加至队首
+        nums[front] = num;
+        queSize++;
+    }
+
+    /* 队尾入队 */
+    public void pushLast(int num) {
+        if (queSize == capacity()) {
+            System.out.println("双向队列已满");
+            return;
+        }
+        // 计算队尾指针，指向队尾索引 + 1
+        int rear = index(front + queSize);
+        // 将 num 添加至队尾
+        nums[rear] = num;
+        queSize++;
+    }
+
+    /* 队首出队 */
+    public int popFirst() {
+        int num = peekFirst();
+        // 队首指针向后移动一位
+        front = index(front + 1);
+        queSize--;
+        return num;
+    }
+
+    /* 队尾出队 */
+    public int popLast() {
+        int num = peekLast();
+        queSize--;
+        return num;
+    }
+
+    /* 访问队首元素 */
+    public int peekFirst() {
+        if (isEmpty())
+            throw new IndexOutOfBoundsException();
+        return nums[front];
+    }
+
+    /* 访问队尾元素 */
+    public int peekLast() {
+        if (isEmpty())
+            throw new IndexOutOfBoundsException();
+        // 计算尾元素索引
+        int last = index(front + queSize - 1);
+        return nums[last];
+    }
+
+    /* 返回数组用于打印 */
+    public int[] toArray() {
+        // 仅转换有效长度范围内的列表元素
+        int[] res = new int[queSize];
+        for (int i = 0, j = front; i < queSize; i++, j++) {
+            res[i] = nums[index(j)];
+        }
+        return res;
+    }
+}
+```
 
 ## 树
 
@@ -197,6 +308,8 @@ frameborder="0"
 sandbox="allow-scripts allow-same-origin"
 ></iframe>
 
+策略表：
+
 | 失衡节点的平衡因子 | 子节点的平衡因子 | 应采用的旋转方法 |
 | ------------------ | ---------------- | ---------------- |
 | $> 1$ （左偏树）   | $\geq 0$         | 右旋             |
@@ -308,7 +421,9 @@ void siftDown(int i) {
 
 时间复杂度为 $O(n)$
 
-**证明如下：**假设树的高度为 $h$（即 $\log N$），总操作次数 $S$ 是每一层节点数乘以该层节点可能下沉的最大高度
+**证明如下：** 
+
+假设树的高度为 $h$（即 $\log N$），总操作次数 $S$ 是每一层节点数乘以该层节点可能下沉的最大高度
 
 - 倒数第 1 层（叶子）：$2^h$ 个节点，下沉 0 层。倒数第 2 层：$2^{h-1}$ 个节点，下沉 1 层。
 - 倒数第 3 层：$2^{h-2}$ 个节点，下沉 2 层。
@@ -736,6 +851,78 @@ function Dijkstra(G, s):
     return dist, parent
 ```
 
+### Bellman-Ford 算法
+
+**Bellman-Ford (贝尔曼-福特)** 也是一种用于在加权图中寻找单源最短路径 (Single-Source Shortest Path) 的经典算法，它不贪心但是可以处理**负权图**
+
+Bellman-Ford 需要进行 **V-1** 轮松弛，每一轮松弛都要**遍历所有边**
+
+<iframe
+src="/widgets/dsaa_BellmanFord.html"
+width="100%"
+style="height: 75vh; border: 1px solid #e2e8f0; border-radius: 8px;"
+frameborder="0"
+sandbox="allow-scripts allow-same-origin"
+></iframe>
+
+**伪代码：**
+
+```
+function BellmanFord(G, s):
+    // 1. 初始化 (Initialization)
+    N ← G 中的节点数量
+    
+    // 初始化距离数组为无穷大，前驱数组为 null
+    对于 i 从 1 到 N:
+        dist[i]   ← infinity
+        parent[i] ← null
+    
+    // 源点到自己的距离为 0
+    dist[s] ← 0
+
+    // 获取图中所有的边列表 (Edge List)
+    // 形式为：(u, v, w) 表示从 u 到 v 权重为 w
+    edges ← G.getAllEdges() 
+
+    // 2. 连续松弛 N-1 轮 (Relaxation Phase)
+    // 在没有任何负权环的图中，任意最短路径最多包含 N-1 条边。
+    // 所以我们需要对所有边进行 N-1 轮松弛操作。
+    重复 N-1 次:
+        
+        // 遍历图中的每一条边 (u, v, w)
+        // 注意：这里必须遍历全图所有的边，而不只是像Dijkstra那样遍历当前最近节点的邻居
+        对于每一条边 (u, v, w) in edges:
+            
+            // [松弛操作]
+            // 前提：起点到 u 必须是可达的 (dist[u] != infinity)
+            // 且经由 u 到 v 的距离更短
+            如果 dist[u] != infinity 且 dist[u] + w < dist[v]:
+                
+                // 更新最短距离
+                dist[v] ← dist[u] + w
+                
+                // 记录前驱节点
+                parent[v] ← u
+
+    // 3. 负权环检测 (Negative Cycle Detection)
+    // 再遍历一次所有边。如果此时还能进行松弛，说明图中存在负权环。
+    // 因为正常的最短路径在 N-1 轮后应该已经收敛固定了。
+    has_negative_cycle ← false
+    
+    对于每一条边 (u, v, w) in edges:
+        如果 dist[u] != infinity 且 dist[u] + w < dist[v]:
+            has_negative_cycle ← true
+            break // 发现负环，可以直接跳出
+
+    // 4. 返回结果
+    如果 has_negative_cycle 为 true:
+        return "Error: Negative Weight Cycle Detected"
+    否则:
+        return dist, parent
+```
+
+
+
 ### Prim 算法
 
 **Prim 算法**用于解决在加权连通图中寻找**MST最小生成树**，即找到连接图中所有顶点的一组边，使得这些边的总权重最小，且不形成任何环
@@ -1066,3 +1253,240 @@ public class KosarajuAlgo {
 }
 ```
 
+## 杂鱼 ❤~
+
+### 主定理
+
+$$
+T(n) = aT(n/b) + cn^d
+$$
+
+想象你在处理一个大任务（比如整理 1000 份文件）：
+
+- **$n$**: 文件的总数（问题规模）
+- **$a$**: 你把任务分给了 $a$ 个下属（子问题数量）
+- **$b$**: 每个下属分到的任务量是原来的 $1/b$（子问题规模缩小倍数）
+- **$cn^d$**: 你作为老板，把任务分发下去以及最后汇总结果所花的时间（分治的开销）
+
+#### 三种情况
+
+我们需要比较 **$a$** 和 **$b^d$** 的大小
+
+**情况 1：子问题太多了 (叶子赢了)**
+
+- **条件：** $a > b^d$
+
+- **含义：** 任务分裂得太快，虽然单个子问题变小了，但架不住数量多。大部分时间都花在了递归树的最底层（即处理成千上万个极小的子问题）
+
+- 结果： 复杂度由叶子数量决定
+
+$$
+T(n) = \Theta(n^{\log_b a})
+$$
+
+(注意：$\log_b a$ 其实就是递归树底部的叶子节点数量指数)
+
+**情况 2：完美平衡**
+
+- **条件：** $a = b^d$
+
+- **含义：** 子问题分裂的速度，正好被规模缩小的速度抵消了。递归树的每一层，总的工作量都是一样的。
+
+- **结果：** 总时间 = (每一层的工作量) $\times$ (树的高度)
+
+  - 每一层工作量是 $n^d$
+
+  - 树的高度是 $\log_b n$
+
+$$
+T(n) = \Theta(n^d \log n)
+$$
+
+**情况 3：合并代价太大**
+
+- **条件：** $a < b^d$
+
+- **含义：** 相比于子问题的增长，你在每一层做“分解和合并”的代价太大了（通常是因为 $d$ 很大）。大部分时间都花在了递归树的顶层（根节点）。随着递归深入，工作量迅速衰减
+
+- 结果： 复杂度由顶层（根节点）的工作量决定
+
+$$
+T(n) = \Theta(n^d)
+$$
+
+#### 例子 1：归并排序 (Merge Sort)
+
+公式：$T(n) = 2T(n/2) + n$
+
+- **参数：** $a=2$ (分成两份), $b=2$ (每份一半), $cn^1$ (合并耗时 $O(n)$，所以 $d=1$)。
+- **比较：**
+  - $a = 2$
+  - $b^d = 2^1 = 2$
+  - **结论：** $2 = 2$，属于 **情况 2 (平衡型)**。
+- **答案：** $T(n) = \Theta(n^1 \log n) = \Theta(n \log n)$
+
+#### 例子 2：二分查找 (Binary Search)
+
+公式：$T(n) = 1T(n/2) + c$
+
+- **参数：** $a=1$ (只查一边), $b=2$ (规模减半), $c = c \cdot n^0$ (常数项，所以 $d=0$)。
+- **比较：**
+  - $a = 1$
+  - $b^d = 2^0 = 1$
+  - **结论：** $1 = 1$，属于 **情况 2 (平衡型)**。
+- **答案：** $T(n) = \Theta(n^0 \log n) = \Theta(\log n)$
+
+### Rabin-Karp && 滚动哈希
+
+Rabin-Karp 的精髓在于如何在 $O(1)$ 的时间内算出下一个窗口的哈希值
+
+**示例：**
+
+#### 设定环境
+
+1. 字符映射 (Mapping)：
+
+   我们将 4 个字符映射为 4 个整数：
+
+   - **A = 1**
+   - **C = 2**
+   - **G = 3**
+   - **T = 4**
+
+2. 进制 (Base)：4
+
+   （因为只有 4 种字符，类似二进制、十六进制，这里我们用四进制）。
+
+3. 模数 (Modulus $Q$)：11
+
+   （为了演示方便，选一个很小的质数，方便心算验证）。
+
+4. **任务**：
+
+   - **文本 (Text)**: `C A T G C`
+   - **模式 (Pattern)**: `A T G`
+   - **窗口长度 ($m$)**: 3
+
+#### 第一步：准备工作
+
+在开始滚动之前，我们需要算一个常数 $h$，它是最高位字符的权重。
+
+公式：$h = \text{Base}^{m-1} \pmod Q$
+
+- $Base = 4$
+- $m - 1 = 2$
+- $Q = 11$
+
+计算：
+
+$$h = 4^2 \pmod{11} = 16 \pmod{11} = \mathbf{5}$$
+
+(记住这个 5，后面每次移除旧字符时都要用到它)
+
+#### 第二步：计算目标（模式串）的哈希
+
+我们要找的是 A T G，对应数值：1, 4, 3
+我们要把它看作一个四进制数 $(143)_4$：
+
+$$1 \cdot 4^2 + 4 \cdot 4^1 + 3 \cdot 4^0$$
+
+计算过程：
+
+1. $1 \cdot 16 = 16$
+2. $4 \cdot 4 = 16$
+3. $3 \cdot 1 = 3$
+4. 和 $= 16 + 16 + 3 = 35$
+
+取模：
+
+$$H_{target} = 35 \pmod{11} = \mathbf{2}$$
+
+**我们的目标就是找到哈希值为 2 的窗口。**
+
+#### 第三步：初始化第一个窗口
+
+文本的开头是 C A T，对应数值：2, 1, 4
+
+计算这个四进制数 $(214)_4$ 的值：
+
+$$2 \cdot 4^2 + 1 \cdot 4^1 + 4 \cdot 4^0$$
+
+$= 32 + 4 + 4 = 40$
+
+取模：
+
+$$H_{curr} = 40 \pmod{11} = \mathbf{7}$$
+
+比较：
+
+当前哈希是 7，目标是 2。
+
+$7 \neq 2$，不匹配。我们需要向右滑动。
+
+#### 第四步：滚动哈希 (关键步骤)
+
+我们将窗口从 `[C A T]` 滑动到 `[A T G]`。
+
+- **旧哈希 ($H_{old}$)**: 7
+- **移出字符**: `C` (对应数值 **2**)
+- **移入字符**: `G` (对应数值 **3**)
+- **进制 ($Base$)**: 4
+- **高位权重 ($h$)**: 5
+- **模数 ($Q$)**: 11
+
+公式回顾：
+
+$$
+H_{new} = \left( (H_{old} - \text{移出} \cdot h) \cdot Base + \text{移入} \right) \pmod Q
+$$
+
+**详细计算步骤：**
+
+1. 移除最高位 (Remove High):
+
+   $$H_{old} - (\text{数值}_C \cdot h)$$
+
+   $$= 7 - (2 \cdot 5)$$
+
+   $$= 7 - 10 = \mathbf{-3}$$
+
+   > 关键点：出现负数了！
+   >
+   > 在计算机取模运算中，负数处理要很小心。我们通常加上一个模数 $Q$ 让它变正。
+   >
+   > $-3 \pmod{11}$ 等同于 $(-3 + 11) \pmod{11} = \mathbf{8}$
+   >
+   > (现在结果是 8)
+
+2. 左移一位 (Shift):
+
+   相当于乘以进制 Base。
+
+   $$8 \cdot 4 = 32$$
+
+   为了防止数字过大，这里可以随时取模（也可以最后取，结果一样）。
+
+   $$32 \pmod{11} = \mathbf{10}$$
+
+   (现在结果是 10，这代表了 'AT' 部分的哈希)
+
+3. 加入最低位 (Add Low):
+
+   加上新进来的字符 G (数值 3)
+
+   $$10 + 3 = 13$$
+
+4. 最终取模:
+
+   $$13 \pmod{11} = \mathbf{2}$$
+
+**结果：** 新窗口 `A T G` 的哈希值是 **2**
+
+#### 第五步：验证
+
+- 当前窗口哈希：**2**
+- 目标模式哈希：**2**
+- **匹配成功！** (Hash Hit)
+
+最后一步是二次确认（防止哈希冲突）：
+程序会去对比字符串 A T G 和模式串 A T G 是否真的相等。

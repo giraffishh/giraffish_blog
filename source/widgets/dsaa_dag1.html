@@ -206,20 +206,29 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
+        @media (max-width: 900px) {
+            .legend-card {
+                transform: scale(0.85);
+                transform-origin: top left;
+            }
+            .controls-island {
+                transform: translateY(-50%) scale(0.85);
+                transform-origin: center right;
+            }
+        }
+
         @media (max-width: 600px) {
             .split-container { flex-direction: column; }
             .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
             .section-right { height: 50%; }
 
-            /* 小屏幕下缩小悬浮组件 */
+            /* 小屏幕下进一步缩小 */
             .legend-card {
-                transform: scale(0.85);
-                transform-origin: top left;
-                max-width: 180px;
+                transform: scale(0.5);
+                max-width: 160px;
             }
             .controls-island {
-                transform: translateY(-50%) scale(0.85);
-                transform-origin: center right;
+                transform: translateY(-50%) scale(0.5);
             }
         }
     </style>
@@ -243,34 +252,34 @@
 
     <main>
         <div class="panel-top">
-            <div class="legend-card">
-                <div class="legend-item"><span class="dot" style="background:var(--color-white);"></span>未访问 (White)</div>
-                <div class="legend-item"><span class="dot" style="background:var(--color-gray); border-color:#eab308;"></span>搜索中 (Gray)</div>
-                <div class="legend-item"><span class="dot" style="background:var(--color-black); border-color:#22c55e;"></span>已完成 (Black)</div>
-                <div class="legend-item"><span class="dot" style="background:transparent; border-color:#ef4444; border-style:dashed;"></span>发现环</div>
-            </div>
-
             <div id="canvas-wrapper">
-                <canvas id="graphCanvas" width="800" height="600"></canvas>
-            </div>
+                <div class="legend-card">
+                    <div class="legend-item"><span class="dot" style="background:var(--color-white);"></span>未访问 (White)</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-gray); border-color:#eab308;"></span>搜索中 (Gray)</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-black); border-color:#22c55e;"></span>已完成 (Black)</div>
+                    <div class="legend-item"><span class="dot" style="background:transparent; border-color:#ef4444; border-style:dashed;"></span>发现环</div>
+                </div>
 
-            <div class="controls-island">
-                <button id="btnReset" class="btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                    <span>重置</span>
-                </button>
-                <button id="btnPrev" class="btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span>后退</span>
-                </button>
-                <button id="btnPlay" class="btn btn-primary">
-                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span>播放</span>
-                </button>
-                <button id="btnNext" class="btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    <span>前进</span>
-                </button>
+                <canvas id="graphCanvas" width="800" height="600"></canvas>
+
+                <div class="controls-island">
+                    <button id="btnReset" class="btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        <span>重置</span>
+                    </button>
+                    <button id="btnPrev" class="btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                        <span>后退</span>
+                    </button>
+                    <button id="btnPlay" class="btn btn-primary">
+                        <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>播放</span>
+                    </button>
+                    <button id="btnNext" class="btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        <span>前进</span>
+                    </button>
+                </div>
             </div>
         </div>
 

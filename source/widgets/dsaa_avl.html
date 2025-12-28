@@ -94,7 +94,7 @@
         }
 
         .canvas-area {
-            flex: 1;
+            flex: 3;
             position: relative;
             background-color: #f8fafc;
             background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
@@ -190,13 +190,13 @@
 
         /* --- 底部数据面板 --- */
         .info-panel {
-            /* 调整高度，从 240px 到 300px */
-            height: 300px; 
+            flex: 2;
             background: white;
             border-top: 1px solid var(--border-color);
             display: flex;
             z-index: 30;
             box-shadow: 0 -4px 20px rgba(0,0,0,0.02);
+            overflow: hidden;
         }
 
         .panel-section {
@@ -266,9 +266,9 @@
             .info-panel { height: auto; flex-direction: column; }
             .panel-section { border-right: none; border-bottom: 1px solid var(--border-color); }
             .explanation-box { padding: 16px; max-height: 120px; }
-            .controls-island { 
-                top: auto; bottom: 20px; right: 50%; transform: translateX(50%);
-                flex-direction: row; width: 90%; justify-content: center;
+            .legend-card {
+                transform: scale(0.5);
+                transform-origin: top left;
             }
         }
     </style>
