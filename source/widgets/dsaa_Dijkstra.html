@@ -340,6 +340,17 @@
             .split-container { flex-direction: column; }
             .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
             .section-right { height: 50%; }
+
+            /* 小屏幕下缩小悬浮组件 */
+            .legend-card {
+                transform: scale(0.85);
+                transform-origin: top left;
+                max-width: 180px;
+            }
+            .controls-island {
+                transform: translateY(-50%) scale(0.85);
+                transform-origin: center right;
+            }
         }
     </style>
 </head>

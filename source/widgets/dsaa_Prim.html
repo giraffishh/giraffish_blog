@@ -115,6 +115,7 @@
             align-items: center;
             padding: 20px;
             box-sizing: border-box;
+            position: relative;
         }
         canvas {
             border-radius: 16px;
@@ -316,6 +317,17 @@
             .split-container { flex-direction: column; }
             .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
             .section-right { height: 50%; }
+
+            /* 小屏幕下缩小悬浮组件 */
+            .legend-card {
+                transform: scale(0.85);
+                transform-origin: top left;
+                max-width: 180px;
+            }
+            .controls-island {
+                transform: translateY(-50%) scale(0.85);
+                transform-origin: center right;
+            }
         }
     </style>
 </head>
@@ -334,34 +346,34 @@
     <main>
         <!-- 上半部分：图表 -->
         <div class="panel-top">
-            <div class="legend-card">
-                <div class="legend-item"><span class="dot" style="background:#f1f5f9; border-color:#94a3b8;"></span>未访问</div>
-                <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#ca8a04;"></span>当前节点 (U)</div>
-                <div class="legend-item"><span class="dot" style="background:#dcfce7; border-color:#16a34a;"></span>MST 节点</div>
-                <div class="legend-item"><span class="dot" style="background:#bfdbfe; border-color:#2563eb;"></span>检查邻居 (V)</div>
-            </div>
-
             <div id="canvas-wrapper">
-                <canvas id="graphCanvas" width="800" height="600"></canvas>
-            </div>
+                <div class="legend-card">
+                    <div class="legend-item"><span class="dot" style="background:#f1f5f9; border-color:#94a3b8;"></span>未访问</div>
+                    <div class="legend-item"><span class="dot" style="background:#fef08a; border-color:#ca8a04;"></span>当前节点 (U)</div>
+                    <div class="legend-item"><span class="dot" style="background:#dcfce7; border-color:#16a34a;"></span>MST 节点</div>
+                    <div class="legend-item"><span class="dot" style="background:#bfdbfe; border-color:#2563eb;"></span>检查邻居 (V)</div>
+                </div>
 
-            <div class="controls-island">
-                <button id="btnReset" class="btn" title="重置">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                    <span>重置</span>
-                </button>
-                <button id="btnPrev" class="btn" title="上一步">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    <span>后退</span>
-                </button>
-                <button id="btnPlay" class="btn btn-primary" title="自动播放">
-                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                    <span>播放</span>
-                </button>
-                <button id="btnNext" class="btn" title="下一步">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    <span>前进</span>
-                </button>
+                <canvas id="graphCanvas" width="800" height="600"></canvas>
+
+                <div class="controls-island">
+                    <button id="btnReset" class="btn" title="重置">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>重置</span>
+                    </button>
+                    <button id="btnPrev" class="btn" title="上一步">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        <span>后退</span>
+                    </button>
+                    <button id="btnPlay" class="btn btn-primary" title="自动播放">
+                        <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>播放</span>
+                    </button>
+                    <button id="btnNext" class="btn" title="下一步">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        <span>前进</span>
+                    </button>
+                </div>
             </div>
         </div>
 

@@ -9,7 +9,7 @@ tags:
 comments: true
 abbrlink: a5c070b0
 date: 2025-09-22 00:55:53
-updated: 2025-12-28 01:26:42
+updated: 2025-12-28 12:34:32
 typora-root-url: ..
 
 ---
@@ -46,6 +46,7 @@ style="height: 75vh; border: 1px solid #e2e8f0; border-radius: 8px;"
 frameborder="0"
 sandbox="allow-scripts allow-same-origin"
 ></iframe>
+
 #### 元素入堆
 
 时间复杂度为 $O(\log n)$
@@ -121,8 +122,7 @@ void siftDown(int i) {
 
 **证明如下：**假设树的高度为 $h$（即 $\log N$），总操作次数 $S$ 是每一层节点数乘以该层节点可能下沉的最大高度
 
-- 倒数第 1 层（叶子）：$2^h$ 个节点，下沉 0 层。
-- 倒数第 2 层：$2^{h-1}$ 个节点，下沉 1 层。
+- 倒数第 1 层（叶子）：$2^h$ 个节点，下沉 0 层。倒数第 2 层：$2^{h-1}$ 个节点，下沉 1 层。
 - 倒数第 3 层：$2^{h-2}$ 个节点，下沉 2 层。
 - ...
 - 根节点：$2^0$ 个节点，下沉 $h$ 层。
@@ -163,6 +163,60 @@ MaxHeap(List<Integer> nums) {
 ```
 
 ## BST
+
+> https://www.hello-algo.com/chapter_tree/binary_search_tree/
+
+**前序查找**
+
+时间复杂度 O(h)
+
+```java
+public long predecessorQuery(Node root, long q) {
+	//节点为空
+	if (root == null) {
+		return -1;
+	//二叉搜索树中存在key=q的节点
+	} else if (root.element == q) {
+		return root.element;
+	//当前节点的key>q的时候，将左子节点(更小)作为查询root节点
+	} else if (root.element > q) {
+		return predecessorQuery(root.leftChild, q);
+	//当前节点的key<q的时候，保存当前的节点的key，将右子节点(更大)作为查询root节点，并且返回的key与当前节点的key做对比，如果是为-1证明无法找到
+	} else {
+		long temp = predecessorQuery(root.rightChild, q);
+		if (temp == -1) {
+			return root.element;
+		} else {
+		return temp;
+		}
+	}
+}
+```
+
+**后序查找**
+
+时间复杂度 O(h)
+
+```java
+public long successorQuery(Node root, long q) {
+	if (root == null) {
+		return -1;
+	} else if (root.element == q) {
+		return root.element;
+	} else if (root.element > q) {
+		long temp = successorQuery(root.leftChild, q);
+		if (temp == -1) {
+			return root.element;
+		} else {
+			return temp;
+		}
+	} else {
+		return successorQuery(root.rightChild, q);
+	}
+}
+```
+
+
 
 ## 图
 
