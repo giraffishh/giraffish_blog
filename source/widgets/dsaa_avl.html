@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AVL 树复杂旋转演示 (Pro)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --transfer: #a855f7; /* Purple for transferred nodes */
+            --bg-canvas: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 头部 --- */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: 56px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 50;
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f172a;
+        }
+
+        .scenario-selector {
+            display: flex;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .scenario-btn {
+            border: none;
+            background: transparent;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .scenario-btn:hover { color: var(--text-main); background: #e2e8f0; }
+        .scenario-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* --- 主布局 --- */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .canvas-area {
+            flex: 1;
+            position: relative;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            background: white;
+        }
+
+        /* --- 悬浮图例 --- */
+        .legend-card {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-md);
+            font-size: 0.8rem;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .legend-row { display: flex; align-items: center; gap: 8px; color: var(--text-sub); font-weight: 500; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+        .tag { padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; }
+        
+        /* --- 悬浮控制栏 (右侧垂直) - 参考 Dijkstra --- */
+        .controls-island {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .btn {
+            border: none;
+            background: transparent;
+            padding: 8px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 48px;
+        }
+        .btn span {
+            font-size: 0.7rem;
+        }
+        .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); color: white; box-shadow: 0 6px 8px -1px rgba(99, 102, 241, 0.4); }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        .btn-danger:hover { background: #dc2626; color: white; }
+
+
+        /* --- 底部数据面板 --- */
+        .info-panel {
+            /* 调整高度，从 240px 到 300px */
+            height: 300px; 
+            background: white;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            z-index: 30;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.02);
+        }
+
+        .panel-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            border-right: 1px solid var(--border-color);
+            min-width: 0;
+        }
+        .panel-section:last-child { border-right: none; }
+
+        .section-header {
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .explanation-box {
+            padding: 16px 20px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-main);
+            overflow-y: auto;
+        }
+        .highlight-text { color: var(--primary); font-weight: 600; }
+        .danger-text { color: var(--danger); font-weight: 600; }
+        .transfer-text { color: var(--transfer); font-weight: 600; }
+
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .metrics-table th {
+            text-align: left;
+            padding: 8px 20px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            border-bottom: 1px solid var(--border-color);
+            background: #fff;
+            position: sticky;
+            top: 0;
+        }
+        .metrics-table td {
+            padding: 6px 20px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .metric-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+        .badge-success { background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
+        .badge-neutral { background: #f1f5f9; color: var(--text-sub); border: 1px solid #e2e8f0; }
+
+        @media (max-width: 768px) {
+            .info-panel { height: auto; flex-direction: column; }
+            .panel-section { border-right: none; border-bottom: 1px solid var(--border-color); }
+            .explanation-box { padding: 16px; max-height: 120px; }
+            .controls-island { 
+                top: auto; bottom: 20px; right: 50%; transform: translateX(50%);
+                flex-direction: row; width: 90%; justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <path d="M2 12h20"></path>
+                <path d="M2 12l5-5"></path>
+                <path d="M2 12l5 5"></path>
+                <circle cx="12" cy="12" r="2"></circle>
+                <path d="M22 12l-5-5"></path>
+                <path d="M22 12l-5 5"></path>
+            </svg>
+            AVL 树旋转演示
+        </div>
+        <div class="scenario-selector">
+            <button class="scenario-btn active" onclick="setScenario('LL')">LL</button>
+            <button class="scenario-btn" onclick="setScenario('RR')">RR</button>
+            <button class="scenario-btn" onclick="setScenario('LR')">LR</button>
+            <button class="scenario-btn" onclick="setScenario('RL')">RL</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="canvas-area">
+            <div class="legend-card">
+                <div class="legend-row">
+                    <span class="dot" style="background:#fef2f2; border-color:#ef4444;"></span> 
+                    <span>失衡节点 (|BF|>1)</span>
+                </div>
+                <div class="legend-row">
+                    <span class="dot" style="background:#f3e8ff; border-color:#a855f7;"></span> 
+                    <span>转移节点 (Subtree Move)</span>
+                </div>
+                <div class="legend-row">
+                    <span class="tag" style="background:#e0e7ff; color:var(--primary);">H</span> 
+                    <span>高度 (Height)</span>
+                </div>
+                <div class="legend-row">
+                    <span class="tag" style="background:#ffedd5; color:#c2410c;">BF</span> 
+                    <span>L.H - R.H</span>
+                </div>
+            </div>
+
+            <canvas id="treeCanvas"></canvas>
+
+            <!-- 右侧垂直控制岛 -->
+            <div class="controls-island">
+                <button id="btnReset" class="btn" title="重置">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <span>重置</span>
+                </button>
+                <button id="btnPrev" class="btn" title="上一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    <span>后退</span>
+                </button>
+                <button id="btnPlay" class="btn btn-primary" title="自动播放">
+                    <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>播放</span>
+                </button>
+                <button id="btnNext" class="btn" title="下一步">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    <span>前进</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="panel-section" style="flex: 2;">
+                <div class="section-header">演示说明 / Step Description</div>
+                <div id="explanationText" class="explanation-box">
+                    加载中...
+                </div>
+            </div>
+            <div class="panel-section" style="flex: 3; overflow-y: auto;">
+                <div class="section-header">节点状态表 / Node Metrics</div>
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>节点 (Node)</th>
+                            <th>高度 (Height)</th>
+                            <th>平衡因子 (BF)</th>
+                            <th>状态 (Status)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metricsBody">
+                        <!-- JS 填充 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. 画布与基础 ---
+        const canvas = document.getElementById('treeCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentScenario = 'LL';
+        let currentStep = 0;
+        let isPlaying = false;
+        let playInterval = null;
+
+        // --- 2. 坐标系统 (支持4层) ---
+        // Y 轴层级 - 整体下移 40px，防止顶部箭头文字遮挡
+        // 原: { 0: 80, 1: 180, 2: 280, 3: 380 };
+        const LVL = { 0: 120, 1: 220, 2: 320, 3: 420 };
+        
+        // X 轴 (中心 400)
+        // 使用相对偏移量更容易管理
+        const CX = 400;
+
+        // --- 3. 复杂场景数据 (Direct Start) ---
+        // 删除了原有的Step 1 (Init)，直接从失衡态开始
+        
+        const scenarios = {
+            'LL': [
+                {
+                    title: "初始状态: 插入 F(10) 后失衡",
+                    text: "已插入节点 F(10)。<br><span class='danger-text'>A: BF = 3(Left) - 1(Right) = 2 (失衡)</span>。<br>B: BF = 2 - 1 = 1 (同号)。<br>注意节点 <span class='transfer-text'>E(40)</span>，它是 B 的右子树，也是旋转中需要转移的节点。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: 2, danger: true}, // Root
+                        {id: 'B', val: 30, x: CX-150, y: LVL[1], h: 3, bf: 1, focus: true}, // Pivot
+                        {id: 'C', val: 70, x: CX+150, y: LVL[1], h: 1, bf: 0}, 
+                        {id: 'D', val: 15, x: CX-220, y: LVL[2], h: 2, bf: 1},
+                        {id: 'E', val: 40, x: CX-80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, 
+                        {id: 'F', val: 10, x: CX-260, y: LVL[3], h: 1, bf: 0}
+                    ],
+                    edges: [['A','B'], ['A','C'], ['B','D'], ['B','E'], ['D','F']],
+                    arrow: { type: 'cw', cx: CX, cy: LVL[0], r: 70, text: '右旋 A' }
+                },
+                {
+                    title: "LL 右旋完成",
+                    text: "A 向右下沉，B 上升为根。<br><b>关键重连：</b> <span class='transfer-text'>节点 E(40)</span> 原本是 B 的右孩子，现在断开并连到 A 的左侧。<br>树恢复平衡。",
+                    nodes: [
+                        {id: 'B', val: 30, x: CX, y: LVL[0], h: 3, bf: 0},      // New Root
+                        {id: 'D', val: 15, x: CX-150, y: LVL[1], h: 2, bf: 1},  // New L
+                        {id: 'A', val: 50, x: CX+150, y: LVL[1], h: 2, bf: 0},  // New R (Old Root)
+                        {id: 'F', val: 10, x: CX-220, y: LVL[2], h: 1, bf: 0},  // LL
+                        {id: 'E', val: 40, x: CX+80, y: LVL[2], h: 1, bf: 0, special: 'transfer'},   // Moved to A's Left!
+                        {id: 'C', val: 70, x: CX+220, y: LVL[2], h: 1, bf: 0}   // A's Right
+                    ],
+                    edges: [['B','D'], ['B','A'], ['D','F'], ['A','E'], ['A','C']]
+                }
+            ],
+
+            'RR': [
+                {
+                    title: "初始状态: 插入 F(90) 后失衡",
+                    text: "已插入节点 F(90)。<br><span class='danger-text'>A: BF = -2 (失衡)</span>。<br>B: BF = -1 (同号)。<br>注意节点 <span class='transfer-text'>E(60)</span>，它是 B 的左子树，旋转时将转移。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: -2, danger: true},
+                        {id: 'Z', val: 30, x: CX-150, y: LVL[1], h: 1, bf: 0},
+                        {id: 'B', val: 70, x: CX+150, y: LVL[1], h: 3, bf: -1, focus: true},
+                        {id: 'E', val: 60, x: CX+80, y: LVL[2], h: 1, bf: 0, special: 'transfer'},
+                        {id: 'D', val: 80, x: CX+220, y: LVL[2], h: 2, bf: -1},
+                        {id: 'F', val: 90, x: CX+260, y: LVL[3], h: 1, bf: 0}
+                    ],
+                    edges: [['A','Z'], ['A','B'], ['B','E'], ['B','D'], ['D','F']],
+                    arrow: { type: 'ccw', cx: CX, cy: LVL[0], r: 70, text: '左旋 A' }
+                },
+                {
+                    title: "RR 左旋完成",
+                    text: "B 上升为根，A 下沉为 B 的左孩子。<br><b>关键重连：</b> <span class='transfer-text'>节点 E(60)</span> 原本是 B 的左孩子，现在断开并连到 A 的右侧。<br>平衡恢复。",
+                    nodes: [
+                        {id: 'B', val: 70, x: CX, y: LVL[0], h: 3, bf: 0},
+                        {id: 'A', val: 50, x: CX-150, y: LVL[1], h: 2, bf: 0},
+                        {id: 'D', val: 80, x: CX+150, y: LVL[1], h: 2, bf: -1},
+                        {id: 'Z', val: 30, x: CX-220, y: LVL[2], h: 1, bf: 0},
+                        {id: 'E', val: 60, x: CX-80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, // Moved to A's Right
+                        {id: 'F', val: 90, x: CX+220, y: LVL[2], h: 1, bf: 0}
+                    ],
+                    edges: [['B','A'], ['B','D'], ['A','Z'], ['A','E'], ['D','F']]
+                }
+            ],
+
+            'LR': [
+                {
+                    title: "初始状态: LR 型失衡",
+                    text: "根 A(50) 失衡 (BF=2)。<br>左孩子 B(20) 的 BF=-1 (异号)。<br>E(40) 是将要上升的新根，目前它带着两个子树 <span class='transfer-text'>F</span> 和 <span class='transfer-text'>G</span>。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: 2, danger: true},
+                        {id: 'B', val: 20, x: CX-150, y: LVL[1], h: 3, bf: -1, focus: true},
+                        {id: 'C', val: 60, x: CX+150, y: LVL[1], h: 1, bf: 0},
+                        {id: 'D', val: 10, x: CX-220, y: LVL[2], h: 1, bf: 0},
+                        {id: 'E', val: 40, x: CX-80, y: LVL[2], h: 2, bf: 0}, // Pivot 2
+                        {id: 'F', val: 35, x: CX-120, y: LVL[3], h: 1, bf: 0, special: 'transfer'}, 
+                        {id: 'G', val: 45, x: CX-40, y: LVL[3], h: 1, bf: 0, special: 'transfer'}   
+                    ],
+                    edges: [['A','B'], ['A','C'], ['B','D'], ['B','E'], ['E','F'], ['E','G']],
+                    arrow: { type: 'ccw', cx: CX-150, cy: LVL[1], r: 60, text: '1. 左旋 B' }
+                },
+                {
+                    title: "LR 步骤 1: 左旋子树",
+                    text: "对左子树根节点 B 进行左旋。<br>E 上升，B 下沉。<br><b>分裂：</b> E 的左孩子 <span class='transfer-text'>F(35)</span> 过继给 B 做右孩子。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: 2, danger: true},
+                        {id: 'E', val: 40, x: CX-150, y: LVL[1], h: 3, bf: 1, focus: true}, // New L of A
+                        {id: 'C', val: 60, x: CX+150, y: LVL[1], h: 1, bf: 0},
+                        {id: 'B', val: 20, x: CX-220, y: LVL[2], h: 2, bf: 0}, // Down
+                        {id: 'G', val: 45, x: CX-80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, 
+                        {id: 'D', val: 10, x: CX-260, y: LVL[3], h: 1, bf: 0},
+                        {id: 'F', val: 35, x: CX-180, y: LVL[3], h: 1, bf: 0, special: 'transfer'} // Moved to B's Right
+                    ],
+                    edges: [['A','E'], ['A','C'], ['E','B'], ['E','G'], ['B','D'], ['B','F']],
+                    arrow: { type: 'cw', cx: CX, cy: LVL[0], r: 70, text: '2. 右旋 A' }
+                },
+                {
+                    title: "LR 步骤 2: 右旋整树",
+                    text: "对根节点 A 进行右旋。<br>E 成为新的全局根。<br><b>分裂：</b> E 的右孩子 <span class='transfer-text'>G(45)</span> 过继给 A 做左孩子。<br>E 的子树完全分配完毕。",
+                    nodes: [
+                        {id: 'E', val: 40, x: CX, y: LVL[0], h: 3, bf: 0}, // Root
+                        {id: 'B', val: 20, x: CX-150, y: LVL[1], h: 2, bf: 0},
+                        {id: 'A', val: 50, x: CX+150, y: LVL[1], h: 2, bf: 0}, // Down
+                        {id: 'D', val: 10, x: CX-220, y: LVL[2], h: 1, bf: 0},
+                        {id: 'F', val: 35, x: CX-80, y: LVL[2], h: 1, bf: 0, special: 'transfer'},
+                        {id: 'G', val: 45, x: CX+80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, // Moved to A's Left
+                        {id: 'C', val: 60, x: CX+220, y: LVL[2], h: 1, bf: 0}
+                    ],
+                    edges: [['E','B'], ['E','A'], ['B','D'], ['B','F'], ['A','G'], ['A','C']]
+                }
+            ],
+
+            'RL': [
+                {
+                    title: "初始状态: RL 型失衡",
+                    text: "根 A(50) 失衡 (BF=-2)。<br>右孩子 B(80) 的 BF=1 (异号)。<br>E(60) 将要上升，携带子树 <span class='transfer-text'>F</span> 和 <span class='transfer-text'>G</span>。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: -2, danger: true},
+                        {id: 'Z', val: 30, x: CX-150, y: LVL[1], h: 1, bf: 0},
+                        {id: 'B', val: 80, x: CX+150, y: LVL[1], h: 3, bf: 1, focus: true},
+                        {id: 'E', val: 60, x: CX+80, y: LVL[2], h: 2, bf: 0}, // Pivot
+                        {id: 'D', val: 90, x: CX+220, y: LVL[2], h: 1, bf: 0},
+                        {id: 'F', val: 55, x: CX+40, y: LVL[3], h: 1, bf: 0, special: 'transfer'},
+                        {id: 'G', val: 65, x: CX+120, y: LVL[3], h: 1, bf: 0, special: 'transfer'}
+                    ],
+                    edges: [['A','Z'], ['A','B'], ['B','E'], ['B','D'], ['E','F'], ['E','G']],
+                    arrow: { type: 'cw', cx: CX+150, cy: LVL[1], r: 60, text: '1. 右旋 B' }
+                },
+                {
+                    title: "RL 步骤 1: 右旋子树",
+                    text: "对右子树根 B 进行右旋。<br>E 上升，B 下沉。<br><b>分裂：</b> E 的右孩子 <span class='transfer-text'>G(65)</span> 过继给 B 做左孩子。",
+                    nodes: [
+                        {id: 'A', val: 50, x: CX, y: LVL[0], h: 4, bf: -2, danger: true},
+                        {id: 'Z', val: 30, x: CX-150, y: LVL[1], h: 1, bf: 0},
+                        {id: 'E', val: 60, x: CX+150, y: LVL[1], h: 3, bf: -1, focus: true}, // New R of A
+                        {id: 'F', val: 55, x: CX+80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, 
+                        {id: 'B', val: 80, x: CX+220, y: LVL[2], h: 2, bf: 0}, // Down
+                        {id: 'G', val: 65, x: CX+180, y: LVL[3], h: 1, bf: 0, special: 'transfer'}, // Moved to B's Left
+                        {id: 'D', val: 90, x: CX+260, y: LVL[3], h: 1, bf: 0}
+                    ],
+                    edges: [['A','Z'], ['A','E'], ['E','F'], ['E','B'], ['B','G'], ['B','D']],
+                    arrow: { type: 'ccw', cx: CX, cy: LVL[0], r: 70, text: '2. 左旋 A' }
+                },
+                {
+                    title: "RL 步骤 2: 左旋整树",
+                    text: "对根节点 A 进行左旋。<br>E 成为新根。<br><b>分裂：</b> E 的左孩子 <span class='transfer-text'>F(55)</span> 过继给 A 做右孩子。",
+                    nodes: [
+                        {id: 'E', val: 60, x: CX, y: LVL[0], h: 3, bf: 0}, // Root
+                        {id: 'A', val: 50, x: CX-150, y: LVL[1], h: 2, bf: 0}, // Down
+                        {id: 'B', val: 80, x: CX+150, y: LVL[1], h: 2, bf: 0},
+                        {id: 'Z', val: 30, x: CX-220, y: LVL[2], h: 1, bf: 0},
+                        {id: 'F', val: 55, x: CX-80, y: LVL[2], h: 1, bf: 0, special: 'transfer'}, // Moved to A's Right
+                        {id: 'G', val: 65, x: CX+80, y: LVL[2], h: 1, bf: 0, special: 'transfer'},
+                        {id: 'D', val: 90, x: CX+220, y: LVL[2], h: 1, bf: 0}
+                    ],
+                    edges: [['E','A'], ['E','B'], ['A','Z'], ['A','F'], ['B','G'], ['B','D']]
+                }
+            ]
+        };
+
+        // --- 4. 绘图逻辑 ---
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-area');
+            const dpr = window.devicePixelRatio || 1;
+            const w = container.clientWidth - 40;
+            const h = container.clientHeight - 40;
+            
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+            
+            draw();
+        }
+
+        function draw() {
+            if (!canvas.width) return;
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            // 缩放适配 800x600 逻辑尺寸
+            const scaleX = w / 800;
+            const scaleY = h / 600;
+            const scale = Math.min(scaleX, scaleY);
+            const offsetX = (w - 800 * scale) / 2;
+            const offsetY = (h - 600 * scale) / 2;
+
+            const tx = (val) => val * scale + offsetX;
+            const ty = (val) => val * scale + offsetY;
+
+            const data = scenarios[currentScenario][currentStep];
+
+            // 1. 连线
+            data.edges.forEach(edge => {
+                const n1 = data.nodes.find(n => n.id === edge[0]);
+                const n2 = data.nodes.find(n => n.id === edge[1]);
+                if (n1 && n2) {
+                    ctx.beginPath();
+                    ctx.moveTo(tx(n1.x), ty(n1.y));
+                    ctx.lineTo(tx(n2.x), ty(n2.y));
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.lineWidth = 2 * scale;
+                    ctx.stroke();
+                }
+            });
+
+            // 2. 箭头
+            if (data.arrow) {
+                drawArrow(ctx, data.arrow, tx, ty, scale);
+            }
+
+            // 3. 节点
+            data.nodes.forEach(node => {
+                const x = tx(node.x);
+                const y = ty(node.y);
+                const r = 24 * scale;
+
+                let bgColor = 'white';
+                let borderColor = '#94a3b8';
+                let textColor = '#334155';
+                let shadowColor = 'rgba(0,0,0,0.05)';
+
+                if (node.danger) {
+                    bgColor = '#fef2f2'; borderColor = '#ef4444'; textColor = '#b91c1c';
+                    shadowColor = 'rgba(239, 68, 68, 0.3)';
+                } else if (node.special === 'transfer') {
+                    bgColor = '#f3e8ff'; borderColor = '#a855f7'; textColor = '#6b21a8';
+                    shadowColor = 'rgba(168, 85, 247, 0.3)';
+                } else if (node.focus) {
+                    bgColor = '#eff6ff'; borderColor = '#3b82f6'; textColor = '#1d4ed8';
+                    shadowColor = 'rgba(59, 130, 246, 0.3)';
+                }
+
+                // Shadow
+                ctx.shadowColor = shadowColor;
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetY = 4;
+
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = bgColor;
+                ctx.fill();
+                
+                ctx.shadowColor = 'transparent';
+                ctx.lineWidth = node.danger ? 3 * scale : (node.special ? 2.5 * scale : 2 * scale);
+                ctx.strokeStyle = borderColor;
+                ctx.stroke();
+
+                // Text
+                ctx.fillStyle = textColor;
+                ctx.font = `bold ${16 * scale}px "Plus Jakarta Sans"`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${node.id}(${node.val})`, x, y);
+
+                // Badges
+                const hTagX = x - r - 10 * scale;
+                const hTagY = y - r;
+                drawBadge(ctx, `H:${node.h}`, hTagX, hTagY, '#e0e7ff', '#4f46e5', scale);
+
+                const bfTagX = x + r + 10 * scale;
+                const bfTagY = y - r;
+                let bfBg = '#ffedd5'; let bfColor = '#c2410c';
+                if (Math.abs(node.bf) > 1) { bfBg = '#fee2e2'; bfColor = '#dc2626'; }
+                else if (node.bf === 0) { bfBg = '#f1f5f9'; bfColor = '#64748b'; }
+                
+                drawBadge(ctx, `BF:${node.bf}`, bfTagX, bfTagY, bfBg, bfColor, scale);
+            });
+        }
+
+        function drawArrow(ctx, arrow, tx, ty, scale) {
+            const { cx, cy, r, text, type } = arrow;
+            const centerx = tx(cx);
+            const centery = ty(cy);
+            const radius = r * scale;
+            
+            ctx.beginPath();
+            if (type === 'cw') {
+                ctx.arc(centerx, centery, radius, Math.PI, 0); 
+            } else {
+                ctx.arc(centerx, centery, radius, 0, Math.PI, true); 
+            }
+            
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+            ctx.lineWidth = 4 * scale;
+            ctx.setLineDash([10, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Arrow head
+            const endAngle = type === 'cw' ? 0 : Math.PI;
+            const arrowX = centerx + Math.cos(endAngle) * radius;
+            const arrowY = centery + Math.sin(endAngle) * radius;
+            
+            ctx.save();
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(type === 'cw' ? Math.PI/2 : -Math.PI/2);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-6 * scale, -10 * scale);
+            ctx.lineTo(6 * scale, -10 * scale);
+            ctx.fillStyle = 'rgba(99, 102, 241, 0.8)';
+            ctx.fill();
+            ctx.restore();
+
+            ctx.fillStyle = 'var(--primary)';
+            ctx.font = `600 ${14 * scale}px "Plus Jakarta Sans"`;
+            ctx.textAlign = 'center';
+            ctx.fillText(text, centerx, centery - radius - 10 * scale);
+        }
+
+        function drawBadge(ctx, text, x, y, bg, color, scale) {
+            ctx.font = `700 ${10 * scale}px "JetBrains Mono"`;
+            const metrics = ctx.measureText(text);
+            const w = metrics.width + 8 * scale;
+            const h = 14 * scale;
+            
+            ctx.fillStyle = bg;
+            roundRect(ctx, x - w/2, y - h/2, w, h, 4 * scale);
+            ctx.fill();
+            
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, x, y);
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+
+        // --- 5. UI 更新 ---
+        function updateUI() {
+            const data = scenarios[currentScenario][currentStep];
+            
+            const expBox = document.getElementById('explanationText');
+            expBox.innerHTML = `
+                <div style="font-weight:700; margin-bottom:8px; color:var(--primary);">${data.title}</div>
+                <div>${data.text}</div>
+            `;
+
+            const tbody = document.getElementById('metricsBody');
+            tbody.innerHTML = '';
+            
+            const sortedNodes = [...data.nodes].sort((a,b) => a.id.localeCompare(b.id));
+            
+            sortedNodes.forEach(node => {
+                const tr = document.createElement('tr');
+                let bfClass = 'badge-neutral';
+                let statusText = 'Balanced';
+                if (Math.abs(node.bf) > 1) { bfClass = 'badge-danger'; statusText = 'Imbalanced'; }
+                else if (Math.abs(node.bf) === 1) { bfClass = 'badge-success'; statusText = 'OK'; }
+                
+                tr.innerHTML = `
+                    <td style="font-weight:600; display:flex; align-items:center; gap:6px;">
+                        ${node.special==='transfer' ? '<span style="width:8px;height:8px;border-radius:50%;background:#a855f7;"></span>' : ''}
+                        ${node.id} <span style="color:var(--text-sub); font-size:0.75rem;">(${node.val})</span>
+                    </td>
+                    <td>${node.h}</td>
+                    <td><span class="metric-badge ${bfClass}">${node.bf > 0 ? '+'+node.bf : node.bf}</span></td>
+                    <td style="font-size:0.75rem; color:var(--text-sub);">${statusText}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('btnPrev').disabled = currentStep === 0;
+            document.getElementById('btnNext').disabled = currentStep === scenarios[currentScenario].length - 1;
+            
+            // 更新按钮组状态
+            document.querySelectorAll('.scenario-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.includes(currentScenario));
+            });
+        }
+
+        // --- 6. 控制逻辑 ---
+        const btnNext = document.getElementById('btnNext');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnReset = document.getElementById('btnReset');
+
+        function setScenario(type) {
+            currentScenario = type;
+            currentStep = 0;
+            stopPlay();
+            resizeCanvas();
+            updateUI();
+        }
+
+        function nextStep() {
+            if (currentStep < scenarios[currentScenario].length - 1) {
+                currentStep++;
+                draw();
+                updateUI();
+            } else {
+                stopPlay();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                draw();
+                updateUI();
+            }
+        }
+
+        function reset() {
+            stopPlay();
+            currentStep = 0;
+            draw();
+            updateUI();
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                stopPlay();
+            } else {
+                if (currentStep === scenarios[currentScenario].length - 1) currentStep = 0;
+                isPlaying = true;
+                
+                // Style Change
+                btnPlay.classList.add('btn-danger');
+                btnPlay.classList.remove('btn-primary');
+                const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+                btnPlay.innerHTML = `${svg}<span>暂停</span>`;
+                
+                // First draw
+                draw(); updateUI();
+                
+                playInterval = setInterval(nextStep, 2500); 
+            }
+        }
+
+        function stopPlay() {
+            isPlaying = false;
+            clearInterval(playInterval);
+            
+            btnPlay.classList.remove('btn-danger');
+            btnPlay.classList.add('btn-primary');
+            const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            btnPlay.innerHTML = `${svg}<span>播放</span>`;
+        }
+
+        // Init
+        btnNext.addEventListener('click', () => { stopPlay(); nextStep(); });
+        btnPrev.addEventListener('click', () => { stopPlay(); prevStep(); });
+        btnReset.addEventListener('click', reset);
+        btnPlay.addEventListener('click', togglePlay);
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', () => { setScenario('LL'); });
+
+    </script>
+</body>
+</html>

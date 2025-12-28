@@ -9,12 +9,200 @@ tags:
 comments: true
 abbrlink: a5c070b0
 date: 2025-09-22 00:55:53
-updated: 2025-12-28 12:34:32
+updated: 2025-12-28 14:37:35
 typora-root-url: ..
 
 ---
 
 > 部分笔记摘录自[hello-algo](https://www.hello-algo.com/)
+
+## 树
+
+### 二叉树
+
+```java
+/* 二叉树节点类 */
+class TreeNode {
+    int val;         // 节点值
+    TreeNode left;   // 左子节点引用
+    TreeNode right;  // 右子节点引用
+    TreeNode(int x) { val = x; }
+}
+```
+
+层序遍历（BFS）
+
+```java
+/* 层序遍历 */
+List<Integer> levelOrder(TreeNode root) {
+    // 初始化队列，加入根节点
+    Queue<TreeNode> queue = new LinkedList<>();
+    queue.add(root);
+    // 初始化一个列表，用于保存遍历序列
+    List<Integer> list = new ArrayList<>();
+    while (!queue.isEmpty()) {
+        TreeNode node = queue.poll(); // 队列出队
+        list.add(node.val);           // 保存节点值
+        if (node.left != null)
+            queue.offer(node.left);   // 左子节点入队
+        if (node.right != null)
+            queue.offer(node.right);  // 右子节点入队
+    }
+    return list;
+}
+```
+
+前序/中序/后续遍历（DFS）
+
+```java
+/* 前序遍历 */
+void preOrder(TreeNode root) {
+    if (root == null)
+        return;
+    // 访问优先级：根节点 -> 左子树 -> 右子树
+    list.add(root.val);
+    preOrder(root.left);
+    preOrder(root.right);
+}
+
+/* 中序遍历 */
+void inOrder(TreeNode root) {
+    if (root == null)
+        return;
+    // 访问优先级：左子树 -> 根节点 -> 右子树
+    inOrder(root.left);
+    list.add(root.val);
+    inOrder(root.right);
+}
+
+/* 后序遍历 */
+void postOrder(TreeNode root) {
+    if (root == null)
+        return;
+    // 访问优先级：左子树 -> 右子树 -> 根节点
+    postOrder(root.left);
+    postOrder(root.right);
+    list.add(root.val);
+}
+```
+
+### 哈夫曼编码
+
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-28-1766903490802.webp)
+
+伪代码：
+
+```
+函数 HuffmanCoding(字符集 C):
+    n = |C|
+    Q = 优先队列(按频率升序)
+
+    # 1. 初始化队列
+    对于 C 中的每个字符 c:
+        创建一个节点 z
+        z.字符 = c
+        z.频率 = c.频率
+        Insert(Q, z)
+
+    # 2. 构建哈夫曼树
+    当 Q.size > 1 时执行:
+        # 取出两个最小的
+        x = ExtractMin(Q)
+        y = ExtractMin(Q)
+
+        # 合并为一个新节点
+        z = 新节点()
+        z.left = x
+        z.right = y
+        z.频率 = x.频率 + y.频率
+        
+        # 将新节点放回队列
+        Insert(Q, z)
+
+    # 3. 返回根节点
+    Return ExtractMin(Q)
+
+函数 GenerateCodes(节点 node, 当前编码 code):
+    如果 node 是叶子节点:
+        打印/存储 node.字符 : code
+        返回
+    
+    GenerateCodes(node.left, code + "0")
+    GenerateCodes(node.right, code + "1")
+```
+
+### BST
+
+> https://www.hello-algo.com/chapter_tree/binary_search_tree/
+
+**前序查找**
+
+时间复杂度 O(h)
+
+```java
+public long predecessorQuery(Node root, long q) {
+	//节点为空
+	if (root == null) {
+		return -1;
+	//二叉搜索树中存在key=q的节点
+	} else if (root.element == q) {
+		return root.element;
+	//当前节点的key>q的时候，将左子节点(更小)作为查询root节点
+	} else if (root.element > q) {
+		return predecessorQuery(root.leftChild, q);
+	//当前节点的key<q的时候，保存当前的节点的key，将右子节点(更大)作为查询root节点，并且返回的key与当前节点的key做对比，如果是为-1证明无法找到
+	} else {
+		long temp = predecessorQuery(root.rightChild, q);
+		if (temp == -1) {
+			return root.element;
+		} else {
+		return temp;
+		}
+	}
+}
+```
+
+**后序查找**
+
+时间复杂度 O(h)
+
+```java
+public long successorQuery(Node root, long q) {
+	if (root == null) {
+		return -1;
+	} else if (root.element == q) {
+		return root.element;
+	} else if (root.element > q) {
+		long temp = successorQuery(root.leftChild, q);
+		if (temp == -1) {
+			return root.element;
+		} else {
+			return temp;
+		}
+	} else {
+		return successorQuery(root.rightChild, q);
+	}
+}
+```
+
+### AVL
+
+> https://www.hello-algo.com/chapter_tree/avl_tree/
+
+<iframe
+src="/widgets/dsaa_avl.html"
+width="100%"
+style="height: 75vh; border: 1px solid #e2e8f0; border-radius: 8px;"
+frameborder="0"
+sandbox="allow-scripts allow-same-origin"
+></iframe>
+
+| 失衡节点的平衡因子 | 子节点的平衡因子 | 应采用的旋转方法 |
+| ------------------ | ---------------- | ---------------- |
+| $> 1$ （左偏树）   | $\geq 0$         | 右旋             |
+| $> 1$ （左偏树）   | $<0$             | 先左旋后右旋     |
+| $< -1$ （右偏树）  | $\leq 0$         | 左旋             |
+| $< -1$ （右偏树）  | $>0$             | 先右旋后左旋     |
 
 ## 堆
 
@@ -161,62 +349,6 @@ MaxHeap(List<Integer> nums) {
     }
 }
 ```
-
-## BST
-
-> https://www.hello-algo.com/chapter_tree/binary_search_tree/
-
-**前序查找**
-
-时间复杂度 O(h)
-
-```java
-public long predecessorQuery(Node root, long q) {
-	//节点为空
-	if (root == null) {
-		return -1;
-	//二叉搜索树中存在key=q的节点
-	} else if (root.element == q) {
-		return root.element;
-	//当前节点的key>q的时候，将左子节点(更小)作为查询root节点
-	} else if (root.element > q) {
-		return predecessorQuery(root.leftChild, q);
-	//当前节点的key<q的时候，保存当前的节点的key，将右子节点(更大)作为查询root节点，并且返回的key与当前节点的key做对比，如果是为-1证明无法找到
-	} else {
-		long temp = predecessorQuery(root.rightChild, q);
-		if (temp == -1) {
-			return root.element;
-		} else {
-		return temp;
-		}
-	}
-}
-```
-
-**后序查找**
-
-时间复杂度 O(h)
-
-```java
-public long successorQuery(Node root, long q) {
-	if (root == null) {
-		return -1;
-	} else if (root.element == q) {
-		return root.element;
-	} else if (root.element > q) {
-		long temp = successorQuery(root.leftChild, q);
-		if (temp == -1) {
-			return root.element;
-		} else {
-			return temp;
-		}
-	} else {
-		return successorQuery(root.rightChild, q);
-	}
-}
-```
-
-
 
 ## 图
 
