@@ -118,19 +118,19 @@
             left: 20px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(8px);
-            padding: 16px;
+            padding: 20px;
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.5);
             box-shadow: var(--shadow-md);
-            font-size: 0.8rem;
+            font-size: 1rem;
             z-index: 10;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
-        .legend-row { display: flex; align-items: center; gap: 8px; color: var(--text-sub); font-weight: 500; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
-        .tag { padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; }
+        .legend-row { display: flex; align-items: center; gap: 10px; color: var(--text-sub); font-weight: 500; }
+        .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; }
+        .tag { padding: 4px 8px; border-radius: 4px; font-family: 'JetBrains Mono'; font-size: 0.85rem; font-weight: 700; }
         
         /* --- 悬浮控制栏 (右侧垂直) - 参考 Dijkstra --- */
         .controls-island {
@@ -262,12 +262,7 @@
         .badge-success { background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
         .badge-neutral { background: #f1f5f9; color: var(--text-sub); border: 1px solid #e2e8f0; }
 
-        @media (max-width: 768px) {
-            .legend-card {
-                transform: scale(0.5);
-                transform-origin: top left;
-            }
-        }
+
     </style>
 </head>
 <body>
@@ -565,9 +560,21 @@
             // 缩放适配 800x600 逻辑尺寸
             const scaleX = w / 800;
             const scaleY = h / 600;
-            const scale = Math.min(scaleX, scaleY);
+            const baseScale = Math.min(scaleX, scaleY);
+            
+            // 图表整体放大 1.15 倍
+            const scale = baseScale * 1.15;
+
+            // 动态调整图例大小，使其跟随 Canvas 缩放 (使用 baseScale 保持原比例)
+            const legend = document.querySelector('.legend-card');
+            if (legend) {
+                legend.style.transform = `scale(${baseScale})`;
+                legend.style.transformOrigin = 'top left';
+            }
+
             const offsetX = (w - 800 * scale) / 2;
-            const offsetY = (h - 600 * scale) / 2;
+            // 整体向下偏移 40px (逻辑单位)
+            const offsetY = (h - 600 * scale) / 2 + (40 * baseScale);
 
             const tx = (val) => val * scale + offsetX;
             const ty = (val) => val * scale + offsetY;

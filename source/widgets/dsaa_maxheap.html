@@ -235,6 +235,8 @@
             display: grid;
             grid-template-columns: 1fr;
             gap: 10px;
+            overflow-y: auto;
+            flex: 1;
         }
         .btn-action {
             padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
@@ -641,15 +643,18 @@
             if (state.arr.length === 0) return;
 
             const levels = Math.floor(Math.log2(state.arr.length)) + 1;
-            const startY = 60;
-            const levelHeight = Math.min(100, (height - 100) / levels);
+            const startY = 100;
+            const levelHeight = Math.min(100, (height - 140) / levels);
             
             const getCoords = (i) => {
                 const level = Math.floor(Math.log2(i + 1));
                 const nodesInLevel = Math.pow(2, level);
                 const posInLevel = i - nodesInLevel + 1;
-                const totalWidth = width;
-                const x = (totalWidth / (nodesInLevel + 1)) * (posInLevel + 1);
+                
+                const effectiveWidth = width * 0.85;
+                const xOffset = (width - effectiveWidth) / 2;
+
+                const x = xOffset + (effectiveWidth / (nodesInLevel + 1)) * (posInLevel + 1);
                 const y = startY + level * levelHeight;
                 return { x, y };
             };
