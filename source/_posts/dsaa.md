@@ -1,5 +1,5 @@
 ---
-index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766768771746.webp'
+index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-02-1767347342110.webp'
 banner_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766802296337.webp'
 title: CS203 Data Structure and Algorithm Analysis
 categories:
