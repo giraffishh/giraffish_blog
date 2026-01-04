@@ -592,7 +592,7 @@ CALL archive_logs();
 
 ## Normalization
 
-
+### 1NF
 
 ## E-R Diagram Design
 
