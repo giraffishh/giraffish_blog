@@ -594,5 +594,11 @@ CALL archive_logs();
 
 ### 1NF
 
+### 2NF
+
+### 3NF
+
+## 
+
 ## E-R Diagram Design
 
