@@ -12,7 +12,7 @@ comments: true
 typora-root-url: ..
 abbrlink: 9edd5bb
 date: 2026-01-04 21:06:58
-updated: 2026-01-05 23:52:48
+updated: 2026-01-06 23:25:49
 
 ---
 
@@ -893,7 +893,63 @@ EXECUTE FUNCTION log_deletion_func();
 | Mike | Chair |
 | Tom | Table |
 
+### Functional Dependencies & Algorithms
 
+在进行数据库规范化时，我们需要一些算法工具来形式化地分析和分解关系模式
+
+#### 1. 属性集闭包 (Closure of Attribute Sets)
+
+> 属性集闭包用于回答：**“给定一组属性，能推导出哪些其他属性？”**
+
+-   **符号:** $A^+$ 表示属性集 $A$ 的闭包
+-   **输入:** 属性集 $A$，函数依赖集 $F$
+-   **算法:**
+    1.  初始化结果集 $Result = A$
+    2.  循环遍历 $F$ 中的每一个依赖 $X \rightarrow Y$：
+        -   如果 $X \subseteq Result$，则将 $Y$ 加入 $Result$ ($Result = Result \cup Y$)
+    3.  重复步骤 2，直到 $Result$ 不再变化
+-   **用途:**
+    -   **判断超键 (Super Key):** 如果 $A^+$ 包含了表中的所有属性，则 $A$ 是超键
+    -   **验证函数依赖:** 要验证 $X \rightarrow Y$ 是否成立，只需检查 $Y$ 是否在 $X^+$ 中
+
+**示例:**
+关系模式 $R(A, B, C, D)$，函数依赖集 $F = \{ A \rightarrow B, B \rightarrow C \}$
+求 $A^+$:
+
+1.  初始化: $Result = \{A\}$
+2.  使用 $A \rightarrow B$: $A \subseteq \{A\}$，加入 $B$，Result = $\{A, B\}$
+3.  使用 $B \rightarrow C$: $B \subseteq \{A, B\}$，加入 $C$，Result = $\{A, B, C\}$
+4.  再无变化。
+结论: $A^+ = \{A, B, C\}$。因为 $\{A, B, C\} \neq \{A, B, C, D\}$，所以 $A$ 不是超键
+
+#### 2. 正则覆盖 (Canonical Cover)
+
+> 正则覆盖 $F_c$ 是函数依赖集 $F$ 的**最简形式**。它去除了 $F$ 中的冗余依赖，但与 $F$ 逻辑等价（闭包相同）
+
+-   **目标:**
+    1.  **右侧单属性:** 所有的依赖右边只有一个属性 (如 $A \rightarrow BC$ 拆解为 $A \rightarrow B, A \rightarrow C$)
+    2.  **无冗余依赖:** 去掉某个依赖后，闭包不变。
+    3.  **无冗余属性:** 去掉某个依赖左边的属性后，闭包不变 (如 $AB \rightarrow C$，如果 $A \rightarrow C$ 已存在，则 $B$ 冗余)
+
+-   **算法步骤:**
+    1.  **单属性化:** 利用合并规则将所有依赖的右边拆解为单个属性
+    2.  **消除左侧冗余属性:** 对于 $X \rightarrow Y$，检查 $X$ 中的属性是否多余
+        -   如果 $X$ 中有个属性 $A$，且 $(X-\{A\})^+ $ 包含 $Y$，则 $A$ 是多余的
+    3.  **消除冗余依赖:** 对于每一个依赖 $X \rightarrow Y$，检查它是否多余
+        -   计算 $F' = F - \{X \rightarrow Y\}$
+        -   如果在 $F'$ 下，$X^+$ 仍然包含 $Y$，说明该依赖可以被其他依赖推导出来，删除它
+    4.  **合并:** 将左侧相同的依赖合并 (如 $A \rightarrow B, A \rightarrow C$ 合并为 $A \rightarrow BC$)
+
+**示例:**
+$F = \{ A \rightarrow B, B \rightarrow C, A \rightarrow C \}$
+1.  **单属性化:** 已经是单属性
+2.  **左侧冗余:** 无复合属性，跳过
+3.  **冗余依赖:**
+    -   检查 $A \rightarrow C$:
+    -   暂时去掉它，剩余 $F' = \{ A \rightarrow B, B \rightarrow C \}$
+    -   在 $F'$ 中计算 $A^+$: $A \rightarrow B \rightarrow C$，所以 $A^+ = \{A, B, C\}$
+    -   $C$ 在 $A^+$ 中，说明 $A \rightarrow C$ 是冗余的。删除。
+4.  **结果:** $F_c = \{ A \rightarrow B, B \rightarrow C \}$。
 
 ## E-R Diagram Design
 
@@ -1059,4 +1115,223 @@ SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 -   **Exclusive Lock (X-Lock / 排他锁 / 写锁):**
     -   事务为了**修改**数据而获取的锁
     -   如果一个事务获取了对象的排他锁，其他事务**不能**获取该对象的任何锁（既不能读也不能写）
+
+## Relational Algebra
+
+> 关系代数 (Relational Algebra) 是一种**过程化**查询语言。它包含一组运算，这些运算以一个或两个关系（表）作为输入，并产生一个新的关系作为输出。它是 SQL 语言的理论基础。
+
+### 1. 基本运算 (Fundamental Operations)
+
+这 6 个运算是关系代数的核心，其他运算都可以由它们组合而成。
+
+#### 1.1 选择 (Select, $\sigma$)
+
+-   **定义:** 选择满足给定谓词 $P$ 的行（元组）。
+-   **符号:** $\sigma_P(R)$
+-   **SQL 对应:** `WHERE` 子句
+-   **示例:**
+    -   查询物理系 (Physics) 的所有教师：
+    -   $\sigma_{dept\_name = 'Physics'}(Instructor)$
+    -   SQL: `SELECT * FROM Instructor WHERE dept_name = 'Physics';`
+
+#### 1.2 投影 (Project, $\pi$)
+
+-   **定义:** 选择指定的列（属性），并自动去重。
+-   **符号:** $\pi_{A_1, A_2, ..., A_k}(R)$
+-   **SQL 对应:** `SELECT DISTINCT col1, col2` (注意：关系代数默认去重，SQL 默认不去重)
+-   **示例:**
+    -   查询所有教师的 ID 和姓名：
+    -   $\pi_{ID, name}(Instructor)$
+    -   SQL: `SELECT DISTINCT ID, name FROM Instructor;`
+
+#### 1.3 并运算 (Union, $\cup$)
+
+-   **定义:** 返回包含在关系 $R$ 或 $S$ 或两者中的所有元组。要求 $R$ 和 $S$ 具有相同的属性数量和兼容的属性域。
+-   **符号:** $R \cup S$
+-   **SQL 对应:** `UNION`
+-   **示例:**
+    -   $\pi_{course\_id}(\sigma_{semester='Fall'}(Section)) \cup \pi_{course\_id}(\sigma_{semester='Spring'}(Section))$
+    -   SQL: 选出 Fall 或 Spring 学期开设的所有课程 ID。
+
+#### 1.4 集合差 (Set Difference, $-$)
+
+-   **定义:** 返回属于关系 $R$ 但不属于关系 $S$ 的元组。
+-   **符号:** $R - S$
+-   **SQL 对应:** `EXCEPT` (在 Oracle 中是 `MINUS`)
+-   **示例:**
+    -   $\pi_{course\_id}(\sigma_{semester='Fall'}(Section)) - \pi_{course\_id}(\sigma_{semester='Spring'}(Section))$
+    -   SQL: 选出在 Fall 学期开设但不在 Spring 学期开设的课程。
+
+#### 1.5 笛卡尔积 (Cartesian Product, $\times$)
+
+-   **定义:** 将关系 $R$ 中的每一行与关系 $S$ 中的每一行进行拼接。
+-   **符号:** $R \times S$
+-   **SQL 对应:** `CROSS JOIN` 或 `FROM table1, table2`
+-   **示例:**
+    -   $Instructor \times Teaches$
+    -   结果包含所有可能的 (教师, 授课) 组合。通常本身没有意义，需要配合选择运算使用。
+
+#### 1.6 更名运算 (Rename, $\rho$)
+
+-   **定义:** 为关系或属性重新命名。
+-   **符号:** $\rho_X(E)$ (将表达式 E 的结果重命名为 X)
+-   **SQL 对应:** `AS`
+-   **示例:**
+    -   $\rho_{Emp}(Employee)$
+    -   SQL: `SELECT * FROM Employee AS Emp;`
+
+### 2. 扩展运算 (Additional Operations)
+
+为了方便使用，基于基本运算定义了一些常用的扩展运算。
+
+#### 2.1 集合交 (Set Intersection, $\cap$)
+
+-   **定义:** 返回同时属于关系 $R$ 和 $S$ 的元组。
+-   **推导:** $R \cap S = R - (R - S)$
+-   **SQL 对应:** `INTERSECT`
+
+#### 2.2 自然连接 (Natural Join, $\bowtie$)
+
+-   **定义:** 基于两个关系中**名称相同**的所有属性进行的等值连接，并去除重复列。
+-   **符号:** $R \bowtie S$
+-   **推导:** $A \bowtie B = \pi_{去除重复列}(\sigma_{A.ID = B.ID}(A \times B))$
+-   **SQL 对应:** `NATURAL JOIN`
+-   **示例:**
+    -   $Instructor \bowtie Teaches$
+    -   自动匹配两个表中的 `ID` 列相等的情况。
+
+#### 2.3 $\theta$ 连接 (Theta Join, $\bowtie_\theta$)
+
+-   **定义:** 笛卡尔积后进行选择运算。
+-   **符号:** $R \bowtie_\theta S = \sigma_\theta(R \times S)$
+-   **SQL 对应:** `JOIN ON` 或 `WHERE`
+-   **示例:**
+    -   $Instructor \bowtie_{Instructor.salary > Teaches.budget} Teaches$
+
+#### 2.4 赋值 (Assignment, $\leftarrow$)
+
+-   **定义:** 将右侧表达式的结果赋给左侧的临时关系变量。
+-   **符号:** $Temp \leftarrow R \times S$
+-   **用途:** 将复杂的查询拆分为多个步骤。
+
+## Indexing
+
+> 索引 (Index) 是数据库中用于提高数据检索速度的数据结构。它类似于书籍的目录，允许数据库快速找到特定的行，而无需扫描整个表。
+
+### 1. 基础知识
+
+-   **优点:**
+    -   极大地加快查询速度（SELECT, WHERE, JOIN）。
+    -   可以强制实施唯一性约束 (UNIQUE Index)。
+-   **缺点:**
+    -   占用额外的存储空间。
+    -   降低写操作的速度 (INSERT, UPDATE, DELETE)，因为每次修改数据时，索引也需要更新。
+
+### 2. 语法
+
+```postgresql
+-- 创建索引
+CREATE INDEX index_name ON table_name (column_name);
+
+-- 创建唯一索引
+CREATE UNIQUE INDEX index_name ON table_name (column_name);
+
+-- 删除索引
+DROP INDEX index_name;
+```
+
+#### 3. 常见索引类型
+
+-   **B-Tree 索引 (默认):** 最常用的索引，支持全键值、键值范围和键前缀查找。
+-   **Hash 索引:** 基于哈希表实现，只有精确匹配索引所有列的查询才有效（仅支持 `=` 和 `IN`）。不支持范围查询。
+-   **Bitmap 索引 (位图索引):** 适用于列的基数 (Cardinality) 很低的情况（如性别、省份）。在数据仓库中常用。
+-   **Clustered Index (聚簇索引):**
+    -   数据的物理存储顺序与索引顺序一致。
+    -   一张表只能有一个聚簇索引（通常是主键）
+-   **Non-Clustered Index (非聚簇索引 / 二级索引):**
+    -   索引中存储的是索引列的值和指向数据行的指针（或主键）
+    -   一张表可以有多个非聚簇索引。
+
+#### 4. B-Tree (Balanced Tree) 实现详解
+
+> B-Tree 是一种自平衡的树，设计初衷是为磁盘等直接存取辅助存储设备提供一种高效的索引结构
+
+**核心概念：阶 (Order)**
+
+B-Tree 通常被描述为 **$m$ 阶 (m-order)** 树，这意味着：
+1.  每个节点**最多**有 $m$ 个子节点。
+2.  每个节点**最多**有 $m-1$ 个 Key。
+3.  除根节点外，每个节点**至少**有 $\lceil m/2 \rceil$ 个子节点（即半满状态）。
+
+**示例:** 一个 **3阶 B-Tree (Order = 3)**：
+-   每个节点最多存 **2** 个 Key。
+-   每个节点最多有 **3** 个子节点 (3路)。
+
+**3阶 B-Tree 结构示意图 (ASCII):**
+
+```text
+       [ 30 ]                  <-- Root Node (1 Key, 2 Children)
+      /      \
+  [ 10 ]    [ 50 | 70 ]        <-- Internal/Leaf Nodes
+ /   \      /   |    \
+...  ...  [40] [60]  [80]      <-- Leaf Nodes
+```
+
+**查找 (Search) 示例:**
+
+假设要在上面的树中查找 **25**：
+1.  **比较根节点 [30]:** 25 < 30，向左子树走。
+2.  **比较节点 [10]:** 25 > 10，向右子树走（假设 10 右边的指针指向包含 20-29 的范围）。
+3.  **到达叶子节点:** 遍历节点内的 Key，找到 25，返回 Data。
+
+**插入 (Insert) 示例：分裂与上浮**
+
+**场景:** 基于上图的 3阶 B-Tree，我们尝试连续插入 **65** 和 **66**，演示从叶子节点到根节点的级联分裂过程。
+
+**Step 1: 插入 65 (节点变满)**
+-   查找发现应插入叶子节点 `[60]`。
+-   插入后该节点变为 `[ 60 | 65 ]`。
+-   Key 数量 (2) 达到上限 (Max Keys)，但未溢出，插入成功。
+
+```text
+       [ 30 ]
+      /      \
+  [ 10 ]    [ 50 | 70 ]
+ /   \      /   |    \
+...  ...  [40] [60|65] [80]  <-- Leaf node filled
+```
+
+**Step 2: 插入 66 (叶子节点分裂 -> 父节点溢出)**
+-   插入后叶子节点临时变为 `[ 60 | 65 | 66 ]` (溢出)。
+-   **分裂:** 中间值 **65** 上浮。原节点分裂为 `[60]` 和 `[66]`。
+-   **65** 进入父节点 `[ 50 | 70 ]`，父节点临时变为 `[ 50 | 65 | 70 ]` (溢出)。
+
+```text
+       [ 30 ]
+      /      \
+  [ 10 ]    [ 50 | 65 | 70 ] <-- Parent Overflow! (Temp state)
+ /   \      /   |    |    \
+...  ...  [40] [60] [66] [80]
+```
+
+**Step 3: 父节点分裂 (级联分裂 -> 根节点更新)**
+-   父节点溢出，中间值 **65** 继续上浮。
+-   原父节点分裂为 `[50]` 和 `[70]`。
+-   **65** 进入根节点 `[ 30 ]`，根节点变为 `[ 30 | 65 ]` (未溢出)。
+
+```text
+       [ 30 | 65 ]             <-- Root Updated
+      /     |     \
+  [ 10 ]  [ 50 ]  [ 70 ]       <-- Parent Split
+ /   \    /   \   /   \
+... ... [40] [60] [66] [80]
+```
+
+**搜索效率:**
+
+-   **时间复杂度:** $O(\log N)$。
+-   **特点:** 搜索可能在非叶子节点提前结束（如果正好匹配到当前节点的 Key），而 B+ Tree 必须搜索到叶子节点。
+
+**为什么数据库更倾向于 B+ Tree (补充背景):**
+虽然 B-Tree 很优秀，但 B+ Tree 在内部节点不存 Data，因此相同大小的磁盘页可以存储更多 Key，扇出 (Fan-out) 更大，树更矮；且 B+ Tree 叶子节点有链表连接，更适合范围扫描
 
