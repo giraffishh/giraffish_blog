@@ -11,8 +11,8 @@ tags:
 comments: true
 typora-root-url: ..
 abbrlink: 9edd5bb
-date: 2026-01-02 15:02:57
-updated: 2026-01-03 15:51:06
+date: 2026-01-04 21:06:58
+updated: 2026-01-06 20:59:12
 
 ---
 
@@ -468,6 +468,85 @@ REVOKE SELECT ON employees FROM readonly_user;
 
 ## Advanced SQL
 
+### Views
+
+> 视图 (View) 是一个**虚拟表**，其内容由查询定义。同真实的表一样，视图包含一系列带有名称的列和行数据。但是，视图**不占用物理存储空间**来存储数据（除非是物化视图），数据库中只存储视图的定义
+
+#### 核心作用
+
+1.  **简化复杂查询**: 将复杂的 JOIN、聚合或子查询封装成一个简单的视图，使用者只需查询视图即可
+2.  **安全性 (Security)**: 可以限制用户访问表中的特定列或行。例如，只向 HR 显示员工姓名和部门，而隐藏薪资列
+3.  **逻辑数据独立性**: 当底层表结构发生变化时，可以通过修改视图定义来保持对外接口不变，从而不影响上层应用
+
+#### 语法
+
+**创建视图:**
+
+```postgresql
+CREATE VIEW view_name AS
+SELECT column1, column2, ...
+FROM table_name
+WHERE condition;
+```
+
+**修改/替换视图:**
+
+```postgresql
+CREATE OR REPLACE VIEW view_name AS
+SELECT ...
+```
+
+**删除视图:**
+
+```postgresql
+DROP VIEW view_name;
+```
+
+#### 示例
+
+假设有一个复杂的查询，用于获取每个部门的平均薪资：
+
+```postgresql
+-- 原始查询
+SELECT d.name, AVG(e.salary)
+FROM employees e
+JOIN departments d ON e.department_id = d.id
+GROUP BY d.name;
+```
+
+**创建视图:**
+
+```postgresql
+CREATE VIEW dept_avg_salary AS
+SELECT d.name AS department_name, AVG(e.salary) AS avg_sal
+FROM employees e
+JOIN departments d ON e.department_id = d.id
+GROUP BY d.name;
+```
+
+**查询视图:**
+
+```postgresql
+-- 就像查询普通表一样
+SELECT * FROM dept_avg_salary WHERE avg_sal > 50000;
+```
+
+#### Materialized Views (物化视图)
+
+> 普通视图是"虚"的，每次查询都会实时执行背后的 SQL。**物化视图 (Materialized View)** 则是将查询结果**物理存储**在磁盘上。
+
+-   **优点**: 查询速度极快（特别是对于复杂的聚合查询），因为不需要每次都重新计算。
+-   **缺点**: 数据不是实时的。当底层表数据更新时，物化视图需要刷新 (Refresh)。
+-   **适用场景**: 数据仓库、报表系统等对实时性要求不高但对性能要求高的场景。
+
+```postgresql
+-- 创建物化视图
+CREATE MATERIALIZED VIEW my_summary AS SELECT ...;
+
+-- 刷新数据
+REFRESH MATERIALIZED VIEW my_summary;
+```
+
 ### Functions
 
 > 在 PostgreSQL 中，Function (函数) 是存储在数据库服务器上的代码块。它类似于编程语言中的函数，可以封装复杂的业务逻辑（如循环、条件判断、多次查询），并减少网络交互
@@ -563,7 +642,7 @@ CALL procedure_name(val1, val2);
 
 #### 示例
 
-> Procedure 最大的优势是处理超长任务。例如清理 100 万条日志，如果用 Function，必须一次性做完，容易锁表或超时；用 Procedure 可以每删 1000 条就 COMMIT 一次。
+> Procedure 最大的优势是处理超长任务。例如清理 100 万条日志，如果用 Function，必须一次性做完，容易锁表或超时；用 Procedure 可以每删 1000 条就 COMMIT 一次
 
 ```postgresql
 CREATE OR REPLACE PROCEDURE archive_logs()
@@ -590,15 +669,394 @@ $$;
 CALL archive_logs();
 ```
 
+### Triggers
+
+> 触发器 (Trigger) 是一种特殊的存储过程，它不能被显式调用，而是由数据库在特定事件（如 `INSERT`, `UPDATE`, `DELETE`）发生时**自动执行**
+
+#### 核心要素
+
+1.  **Event (事件):** 触发执行的操作，如 `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`
+2.  **Timing (时机):**
+    -   `BEFORE`: 在数据修改**之前**执行（常用于数据校验、自动填充默认值）
+    -   `AFTER`: 在数据修改**之后**执行（常用于记录审计日志、级联更新其他表）
+    -   `INSTEAD OF`: 代替原始操作执行（通常用于视图）
+3.  **Level (级别):**
+    -   `FOR EACH ROW`: 对受影响的每一行都执行一次（例如 UPDATE 10 行，就触发 10 次）。可以使用 `NEW` 和 `OLD` 变量引用新旧数据
+    -   `FOR EACH STATEMENT`: 无论影响多少行，整个 SQL 语句只触发一次
+
+#### 创建流程 (PostgreSQL)
+
+在 PostgreSQL 中，创建触发器通常分为两步：
+1.  创建一个**触发器函数 (Trigger Function)**，返回类型必须是 `TRIGGER`
+2.  创建**触发器 (Trigger)** 本身，将其绑定到具体的表和事件上
+
+#### 示例：自动更新 `updated_at` 时间戳
+
+**1. 创建触发器函数:**
+
+```postgresql
+CREATE OR REPLACE FUNCTION update_timestamp_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- NEW 代表即将被插入或更新的新行数据
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**2. 创建触发器:**
+
+```postgresql
+CREATE TRIGGER set_timestamp
+BEFORE UPDATE ON employees  -- 在 employees 表更新之前触发
+FOR EACH ROW                -- 对每一行数据生效
+EXECUTE FUNCTION update_timestamp_func();
+```
+
+#### 示例：审计日志 (Audit Log)
+
+记录谁在什么时候删除了哪位员工
+
+**1. 创建审计表:**
+
+```postgresql
+CREATE TABLE audit_log (
+    id SERIAL PRIMARY KEY,
+    operation_type VARCHAR(10),
+    employee_id INT,
+    deleted_by VARCHAR(50),
+    deleted_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**2. 创建触发器函数:**
+
+```postgresql
+CREATE OR REPLACE FUNCTION log_deletion_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- OLD 代表已经被删除的旧行数据
+    INSERT INTO audit_log (operation_type, employee_id, deleted_by)
+    VALUES ('DELETE', OLD.id, CURRENT_USER);
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**3. 创建触发器:**
+
+```postgresql
+CREATE TRIGGER audit_delete_trigger
+AFTER DELETE ON employees
+FOR EACH ROW
+EXECUTE FUNCTION log_deletion_func();
+```
+
+#### 特殊变量 (NEW vs OLD)
+
+| 变量 | 描述 | 适用事件 |
+| :--- | :--- | :--- |
+| `NEW` | 包含新的一行数据 | `INSERT`, `UPDATE` |
+| `OLD` | 包含旧的一行数据 | `UPDATE`, `DELETE` |
+| `TG_OP` | 触发操作的名称 ('INSERT', 'UPDATE'...) | 所有 |
+
 ## Normalization
 
-### 1NF
+> 数据库规范化 (Normalization) 是用来组织数据库中的数据，以减少数据冗余和提高数据完整性。通常分为不同的范式 (Normal Forms)，从 1NF 到 BCNF 逐级严格
 
-### 2NF
+### 1NF (第一范式)
 
-### 3NF
+> **核心要求:** 强调**属性的原子性**，即表中的每一列都是不可分割的基本数据项
 
-## 
+- **要求:**
+  1.  表中的每一行必须是唯一的（主键）
+  2.  表中的每一列必须包含原子的值，不能包含集合、数组或重复的组
+
+**违反 1NF 的示例:**
+
+| ID | Name | Phone_Numbers |
+| :--- | :--- | :--- |
+| 1 | Alice | 123-4567, 987-6543 |
+| 2 | Bob | 555-1234 |
+
+**修正后的 1NF:**
+
+| ID | Name | Phone_Number |
+| :--- | :--- | :--- |
+| 1 | Alice | 123-4567 |
+| 1 | Alice | 987-6543 |
+| 2 | Bob | 555-1234 |
+
+### 2NF (第二范式)
+
+> **核心要求:** 在满足 1NF 的基础上，**消除非主属性对主键的部分函数依赖**。即：所有非主属性必须完全依赖于主键
+
+- **适用场景:** 当主键由多个列组成（复合主键）时，才可能违反 2NF。如果主键只有一列，自然满足 2NF
+- **问题:** 如果一个非主属性只依赖于复合主键中的某一部分，就会导致数据冗余
+
+**违反 2NF 的示例:**
+假设主键是 `(Student_ID, Course_ID)`
+
+| Student_ID | Course_ID | Student_Name | Grade |
+| :--- | :--- | :--- | :--- |
+| 1 | 101 | Alice | A |
+| 1 | 102 | Alice | B |
+
+*   `Student_Name` 依赖于 `Student_ID`，而不依赖于 `Course_ID`。这就是部分依赖
+
+**修正后的 2NF (拆表):**
+
+**Student 表:**
+
+| Student_ID | Student_Name |
+| :--- | :--- |
+| 1 | Alice |
+
+**Grade 表:**
+
+| Student_ID | Course_ID | Grade |
+| :--- | :--- | :--- |
+| 1 | 101 | A |
+| 1 | 102 | B |
+
+### 3NF (第三范式)
+
+> **核心要求:** 在满足 2NF 的基础上，**消除非主属性对主键的传递函数依赖**。即：非主属性必须直接依赖于主键，而不能通过其他非主属性间接依赖
+
+- **规则:** 任何非主属性都不能依赖于其他非主属性 (Attributes depend only on the Key, the whole Key, and nothing but the Key)
+
+**违反 3NF 的示例:**
+主键是 `Employee_ID`
+
+| Employee_ID | Department_Name | Manager_Name |
+| :--- | :--- | :--- |
+| 1 | Sales | John |
+| 2 | Sales | John |
+
+*   `Manager_Name` 依赖于 `Department_Name`，而 `Department_Name` 依赖于 `Employee_ID`
+*   存在传递依赖: `Employee_ID` -> `Department_Name` -> `Manager_Name`
+
+**修正后的 3NF (拆表):**
+
+**Employee 表:**
+
+| Employee_ID | Department_Name |
+| :--- | :--- |
+| 1 | Sales |
+| 2 | Sales |
+
+**Department 表:**
+
+| Department_Name | Manager_Name |
+| :--- | :--- |
+| Sales | John |
+
+### BCNF (Boyce-Codd Normal Form)
+
+> **核心要求:** BCNF 是 3NF 的加强版，通常称为 "3.5NF"。它解决了 3NF 中主属性对非主键的依赖问题。
+
+- **定义:** 对于关系模式中的每一个函数依赖 $X \rightarrow Y$（$Y$ 不是 $X$ 的子集），$X$ 必须是**超键 (Super Key)**。
+- **简而言之:** 表中的每一个决定因素 (Determinant) 都必须是候选键。
+
+**违反 BCNF 的示例:**
+假设一个仓库管理表，规则是：
+1. 一个仓库管理员 (Keeper) 只管理一个仓库 (Warehouse)。
+2. 一个仓库可能有多个管理员。
+3. 每种物品 (Item) 在每个仓库里只存放一次。
+
+候选键: `(Warehouse, Item)` 或 `(Keeper, Item)`。
+
+| Warehouse | Keeper | Item |
+| :--- | :--- | :--- |
+| A | John | Table |
+| A | Mike | Chair |
+| B | Tom | Table |
+
+*   存在函数依赖: `Keeper` -> `Warehouse` (因为每个管理员只在一个仓库)。
+*   但是 `Keeper` 不是候选键 (因为 `Keeper` 决定不了 `Item`)。
+*   这里 `Keeper` 是决定因素，但不是超键，所以违反 BCNF。
+
+**修正后的 BCNF:**
+
+**Keeper_Assignment 表:**
+| Keeper | Warehouse |
+| :--- | :--- |
+| John | A |
+| Mike | A |
+| Tom | B |
+
+**Stock 表:**
+| Keeper | Item |
+| :--- | :--- |
+| John | Table |
+| Mike | Chair |
+| Tom | Table |
+
+
 
 ## E-R Diagram Design
+
+> Chen's Notation (陈氏表示法)
+
+![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-06-1767701184078.webp)
+
+### 1. 基本组件 (Basic Components) 
+
+| 组件 (Component) | 符号 (Symbol) | 描述 |
+| :--- | :--- | :--- |
+| **Entity (实体)** | **矩形 (Rectangle)** | 现实世界中可区分的对象。例如：`Student`, `Car` |
+| **Attribute (属性)** | **椭圆 (Ellipse)** | 描述实体的特征。实体与属性用直线连接。例如：`Name`, `Age` |
+| **Relationship (关系)** | **菱形 (Diamond)** | 实体之间的关联。用直线连接相关的实体。例如：`Enrolls`, `Works_For` |
+
+### 2. 属性类型 (Attribute Types)
+
+- **Key Attribute (主键属性):**
+  - **符号:** 椭圆内文字带**下划线**
+  - **含义:** 唯一标识实体的属性。例如：`Student_ID`
+  
+- **Multivalued Attribute (多值属性):**
+  - **符号:** **双边椭圆 (Double Ellipse)**
+  - **含义:** 一个实体在该属性上可能有多个值。例如：`Phone_Numbers` (一个人可能有多个电话)
+
+- **Derived Attribute (派生属性):**
+  - **符号:** **虚线椭圆 (Dashed Ellipse)**
+  - **含义:** 该属性的值不是直接存储的，而是从其他属性计算得来的。例如：`Age` (可以从 `Birth_Date` 计算得出)
+
+- **Composite Attribute (复合属性):**
+  - **符号:** 属性延伸出其他属性
+  - **含义:** 属性可以被细分为更小的部分。例如：`Name` 可以分为 `First_Name` 和 `Last_Name`
+
+### 3. 弱实体与强实体 (Weak & Strong Entities)
+
+- **Weak Entity (弱实体):**
+  - **符号:** **双边矩形 (Double Rectangle)**
+  - **含义:** 没有自己的主键，必须依赖于强实体 (Owner Entity) 才能被唯一标识的实体。例如：`Dependent` (家属) 依赖于 `Employee`
+  - **Partial Key (部分键):** 弱实体的区分符，用**虚下划线**表示
+
+- **Identifying Relationship (识别关系):**
+  - **符号:** **双边菱形 (Double Diamond)**
+  - **含义:** 连接弱实体及其所有者强实体的关系
+
+### 4. 约束 (Constraints)
+
+**基数比率 (Cardinality Ratios):**
+
+> 描述一个实体通过关系可以关联多少个其他实体，标注在关系连线上
+
+- **1:1 (One-to-One):** 关系两边分别标 `1`。例如：`Manager` --1-- `<Manages>` --1-- `Department`
+- **1:N (One-to-Many):** 一边标 `1`，另一边标 `N`，箭头多指向1。例如：`Department` <--1-- `<Has>` --N-- `Employee`
+- **M:N (Many-to-Many):** 一边标 `M`，另一边标 `N`。例如：`Student` --M-- `<Enrolls>` --N-- `Course`
+
+**参与约束 (Participation Constraints):**
+> 描述实体是否存在依赖于关系
+
+- **Total Participation (全部参与 / 强制参与):**
+  - **符号:** **双线 (Double Line)** 连接实体与关系
+  - **含义:** 实体集中的**每个**实体都必须参与该关系。例如：每个 `Loan` (贷款) 必须属于某个 `Branch` (支行)
+  
+- **Partial Participation (部分参与):**
+  - **符号:** **单线 (Single Line)** 连接
+  - **含义:** 实体集中只有**部分**实体参与该关系。例如：并非每个 `Employee` 都 `Manages` (管理) 一个部门
+
+## Transactions
+
+> 事务 (Transaction) 是数据库管理系统执行过程中的一个逻辑单位，由一个有限的数据库操作序列构成。事务的主要目的是为了保证数据的一致性和完整性。
+
+### 1. ACID 特性
+
+一个标准的数据库事务必须满足 ACID 四大特性：
+
+-   **Atomicity (原子性):**
+    -   事务中的所有操作**要么全部完成，要么全部不完成**。
+    -   如果事务在执行过程中发生错误，会被回滚 (Rollback) 到事务开始前的状态，就像这个事务从未执行过一样。
+-   **Consistency (一致性):**
+    -   事务执行前后，数据库必须始终保持一致性状态。
+    -   数据必须满足所有定义的规则（如外键约束、CHECK 约束等）。
+-   **Isolation (隔离性):**
+    -   多个并发事务之间是相互隔离的，一个事务的执行不应影响其他事务。
+    -   具体的隔离程度取决于**隔离级别**。
+-   **Durability (持久性):**
+    -   一旦事务提交 (Commit)，其对数据的修改就是永久的，即使系统崩溃也不会丢失。
+
+### 2. 事务控制语句 (TCL)
+
+-   `BEGIN` 或 `START TRANSACTION`: 显式开启一个事务。
+-   `COMMIT`: 提交事务，保存更改。
+-   `ROLLBACK`: 回滚事务，撤销未提交的更改。
+-   `SAVEPOINT name`: 在事务中创建一个保存点。
+-   `ROLLBACK TO name`: 回滚到指定的保存点，而不是回滚整个事务。
+
+**示例:**
+
+```postgresql
+BEGIN;
+
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+
+-- 如果上述两条都成功，则提交
+COMMIT;
+
+-- 如果发生错误，则回滚
+-- ROLLBACK;
+```
+
+### 3. 并发问题 (Concurrency Issues)
+
+当多个事务并发运行时，可能会出现以下问题：
+
+1.  **Dirty Read (脏读):** 事务 A 读取了事务 B **未提交**的数据。如果事务 B 后来回滚了，事务 A 读到的就是无效数据。
+2.  **Non-repeatable Read (不可重复读):** 事务 A 在同一个事务中读取了同一行两次，但得到的结果不同。这是因为在两次读取之间，事务 B **修改或删除**了该行并提交了。
+3.  **Phantom Read (幻读):** 事务 A 在同一个事务中按相同条件查询了两次，但第二次查询出的**行数**不同。这是因为在两次查询之间，事务 B **插入**了新行并提交了。
+
+### 4. 隔离级别 (Isolation Levels)
+
+SQL 标准定义了四种隔离级别，用于平衡并发性能和数据安全性（级别由低到高）：
+
+| 隔离级别 (Isolation Level) | 脏读 (Dirty Read) | 不可重复读 (Non-repeatable) | 幻读 (Phantom Read) | 性能 |
+| :--- | :---: | :---: | :---: | :--- |
+| **Read Uncommitted** (读未提交) | 可能 | 可能 | 可能 | 最高 |
+| **Read Committed** (读已提交) | **不可能** | 可能 | 可能 | 高 (PostgreSQL 默认) |
+| **Repeatable Read** (可重复读) | **不可能** | **不可能** | 可能 | 中 (MySQL InnoDB 默认) |
+| **Serializable** (串行化) | **不可能** | **不可能** | **不可能** | 最低 (最安全) |
+
+-   **Read Committed:** 只能读到其他事务已经提交的数据。解决了脏读。
+-   **Repeatable Read:** 保证在同一个事务中多次读取同一数据结果是一致的。解决了脏读和不可重复读。
+-   **Serializable:** 强制事务串行执行。解决了所有并发问题，但并发性能极差，容易导致锁竞争。
+
+#### 核心实现机制：MVCC (多版本并发控制)
+
+大多数现代数据库（如 PostgreSQL, MySQL InnoDB）使用 **MVCC (Multi-Version Concurrency Control)** 来实现 `Read Committed` 和 `Repeatable Read`，而不是单纯依赖锁（锁会阻塞读操作）。
+
+-   **基本原理:**
+    -   数据库为每一行数据维护多个版本（通过 undo log 或 hidden columns）。
+    -   读操作不阻塞写操作，写操作也不阻塞读操作。
+
+-   **Read Committed 的实现:**
+    -   **Read View (快照) 生成时机:** 在事务中，**每次执行 SELECT 语句时**都会生成一个新的 Read View。
+    -   **效果:** 如果在两次查询之间，有其他事务提交了修改，生成的快照就会不同，因此能读到最新的已提交数据（导致不可重复读）。
+
+-   **Repeatable Read 的实现:**
+    -   **Read View (快照) 生成时机:** 在事务中，**第一次执行 SELECT 语句时**生成一个 Read View，并在整个事务期间复用这个快照。
+    -   **效果:** 无论其他事务是否提交修改，当前事务看到的始终是第一次查询时的数据状态，从而保证了可重复读。
+
+**设置隔离级别:**
+
+```postgresql
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+```
+
+### 5. Locks (锁)
+
+锁 (Lock) 是数据库系统用来管理并发访问的一种机制，用于确保数据的一致性和完整性
+
+#### 锁的类型 (Types of Locks)
+
+-   **Shared Lock (S-Lock / 共享锁 / 读锁):**
+    -   多个事务可以同时获取同一对象的共享锁进行**读取**
+    -   如果一个对象有共享锁，其他事务**不能**获取该对象的排他锁（不能修改），但可以获取共享锁（可以读取）
+-   **Exclusive Lock (X-Lock / 排他锁 / 写锁):**
+    -   事务为了**修改**数据而获取的锁
+    -   如果一个事务获取了对象的排他锁，其他事务**不能**获取该对象的任何锁（既不能读也不能写）
 
