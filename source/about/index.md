@@ -4,7 +4,7 @@ layout: about
 comments: true
 ---
 > To G.MiaGa,
-> who has benn, is, and always will be the love of my life
+> who has been, is, and always will be the love of my life
 > 
 
 ***
