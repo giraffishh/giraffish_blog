@@ -26,6 +26,7 @@ const DEFAULT_CONFIG = {
   updatedOnly: false,
   noCommit: false,
   noPush: false,
+  fix: false,
   message: ''
 };
 
@@ -42,6 +43,7 @@ Options:
   --updated-only       Only update updated field
   --no-commit          Do not auto-commit after updates
   --no-push            Do not push to remote after updating dates
+  --fix                Fix file mtime based on "updated" or "date" field
   --help               Show this help message
 `);
 }
@@ -83,6 +85,9 @@ function parseArgs() {
         break;
       case '--no-push':
         config.noPush = true;
+        break;
+      case '--fix':
+        config.fix = true;
         break;
       default:
         console.error(`Unknown option: ${arg}`);
@@ -213,10 +218,6 @@ function shouldIgnoreModification(filePath, sourceDir) {
 function main() {
   const config = parseArgs();
   
-  console.log('🚀 Updating article timestamps based on Git history and current changes...');
-  console.log(`   Mode: ${config.dryRun ? 'DRY RUN' : 'ACTUAL UPDATE'}`);
-  console.log(`   Scope: ${config.dateOnly ? 'DATE ONLY' : config.updatedOnly ? 'UPDATED ONLY' : 'BOTH FIELDS'}`);
-  
   const postsDir = path.resolve(config.postsDir);
   const sourceDir = path.resolve(config.sourceDir);
   
@@ -224,6 +225,56 @@ function main() {
     console.log(`❌ Posts directory not found: ${postsDir}`);
     return;
   }
+
+  const allMarkdownFiles = getMarkdownFiles(postsDir);
+
+  const finalFix = () => {
+    console.log('\n🔧 Synchronizing file modification times with "updated" or "date" field...');
+    const fixResults = [];
+    allMarkdownFiles.forEach(file => {
+      try {
+        const result = fixMtimeFromFrontMatter(file, config.dryRun);
+        if (result) {
+          fixResults.push({
+            file: path.relative(sourceDir, file),
+            ...result
+          });
+        }
+      } catch (error) {
+        console.error(`   ❌ Error checking ${path.relative(sourceDir, file)}: ${error.message}`);
+      }
+    });
+
+    if (fixResults.length > 0) {
+      // Sort by absolute difference from highest to lowest
+      fixResults.sort((a, b) => Math.abs(b.diffSeconds) - Math.abs(a.diffSeconds));
+
+      console.log(`\n📊 Detailed Synchronization Report (${config.dryRun ? 'DRY RUN' : 'ACTUAL'}):`);
+      console.log('--------------------------------------------------------------------------------');
+      fixResults.forEach(res => {
+        const diffStr = moment.duration(res.diffSeconds, 'seconds').humanize();
+        const direction = res.diffSeconds > 0 ? 'newer' : 'older';
+        console.log(`📄 ${res.file}`);
+        console.log(`   Gap: ${Math.abs(res.diffSeconds)}s (~${diffStr}) [File is ${direction} than field]`);
+        console.log(`   Field: ${res.newMtime.format('YYYY-MM-DD HH:mm:ss')}`);
+        console.log(`   Mtime: ${res.oldMtime.format('YYYY-MM-DD HH:mm:ss')}`);
+        console.log('');
+      });
+      console.log(`   ✅ ${config.dryRun ? 'Would synchronize' : 'Synchronized'} mtime for ${fixResults.length} file(s).`);
+    } else {
+      console.log('   ✅ All files are already synchronized.');
+    }
+  };
+
+  if (config.fix) {
+    finalFix();
+    console.log(`\n🎉 Done!`);
+    return;
+  }
+  
+  console.log('🚀 Updating article timestamps based on Git history and current changes...');
+  console.log(`   Mode: ${config.dryRun ? 'DRY RUN' : 'ACTUAL UPDATE'}`);
+  console.log(`   Scope: ${config.dateOnly ? 'DATE ONLY' : config.updatedOnly ? 'UPDATED ONLY' : 'BOTH FIELDS'}`);
   
   try {
     execSync('git rev-parse --is-inside-work-tree', { cwd: sourceDir, stdio: 'ignore' });
@@ -239,7 +290,6 @@ function main() {
   const userChangedFiles = initialChanges.map(f => path.resolve(sourceDir, f.path));
   const userChangedFilesSet = new Set(userChangedFiles);
 
-  const allMarkdownFiles = getMarkdownFiles(postsDir);
   console.log(`\n📁 Found ${allMarkdownFiles.length} markdown files to process.`);
   
   let updatedCount = 0;
@@ -297,6 +347,10 @@ function main() {
     console.log(`   Processed: ${allMarkdownFiles.length} files`);
     console.log(`   Would update: ${updatedCount} files`);
     console.log(`\n💡 This was a dry run. No files were changed or committed.`);
+    
+    // Also run fix logic in dry run
+    finalFix();
+    
     return;
   }
 
@@ -336,7 +390,44 @@ function main() {
     console.log('\n✅ No changes detected in content or timestamps. Nothing to commit.');
   }
 
+  // Auto-run fix after normal upload process
+  finalFix();
+
   console.log(`\n🎉 Done!`);
+}
+
+function fixMtimeFromFrontMatter(filePath, dryRun) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const match = content.match(/^(---\s*\n)([\s\S]*?)(\n---\s*\n)/);
+  if (!match) return null;
+
+  const frontMatterContent = match[2];
+  const updatedMatch = frontMatterContent.match(/^updated:\s*(.*)$/m);
+  const dateMatch = frontMatterContent.match(/^date:\s*(.*)$/m);
+
+  const targetDateStr = (updatedMatch ? updatedMatch[1] : (dateMatch ? dateMatch[1] : null))?.trim().replace(/['"]/g, '');
+
+  if (targetDateStr) {
+    const targetDate = parseDate(targetDateStr);
+    if (targetDate && targetDate.isValid()) {
+      const stats = fs.statSync(filePath);
+      const currentMtime = moment(stats.mtime);
+      
+      // Compare ignoring milliseconds/fine details if necessary, but moment handles it
+      if (!currentMtime.isSame(targetDate, 'second')) {
+        const diffSeconds = currentMtime.diff(targetDate, 'seconds');
+        if (!dryRun) {
+          fs.utimesSync(filePath, stats.atime, targetDate.toDate());
+        }
+        return {
+          oldMtime: currentMtime,
+          newMtime: targetDate,
+          diffSeconds: diffSeconds
+        };
+      }
+    }
+  }
+  return null;
 }
 
 function parseDate(dateStr) {
