@@ -1,3 +1,4 @@
+---
 index_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
 banner_img: >-
@@ -11,7 +12,9 @@ tags:
 comments: true
 abbrlink: bfc37577
 date: 2026-03-25 22:55:53
-updated: 2026-03-25 21:05:00
+updated: 2026-03-26 13:23:47
+
+---
 
 # Real-Time Execution of Action Chunking Flow Policies (RTC)
 
