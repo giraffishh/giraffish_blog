@@ -12,11 +12,11 @@ tags:
 comments: true
 abbrlink: bfc37577
 date: 2026-03-25 22:55:53
-updated: 2026-03-26 13:23:47
+updated: 2026-03-26 15:21:16
 
 ---
 
-# Real-Time Execution of Action Chunking Flow Policies (RTC)
+## Real-Time Execution of Action Chunking Flow Policies (RTC)
 
 **作者**: Kevin Black, Manuel Y. Galliker, Sergey Levine
 **机构**: Physical Intelligence, UC Berkeley
@@ -523,3 +523,493 @@ We present our full real-time chunking system in Algorithm 1 (complemented by Fi
 2. **Soft masking 是关键**: Hard masking 的 guidance 信号太弱，特别是 $d$ 小的时候。指数衰减的 soft mask 让过渡平滑
 3. **双线程架构**: Controller 不等推理，推理后台持续运行。Action 总是可用的
 4. **计算代价可控**: 每步多一次反向传播，总延迟增加 ~28%（76ms → 97ms）。但因为是异步的，这个增量不影响控制频率
+
+## 4 Experiments
+
+### 📌 预览
+实验分仿真和真实两部分。仿真用 Kinetix 的 12 个高动态任务测试不同延迟下的鲁棒性；真实世界用 π₀.₅ 在 6 个双臂操作任务上评估，总计 480 episodes、28 小时机器人执行时间。核心结论：RTC 在所有延迟下都最优，且是唯一对延迟完全鲁棒的方法。
+
+
+In our experiments, we aim to answer the following questions. First, how does RTC compare to existing methods in highly dynamic and stochastic environments, and under increasing inference delays? Second, how important is soft masking (Sec. 3.2) to RTC? Third, how does RTC affect the performance and speed of real-world dexterous robots?
+
+We first evaluate RTC using a benchmark of 12 highly dynamic and stochastic environments in the Kinetix [43] simulator. We use this benchmark to compare the performance of RTC to other methods under simulated inference delays, as well as investigate the effect of soft masking. Then, using the π₀.₅ VLA [24] as the base model, we evaluate the performance and speed of RTC on 6 challenging bimanual dexterous manipulation tasks, including 2 mobile manipulation tasks.
+
+> 💡 **实验设计三个问题**:
+> 1. RTC vs baselines 在不同延迟下的表现？
+> 2. Soft masking 有多重要？
+> 3. 真实世界中 RTC 对速度和性能的影响？
+
+
+### 4.1 Simulated Benchmark
+
+Most simulated imitation learning benchmarks are quasi-static, and standard chunked execution with a long enough execution horizon can achieve near-perfect success rates [11]. We instead create a benchmark of 12 dynamic tasks in Kinetix [43], which uses force-based control, so inference delay necessitates asynchronous execution (there is no concept of "holding position"). We select 10 existing environments and create 2 new ones such that all environments involve dynamic motions like throwing, catching, and balancing. To simulate imperfect actuation, we add Gaussian noise to the actions, making closed-loop corrections crucial for success.
+
+> 💡 **为什么要新 benchmark**:
+> - 现有 benchmark（如 Diffusion Policy 用的那些）太简单——quasi-static，长 execution horizon 的 open-loop 就能搞定
+> - Kinetix 用**力控制**（force-based），不是位置控制，没有"保持位置"的概念 → 推理延迟时机器人不会静止，而是会飘走
+> - 加了 action 噪声 → 必须 closed-loop 修正，不能靠 open-loop 过关
+
+
+**Setup.** To generate data for imitation learning, we first train expert policies using RPO [50] and a binary success reward. For each environment, we train 6 expert policies with different seeds and then generate a 1M transition dataset with a different policy selected each episode. We then train action chunking flow policies with a prediction horizon of $H = 8$ and a 4-layer MLP-Mixer [61] architecture for 32 epochs. We report binary success rates with 2048 rollouts per data point, and simulate delays between 0 (fully closed-loop) and 4 (the maximum supported when $H = 8$).
+
+> 💡 **仿真实验配置**:
+> | 配置项 | 值 |
+> |--------|-----|
+> | Expert 训练 | RPO, 6 seeds × 12 envs |
+> | 数据集 | 1M transitions/env |
+> | Policy 架构 | 4-layer MLP-Mixer |
+> | $H$ (prediction horizon) | 8 |
+> | 训练 epochs | 32 |
+> | 评估 rollouts | 2048/data point |
+> | 延迟范围 | 0 ~ 4 步 |
+
+
+**Baselines.** We compare against the following baselines:
+
+- **Naive async.** This strategy does not pay attention to the previous action chunk at all when generating a new one, naively switching chunks as soon as the new one is ready.
+- **Bidirectional decoding (BID; [39]).** This strategy uses rejection sampling to keep continuity across chunks. We use a batch size of $N = 32$, mode size of $K = 3$, and a checkpoint trained for 8 epochs as the weak policy.
+- **Temporal ensembling (TE; [68]).** This strategy involves keeping a buffer of predicted action chunks and executing an average of all actions predicted for a particular timestep.
+
+> 💡 **Baselines 分析**:
+> | 方法 | 原理 | 计算量 | 需要训练？ |
+> |------|------|--------|-----------|
+> | Naive async | 直接切换新 chunk | 1x | 否 |
+> | BID | 采样多个 chunk，挑最连续的 | **64x**（32 strong + 32 weak） | 需要 weak model |
+> | TE | 对重叠 action 取平均 | 1x | 否 |
+> | **RTC** | Inpainting + soft masking | ~1.3x（反向传播） | 否 |
+> 
+> BID 的计算量是 RTC 的 ~50 倍，但效果还更差。这是 RTC 最有说服力的对比。
+
+
+![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774499556192.webp)
+*Figure 5: Top left: Kinetix 环境（绿色物体碰到蓝色物体即成功）。Bottom left: Execution horizon vs solve rate（固定 delay=1）。Right: Inference delay vs solve rate（固定 $s = \max(d, 1)$)。每个数据点 2048 trials，95% Wilson 置信区间。*
+
+> 💡 **Figure 5 批读——仿真核心结果**:
+> 
+> **右图（delay vs solve rate）——最重要**:
+> - **TE 全面垮掉**: 即使 $d=0$ 也很差，说明 Kinetix 的任务是多模态的（取平均 = 无效 action）
+> - **Naive async**: $d=0$ 时还行，delay 增大后迅速下降
+> - **BID**: 比 naive 好，但 delay 增大后也明显下降
+> - **RTC**: 所有 delay 下都最优，且**下降幅度最小**——对延迟最鲁棒
+> - **RTC soft > RTC hard**: Soft masking 在小 $d$ 时优势明显
+> 
+> **左图（execution horizon vs solve rate）**:
+> - RTC 和 BID 是唯二能从更短 execution horizon 中获益的方法（越短 = 越频繁更新 = 更 closed-loop）
+> - 其他方法缩短 execution horizon 反而变差（mode-jumping 更严重）
+
+
+### 4.2 Real-World Results
+
+Next, we deploy our full real-time chunking system to the real world. We use the π₀.₅ VLA [24] as our base policy, and evaluate RTC on a bimanual system with two 6-DoF arms and parallel jaw grippers. Unlike our simulated benchmark, the robots use position control, and so synchronous inference—stopping between chunks—is a reasonable default strategy, used in many prior works [5, 24, 31, 47]. Our goal is to improve upon synchronous inference in a combination of both performance and speed.
+
+> 💡 **真实世界 vs 仿真的关键区别**:
+> - 仿真用力控（force control）→ 停下来 = 失控
+> - 真实用位控（position control）→ 停下来 = 保持位置（所以同步推理在真实世界是可行的 baseline）
+> - 这意味着 RTC 在真实世界的竞争对手更强——同步推理至少能"停住等"
+
+
+**Setup.** We use π₀.₅ ($H = 50$, $\Delta t = 20\text{ms}$) with $n = 5$ denoising steps, giving a model latency of 76ms for the baselines and 97ms for RTC. We use remote inference over LAN, which adds 10-20ms of latency, giving a starting inference delay around $d \approx 6$ for RTC. However, we would like to understand how the system behaves with higher inference latencies, simulating, e.g., scaling up the model size or running inference on a distant cloud server. Thus, we also evaluate all methods with +100ms and +200ms of injected latency, corresponding to $d \approx 11$ and $d \approx 16$, respectively.
+
+> 💡 **真实世界延迟配置**:
+> | 条件 | 总延迟 | $d$ (控制步) |
+> |------|--------|-------------|
+> | 基线 (LAN) | ~110ms | ~6 |
+> | +100ms 注入 | ~210ms | ~11 |
+> | +200ms 注入 | ~310ms | ~16 |
+> 
+> +200ms 对应 $d \approx 16$，相当于 prediction horizon $H=50$ 的 32%。这是非常极端的延迟。
+
+
+**Tasks and scoring.** Each episode gets an integer score corresponding to how many substeps of the task it completed successfully. We evaluate the following tasks:
+
+- **Light candle** (5 steps, 40s cutoff). Pick up a match and matchbox, strike the match, use it to light a candle, and drop it in a bowl.
+- **Plug ethernet** (6 steps, 120s cutoff). Pick up the end of an ethernet cable, reorient it, plug it into a server rack, and repeat the process for the other end.
+- **Make bed, mobile** (3 steps, 200s cutoff). Move the corner of a blanket and 2 pillows from the foot to the head of a bed.
+- **Shirt folding** (1 step, 300s cutoff). Fold a shirt from a flattened position.
+- **Batch folding** (4 steps, 300s cutoff). Take a varied, crumpled clothing item out of a bin, flatten it, fold it, then place it neatly on a pile.
+- **Dishes in sink, mobile** (8 steps, 300s cutoff). Move 4 varied items from a counter into a sink.
+
+> 💡 **任务设计分析**:
+> - **精度敏感**: Light candle（点火柴需要精确的力和时序）、Plug ethernet（插口对准）
+> - **长时间操作**: Batch folding（300s）、Dishes（300s，8 步）
+> - **移动操作**: Make bed 和 Dishes 需要移动底座
+> - **关键**: Light candle 是**唯一不允许重试**的任务（火柴点了就点了），最能体现 RTC 的优势
+> 
+> 评估规模: 6 tasks × 4 methods × ~10 trials × 多种延迟 = **480 episodes, 28 小时机器人时间**
+
+
+**Baselines.**
+
+- **Synchronous.** Default in prior work [5, 24, 31, 47]. Execute $s = 25$ actions then pause while generating next chunk.
+- **TE, sparse.** Execute $s = 25$ actions while computing next chunk in parallel. Apply TE on overlapping steps.
+- **TE, dense.** Run inference as often as possible ($s = d$). Always ≥2 overlapping chunks to ensemble.
+
+We do not compare to BID [39] in the real world, as we found in simulation that it underperforms RTC while using significantly more compute—when applied to π₀.₅ with a batch size of 16, BID has 2.3 times the latency of our method (see A.3 for latency measurements).
+
+> 💡 **BID 被排除的原因**: 仿真中已经证明 BID 效果更差且计算量更大（π₀.₅ 上 BID 延迟是 RTC 的 2.3 倍）。合理的决策。
+
+
+![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774499544052.webp)
+*Figure 6: Top: 各任务的 controller steps vs cumulative progress。Left: 时间 vs cumulative progress（所有任务汇总，X轴 log scale）。Right: Inference delay vs average throughput（任务完成比例/时间)。TE 在 +100ms 和 +200ms 延迟下振荡太大，触发机器人保护性停机。*
+
+> 💡 **批读——真实世界核心结果**:
+>
+> **右下图（delay vs throughput）——最关键**:
+> - **RTC 在所有延迟下都最优**，且对延迟完全鲁棒（曲线几乎平坦！），更大的延迟不一定线性伤害 RTC，+200ms 可能虽然延迟更大，但因为切 chunk 更少、边界更少、轨迹更稳，综合
+>     throughput 不一定更差
+> - **Synchronous**: 随延迟线性下降（因为停顿时间越来越长）
+> - **TE (两种)**: +100ms 和 +200ms 直接**无法运行**——振荡太大触发安全停机！
+>
+> **上排（per-task progress curves）**:
+> - **Light candle**: RTC 优势最大（唯一不允许重试的任务）。同步推理在延迟大时成功率明显下降
+> - **Make bed**: RTC 也有明显优势——枕头操作是最难的部分
+> - **其他任务**: RTC 一般更早完成（更少错误和重试），即使最终得分相似
+>
+> **关键发现**: 即使去掉推理暂停时间（纯"有效运动时间"），RTC 完成任务仍然更快！说明 RTC 不只是"消除暂停"那么简单——**它的连续控制信号本身就比间断的更好**。
+
+
+### 🔖 Section 总结
+
+#### 关键数字速查
+| 指标 | 数值 |
+|------|------|
+| 仿真任务数 | 12 (Kinetix) |
+| 真实任务数 | 6 (双臂) |
+| 真实评估量 | 480 episodes, 28h |
+| RTC 延迟 (真实) | 97ms model + 10-20ms network |
+| 基线延迟 | 76ms model + 10-20ms network |
+| TE 在高延迟下 | **无法运行**（触发安全停机） |
+
+#### 核心洞察
+1. **RTC 是唯一对延迟完全鲁棒的方法**: 从 ~110ms 到 ~310ms 几乎无性能下降
+2. **TE 在真实世界高延迟下直接失败**: 振荡触发保护性停机，这是此前未被报告的问题
+3. **RTC 不只是更快，也更准**: 去掉暂停时间后仍然比 synchronous 快完成任务
+4. **Light candle 是最好的 test case**: 高精度 + 不可重试 + 时间敏感，RTC 优势最明显
+
+## 5 Related Work
+
+### 📌 预览
+Related Work 覆盖了 5 个方向：action chunking & VLA、减少推理延迟、inpainting & guidance、实时控制、BID。RTC 的独特定位是：第一个将 inpainting/guidance 应用到**实时控制**的工作。
+
+
+**Action chunking, VLAs, and cascade control.** Inspired in part by human motor control [33], action chunking has recently emerged as the de facto standard in imitation learning for visuomotor control [68, 11]. Learning to generate action chunks from human data requires expressive statistical models, such as variational inference [68, 19], diffusion [11, 12, 69, 68, 46, 59], flow matching [5, 6], vector quantization [34, 3, 44], or byte-pair encoding [47]. Recently, some of these methods have been scaled to billions of parameters, giving rise to VLAs [7, 13, 30, 5, 71, 10, 9, 70, 24, 47, 37], a class of large models built on pre-trained vision-language model backbones. With the capacity to fit ever-growing robot datasets [13, 29, 62, 15, 41, 27], as well as Internet knowledge from vision-language pre-training, VLAs have achieved impressive results in generalizable robot manipulation. When applied to real-world robots, action chunking policies are often used in conjunction with a lower-level, higher-frequency control loop—such as a PID controller—which translates the outputs of the policy (e.g., joint positions) to hardware-specific control signals (e.g., joint torques). In these cases, action chunking policies can be viewed as a form of cascade control [14], with the learned policy acting the outermost control loop. However, this is not always the case: for example, our simulated experiments use learned policies that output torques and forces directly. As such, we defer any exploration of the intersection between cascade control theory and learned action chunking policies to future work.
+
+> 💡 **Action Chunking 生态梳理**:
+> - **生成模型选择**: VAE [68] → Diffusion [11] → Flow Matching [5] → VQ [34] → BPE [47]
+> - **VLA 代表作**: RT-2 [7,8], OpenVLA [30], π₀ [5], π₀.₅ [24], FAST [47], RDT-1B [37]
+> - **Cascade control 视角**: VLA 是最外层控制环，PID 是内层。RTC 不改变这个架构，只优化外层的执行策略。
+
+
+**Reducing inference latency.** A natural approach to improve the real-time capabilities of a model is to simply speed it up. For instance, consistency policy [49] distills diffusion policies to elide expensive iterative denoising. Streaming diffusion policy [23] proposes an alternative training recipe that allows for very few denoising steps per controller timestep. Kim et al. [31] augment OpenVLA [30] with parallel decoding to elide expensive autoregressive decoding. More broadly, there is a rich literature on optimizing inference speed, both for diffusion models [52, 38, 56, 17] and large transformers in general [32, 25, 35]. Unfortunately, these directions cannot reduce inference cost below one forward pass. So long as this forward pass takes longer than the controller's sampling period, other methods will be needed for real-time execution.
+
+> 💡 **"加速推理"路线的局限**:
+> - Consistency Policy [49]: 蒸馏去掉迭代 denoising
+> - Streaming Diffusion Policy [23]: 每个控制步只做很少 denoising steps
+> - OpenVLA + parallel decoding [31]: 并行解码替代自回归
+> - **共同局限**: 不管怎么优化，延迟不可能低于**单次前向传播**。只要前向传播 > Δt，就需要异步方案。
+> - **RTC 与这些方法正交**: 你可以先加速模型，再用 RTC 处理剩余延迟。两者可以叠加。
+
+
+**Inpainting and guidance.** There is a rich literature on image inpainting with pre-trained diffusion and flow models [48, 55, 40, 42]. In our work, we incorporate one such method [48] into our novel real-time execution framework with modifications (namely, soft masking and guidance weight clipping) that we find necessary for our setting. For sequential decision-making, Diffuser [26] pioneered diffusion-based inpainting for following state and action constraints in long-term planning, though their inpainting method is not guidance-based. (See Appendix A.4 for a comparison to the inpainting method from Diffuser applied to our setting.) Diffuser and other work [64, 1] have also guided diffusion models with value functions to solve reinforcement learning (RL) problems. Our work is distinct in that it is the first to apply either inpainting or guidance to real-time control.
+
+> 💡 **Inpainting 在控制中的先驱**:
+> - **Diffuser [26]**: 第一个在决策中用 diffusion inpainting，但方法不同（直接替换，非 guidance-based）
+> - Appendix A.4 对比了 Diffuser 的 inpainting 和 RTC 的 ΠGDM guidance → RTC 明显更好
+> - **RTC 的新颖性**: 第一个把 inpainting/guidance 用于**实时控制**（而非规划）
+
+
+**Real-time execution.** Real-time control has been studied long before the advent of VLAs. Similar to action chunking, model predictive control (MPC; [51]) generates plans over a receding time horizon; like our method, it parallelizes execution and computation, and uses the prior chunk to warm-start planning for the next. Though recent works combining learning methods with MPC have demonstrated real-time control capabilities in narrow domains [53, 21], they rely on explicit, hand-crafted dynamics models and cost functions. These methods are not applicable to our setting, which considers model-free imitation learning policies and tests them on unstructured, open-world manipulation tasks. Separately, in reinforcement learning, a variety of prior works have developed time-delayed decision-making methods [57, 16, 54, 63, 66, 67]. However, these approaches are not always applicable to imitation learning, and none of them leverage action chunking. Most recently, hierarchical VLA designs [58, 4] have emerged where the model is split into a System 2 (high-level planning) and System 1 (low-level action generation) component. The System 2 component contains the bulk of the VLA's capacity and runs at a low frequency, while the System 1 component is lightweight and fast. This approach is orthogonal to ours, and comes with its own tradeoffs (e.g., limiting the size of the System 1 component and requiring its own training recipe).
+
+> 💡 **MPC vs RTC**:
+> | 对比项 | MPC | RTC |
+> |--------|-----|-----|
+> | 模型 | 显式动力学模型 | 隐式（学习的 VLA） |
+> | 目标函数 | 手工设计 | 从 demonstration 学习 |
+> | 异步执行 | ✅ (warm-start) | ✅ (inpainting) |
+> | 适用场景 | 窄域（已知动力学） | 开放世界操作 |
+> 
+> **System 1/2 分离** (Gemini Robotics [58], GR00T [4]): 大模型低频思考 + 小模型高频执行。跟 RTC 正交——可以在 System 2 上加 RTC。
+
+
+**Bidirectional Decoding.** The most closely related prior work is Bidirectional Decoding (BID; [39]), which enables fully closed-loop control with pre-trained action chunking policies via rejection sampling. While Liu et al. [39] do not consider inference delay, the BID algorithm can be used to accomplish the same effect as our guidance-based inpainting. We compare to BID in our simulated benchmark, finding that it underperforms RTC while using significantly more compute.
+
+> 💡 **BID vs RTC 最终对比**:
+> - BID: 采样 N 个 chunk → 挑最好的（rejection sampling）→ 计算量 O(N)
+> - RTC: 1 个 chunk + guidance → 计算量 O(1) + backprop
+> - 结果: RTC 效果更好、计算更少、实现更简单
+
+
+### 🔖 Section 总结
+
+#### RTC 的定位
+```
+加速推理 (Consistency, Streaming, Parallel Decoding)
+    ↓ 不够：单次前向传播 > Δt
+异步执行 (MPC warm-start, RL delay methods)  
+    ↓ 不够：需要显式模型或不适用 IL
+Action chunking + inpainting/guidance
+    ↓ RTC: 第一个用于实时控制的 inpainting 方法
+System 1/2 分离 (Gemini Robotics, GR00T)
+    ↑ 正交：可以叠加使用
+```
+## 6 Discussion and Future Work
+
+### 📌 预览
+讨论局限性和未来方向。
+
+
+Real-time chunking is an inference-time algorithm for asynchronous execution of action chunking policies that demonstrates speed and performance across simulation and real-world experiments, including under significant inference delays. However, this work is not without limitations: it adds significant computational overhead compared to methods that sample directly from the base policy, and it is applicable only to diffusion- and flow-based policies. Additionally, while our real-world experiments cover a variety of challenging manipulation tasks, there are more dynamic settings that could benefit even more from real-time execution. One example is legged locomotion, which is represented in our simulated benchmark but not our real-world results.
+
+> 💡 **局限性分析**:
+> 1. **计算开销**: 每步 denoising 需要反向传播，延迟增加 ~28%（76ms → 97ms）。虽然是异步的不影响控制频率，但 GPU 占用更高
+> 2. **只适用于 diffusion/flow-based**: 对 autoregressive VLA（如 RT-2 [8]、OpenVLA [30] 的 token 预测部分）不适用。不过可以通过 FAST [47] 等方法将 autoregressive 转换为 flow-based
+> 3. **真实实验缺少腿足运动**: 仿真中有但真实世界没做。腿足运动对实时性要求更高（摔倒不可逆），是最好的应用场景之一
+> 
+> **我的补充**:
+> - 没有讨论 **多模态 observation 延迟**（如相机帧延迟、状态估计延迟），这在真实部署中是个问题
+> - 没有分析 **不同 VLA 架构**的适用性差异（如 Transformer vs MLP-Mixer 的 Jacobian 计算效率）
+> - **跟 System 1/2 的结合**是最有前景的方向——在 System 2（大模型）上用 RTC 减少高层延迟
+
+
+### 🔖 Section 总结
+
+#### 未来方向
+1. 扩展到**腿足运动**的真实世界实验
+2. 降低计算开销（如近似 Jacobian、更少的 guidance steps）
+3. 与 System 1/2 架构结合
+4. 适配 autoregressive VLA（需要新的 inpainting 形式）
+
+## Appendix
+
+### 📌 预览
+附录包含 broader impacts、β 截断分析、延迟测量、soft masking 消融、超参数表和计算资源。
+
+
+### A.1 Broader Impacts
+
+The goal of our work is to improve the speed and performance of learned policies for control tasks, and our experiments primarily deal with household robots. This technology has great potential to improve lives, e.g., by automating dangerous and difficult jobs, or assisting the disabled and elderly. Like any technology, it also has the potential for harm—e.g., in military applications, or by displacing physical labor.
+
+
+### A.2 The Necessity of Guidance Weight Clipping (β)
+
+![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508994235.webp)
+
+*Figure 7: Top left: guidance 权重 $\frac{1-\tau}{\tau \cdot r_\tau^2}$ 随 τ 的变化。Top right: β 消融。Bottom left: 不同 β 下 n=5 和 n=100 的 action chunk 对比。Bottom right: β vs 最大加速度。*
+
+> 💡 **Figure 7 批读——β 为什么重要**:
+> - **Top left**: 在 τ→0 时 guidance 权重趋向无穷大，必须截断
+> - **Top right**: β≥5 后没有边际提升 → β=5 是最优保守值
+> - **Bottom left**: n=5（实际使用）时高 β 导致 action chunk 发散（不同 β 的曲线差异大）；n=100 时差异小
+> - **Bottom right**: β 越高 → 最大加速度越大 → 越抖动 → 越 OOD
+>
+> **结论**: 少 denoising steps（现实需求）+ 高 guidance weight = 灾难。β=5 是甜点。
+
+
+### A.3 Latency Measurements
+
+| Method                      | Latency  |
+| --------------------------- | -------- |
+| **RTC (ours)**              | **97ms** |
+| BID N=16 (no forward model) | 115ms    |
+| BID N=16 (shared backbone)  | 169ms    |
+| BID N=16 (full)             | 223ms    |
+| Vanilla π₀.₅                | 76ms     |
+
+> 💡 **延迟对比**:
+> - RTC 比 vanilla 多 21ms（+28%），但比任何版本的 BID 都快
+> - BID full 是 RTC 的 **2.3x**
+> - RTC 的额外开销全部来自反向传播（Jacobian 计算）
+
+**RTC 延迟分解（真实部署）**:
+
+| Component    | Mobile       | Non-mobile   |
+| ------------ | ------------ | ------------ |
+| Model        | 96.89ms      | 97.43ms      |
+| Network      | 21.20ms      | 6.89ms       |
+| Image resize | 11.22ms      | 1.44ms       |
+| Other        | 9.67ms       | 3.00ms       |
+| **Total**    | **138.98ms** | **108.76ms** |
+
+> 💡 **真实部署瓶颈**:
+> - Model 推理是绝对主导（~70%）
+> - Mobile 场景的瓶颈是 network（21ms）和 image resize（11ms，NUC CPU 弱）
+> - Non-mobile 用台式机 CPU + 有线 LAN，总延迟只有 109ms
+
+**Model 内部分解**:
+
+| Component               | No RTC   | With RTC |
+| ----------------------- | -------- | -------- |
+| Image encoders (SigLIP) | 18ms     | 18ms     |
+| LLM prefill (Gemma 2B)  | 44ms     | 44ms     |
+| Denoising step (×5)     | 14ms     | 35ms     |
+| **Total**               | **76ms** | **97ms** |
+
+> 💡 **RTC 开销来源**:
+> - Image encoder 和 LLM prefill 不变（18ms + 44ms）
+> - 每个 denoising step: 14ms → 35ms（2.5x，因为反向传播）
+> - 5 步总开销: 14ms → 35ms 的差 = 21ms
+> - 占比: 21/97 ≈ 22%
+
+
+### A.4 Soft Masking Ablation
+
+![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508990089.webp)
+
+*Figure 8: Left: 不同 soft masking decay schedule 对比。Right: Diffuser inpainting 方法 vs RTC guidance-based inpainting 对比。*
+
+> 💡 **Figure 8 批读**:
+> - **左图**: Exponential decay（论文选择）最好，但 linear decay 非常接近。Step function（hard masking）最差
+> - **右图**: Diffuser 的简单 inpainting（每步替换）vs ΠGDM guidance → guidance-based 明显更好
+> - **结论**: decay schedule 的选择不太敏感（exponential ≈ linear >> step），但 inpainting 方法的选择很关键（guidance >> replace）
+
+
+### A.5 Hyperparameters
+
+| Hyperparameter | Description              | Simulation | Real-world |
+| -------------- | ------------------------ | ---------- | ---------- |
+| $n$            | Denoising steps          | 5          | 5          |
+| $H$            | Prediction horizon       | 8          | 50         |
+| $s_\text{min}$ | Min execution horizon    | -          | 25         |
+| $\beta$        | Guidance weight clipping | 5          | 5          |
+| $b$            | Delay buffer size        | -          | 10         |
+
+
+### A.6 Compute Resources
+
+All experiments use no more than 8 NVIDIA H100 GPUs (one DGX server). Real-world inference on a single RTX 4090.
+
+| Stage                        | Compute         |
+| ---------------------------- | --------------- |
+| Expert training (RPO)        | 4h on 4×H100    |
+| Data generation              | 20min on 6×H100 |
+| IL training per env          | 1.5h on 2×H100  |
+| Evaluation (2048 trials/env) | 5min on 6×H100  |
+| π₀.₅ fine-tuning             | 24h on 8×H100   |
+| Real-world inference         | 1× RTX 4090     |
+
+
+### 🔖 Section 总结
+
+#### 核心洞察
+1. **β=5 是必要的**: 少 denoising steps + 无截断 = 发散。这是从图像 inpainting 迁移到控制时必须做的适配
+2. **RTC 延迟开销可控**: +21ms (+28%)，全部来自 denoising 的反向传播
+3. **Soft masking decay 不敏感**: exponential ≈ linear，但 guidance 方法很关键（ΠGDM >> Diffuser replace）
+4. **真实部署瓶颈是 model inference**: 占 70%+ 延迟，network 和 preprocessing 是次要的
+
+## Appendix
+
+### 📌 预览
+附录包含 broader impacts、β 截断分析、延迟测量、soft masking 消融、超参数表和计算资源。
+
+
+### A.1 Broader Impacts
+
+The goal of our work is to improve the speed and performance of learned policies for control tasks, and our experiments primarily deal with household robots. This technology has great potential to improve lives, e.g., by automating dangerous and difficult jobs, or assisting the disabled and elderly. Like any technology, it also has the potential for harm—e.g., in military applications, or by displacing physical labor.
+
+
+### A.2 The Necessity of Guidance Weight Clipping (β)
+
+![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508985394.webp)
+
+*Figure 7: Top left: guidance 权重 $\frac{1-\tau}{\tau \cdot r_\tau^2}$ 随 τ 的变化。Top right: β 消融。Bottom left: 不同 β 下 n=5 和 n=100 的 action chunk 对比。Bottom right: β vs 最大加速度。*
+
+> 💡 **Figure 7 批读——β 为什么重要**:
+> - **Top left**: 在 τ→0 时 guidance 权重趋向无穷大，必须截断
+> - **Top right**: β≥5 后没有边际提升 → β=5 是最优保守值
+> - **Bottom left**: n=5（实际使用）时高 β 导致 action chunk 发散（不同 β 的曲线差异大）；n=100 时差异小
+> - **Bottom right**: β 越高 → 最大加速度越大 → 越抖动 → 越 OOD
+> 
+> **结论**: 少 denoising steps（现实需求）+ 高 guidance weight = 灾难。β=5 是甜点。
+
+
+### A.3 Latency Measurements
+
+| Method | Latency |
+|--------|---------|
+| **RTC (ours)** | **97ms** |
+| BID N=16 (no forward model) | 115ms |
+| BID N=16 (shared backbone) | 169ms |
+| BID N=16 (full) | 223ms |
+| Vanilla π₀.₅ | 76ms |
+
+> 💡 **延迟对比**:
+> - RTC 比 vanilla 多 21ms（+28%），但比任何版本的 BID 都快
+> - BID full 是 RTC 的 **2.3x**
+> - RTC 的额外开销全部来自反向传播（Jacobian 计算）
+
+**RTC 延迟分解（真实部署）**:
+
+| Component | Mobile | Non-mobile |
+|-----------|--------|------------|
+| Model | 96.89ms | 97.43ms |
+| Network | 21.20ms | 6.89ms |
+| Image resize | 11.22ms | 1.44ms |
+| Other | 9.67ms | 3.00ms |
+| **Total** | **138.98ms** | **108.76ms** |
+
+> 💡 **真实部署瓶颈**:
+> - Model 推理是绝对主导（~70%）
+> - Mobile 场景的瓶颈是 network（21ms）和 image resize（11ms，NUC CPU 弱）
+> - Non-mobile 用台式机 CPU + 有线 LAN，总延迟只有 109ms
+
+**Model 内部分解**:
+
+| Component | No RTC | With RTC |
+|-----------|--------|----------|
+| Image encoders (SigLIP) | 18ms | 18ms |
+| LLM prefill (Gemma 2B) | 44ms | 44ms |
+| Denoising step (×5) | 14ms | 35ms |
+| **Total** | **76ms** | **97ms** |
+
+> 💡 **RTC 开销来源**:
+> - Image encoder 和 LLM prefill 不变（18ms + 44ms）
+> - 每个 denoising step: 14ms → 35ms（2.5x，因为反向传播）
+> - 5 步总开销: 14ms → 35ms 的差 = 21ms
+> - 占比: 21/97 ≈ 22%
+
+
+### A.4 Soft Masking Ablation
+
+![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508981819.webp)
+
+*Figure 8: Left: 不同 soft masking decay schedule 对比。Right: Diffuser inpainting 方法 vs RTC guidance-based inpainting 对比。*
+
+> 💡 **Figure 8 批读**:
+> - **左图**: Exponential decay（论文选择）最好，但 linear decay 非常接近。Step function（hard masking）最差
+> - **右图**: Diffuser 的简单 inpainting（每步替换）vs ΠGDM guidance → guidance-based 明显更好
+> - **结论**: decay schedule 的选择不太敏感（exponential ≈ linear >> step），但 inpainting 方法的选择很关键（guidance >> replace）
+
+
+### A.5 Hyperparameters
+
+| Hyperparameter | Description | Simulation | Real-world |
+|----------------|-------------|------------|------------|
+| $n$ | Denoising steps | 5 | 5 |
+| $H$ | Prediction horizon | 8 | 50 |
+| $s_\text{min}$ | Min execution horizon | - | 25 |
+| $\beta$ | Guidance weight clipping | 5 | 5 |
+| $b$ | Delay buffer size | - | 10 |
+
+
+### A.6 Compute Resources
+
+All experiments use no more than 8 NVIDIA H100 GPUs (one DGX server). Real-world inference on a single RTX 4090.
+
+| Stage | Compute |
+|-------|---------|
+| Expert training (RPO) | 4h on 4×H100 |
+| Data generation | 20min on 6×H100 |
+| IL training per env | 1.5h on 2×H100 |
+| Evaluation (2048 trials/env) | 5min on 6×H100 |
+| π₀.₅ fine-tuning | 24h on 8×H100 |
+| Real-world inference | 1× RTX 4090 |
+
+
+### 🔖 Section 总结
+
+#### 核心洞察
+1. **β=5 是必要的**: 少 denoising steps + 无截断 = 发散。这是从图像 inpainting 迁移到控制时必须做的适配
+2. **RTC 延迟开销可控**: +21ms (+28%)，全部来自 denoising 的反向传播
+3. **Soft masking decay 不敏感**: exponential ≈ linear，但 guidance 方法很关键（ΠGDM >> Diffuser replace）
+4. **真实部署瓶颈是 model inference**: 占 70%+ 延迟，network 和 preprocessing 是次要的
+
