@@ -12,7 +12,7 @@ tags:
 comments: true
 abbrlink: bfc37577
 date: 2026-03-25 22:55:53
-updated: 2026-03-26 15:25:41
+updated: 2026-03-27 01:56:19
 
 ---
 
@@ -42,14 +42,14 @@ RTC 是一种纯推理时算法，通过将异步 action chunking 建模为 **in
 
 | Section                                            | 内容                                                       |
 | -------------------------------------------------- | ---------------------------------------------------------- |
-| [00 - Abstract](sections/00-abstract.md)           | 摘要 + Figure 1（点火柴演示 + 轨迹对比）                   |
-| [01 - Introduction](sections/01-introduction.md)   | 动机：物理世界不等你 + action chunking 的两难              |
-| [02 - Preliminaries](sections/02-preliminaries.md) | 符号定义 + flow matching 基础 + 延迟数据 + Figure 2/3      |
-| [03 - Method](sections/03-method.md)               | **核心方法**：ΠGDM inpainting + soft masking + Algorithm 1 |
-| [04 - Experiments](sections/04-experiments.md)     | 仿真 12 任务 + 真实 6 任务 + Figure 5/6                    |
-| [05 - Related Work](sections/05-related-work.md)   | 定位：vs 加速推理、MPC、BID、System 1/2                    |
-| [06 - Discussion](sections/06-discussion.md)       | 局限性 + 未来方向                                          |
-| [07 - Appendix](sections/07-appendix.md)           | β 消融 + 延迟分解 + soft masking 消融 + 超参数             |
+| [00 - Abstract](#Abstract)                         | 摘要 + Figure 1（点火柴演示 + 轨迹对比）                   |
+| [01 - Introduction](#1-Introduction)               | 动机：物理世界不等你 + action chunking 的两难              |
+| [02 - Preliminaries](#2-Preliminaries-and-Motivation) | 符号定义 + flow matching 基础 + 延迟数据 + Figure 2/3   |
+| [03 - Method](#3-Real-Time-Chunking-via-Inpainting) | **核心方法**：ΠGDM inpainting + soft masking + Algorithm 1 |
+| [04 - Experiments](#4-Experiments)                 | 仿真 12 任务 + 真实 6 任务 + Figure 5/6                    |
+| [05 - Related Work](#5-Related-Work)               | 定位：vs 加速推理、MPC、BID、System 1/2                    |
+| [06 - Discussion](#6-Discussion-and-Future-Work)   | 局限性 + 未来方向                                          |
+| [07 - Appendix](#7-Appendix)                       | β 消融 + 延迟分解 + soft masking 消融 + 超参数             |
 
 
 ## 关键数字
@@ -779,7 +779,7 @@ Real-time chunking is an inference-time algorithm for asynchronous execution of 
 3. 与 System 1/2 架构结合
 4. 适配 autoregressive VLA（需要新的 inpainting 形式）
 
-## Appendix
+## 7 Appendix
 
 ### 📌 预览
 附录包含 broader impacts、β 截断分析、延迟测量、soft masking 消融、超参数表和计算资源。
