@@ -15,6 +15,10 @@ comments: true
 
 Giraffish，坐标广东，南方科技大学，大二，计算机科学与工程
 
+### 研究方向
+
+多模态模型，视频文本检索，模型蒸馏/剪枝/量化，目标检测，VLA，VLA-RTC
+
 <img src="https://cdn.giraffish.top/github-metrics.svg" alt="Metrics" style="float: left;">
 
 <a href="https://github.com/ashutosh00710/github-readme-activity-graph">

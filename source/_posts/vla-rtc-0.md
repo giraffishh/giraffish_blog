@@ -1,6 +1,6 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774422510855.webp
+  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
 banner_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
 title: VLA-RTC：Introduction
@@ -13,7 +13,7 @@ comments: true
 typora-root-url: ..
 abbrlink: 765f81f2
 date: 2026-03-25 12:55:53
-updated: 2026-03-25 20:30:03
+updated: 2026-03-26 13:20:25
 
 ---
 
@@ -678,6 +678,19 @@ VLA 往往想吸收更多来源的数据：
 1. 输出 action chunk
 2. 用 diffusion / flow matching 多步生成动作
 
+这里的 diffusion / flow policy 可以先这样理解：
+
+- **它们不是一步直接吐出动作**，而是从一个随机噪声开始，经过多步迭代，逐渐把噪声变成合理的 action chunk。
+- **diffusion-based policy**：更像“反复去噪”，一步一步把噪声还原成动作序列。
+- **flow-based policy**：更像“沿着一个学到的更新方向持续推进”，把噪声逐步推到真实动作分布上。
+- 对初学者来说，这两类方法现在只要记住一个共同点就够了：**它们都是迭代生成动作 chunk，而不是一次前向就直接输出动作。**
+
+这件事和 RTC 的关系非常直接：
+
+1. 这类模型往往推理更慢，因为它们要做多步生成；
+2. 但它们也天然更适合做 **inpainting / guidance**，因为你可以在生成过程中不断施加约束；
+3. RTC 正是利用这一点，先把必须和旧 chunk 对齐的前缀“冻住”，再在约束下补全剩余动作。
+
 这会进一步增加延迟。
 
 #### 关键矛盾
@@ -688,7 +701,7 @@ VLA 往往想吸收更多来源的数据：
 
 这就是 RTC 这条研究线要解决的核心张力。
 
-### 5.  VLA & action chunking
+### 5.  VLA 与 action chunking
 
 #### 最朴素原因
 
@@ -1417,3 +1430,4 @@ RTC 里的对应关系是：
 3. `Stage 3` 今天的 policy 往往不只是小控制器，而可能是更强也更慢的 VLA。
 4. `Stage 4` 为了部署慢模型，系统会一次生成一段动作，也就是 action chunking。
 5. `Stage 5` 当 chunking 遇到真实延迟时，为什么会出现 prediction-execution mismatch，以及 RTC 为什么自然会走向 inpainting
+
