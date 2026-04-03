@@ -3,16 +3,16 @@ index_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
 banner_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
-title: VLA-RTC：[Arxiv 2512.01031] VLASH
+title: 'VLA-RTC：[Arxiv 2512.01031] VLASH'
 categories:
-  - 学习笔记
+  - 论文批读
 tags:
   - VLA
   - VLA-RTC
 comments: true
-abbrlink:
+abbrlink: d014d39
 date: 2026-04-03 00:37:06
-updated: 2026-04-03 12:11:45
+updated: 2026-04-03 22:32:02
 
 ---
 
