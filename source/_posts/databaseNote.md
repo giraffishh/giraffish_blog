@@ -1216,7 +1216,7 @@ SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 -   **定义:** 基于两个关系中**名称相同**的所有属性进行的等值连接，并去除重复列。
 -   **符号:** $R \bowtie S$
--   **推导:** $A \bowtie B = \pi_{去除重复列}(\sigma_{A.ID = B.ID}(A \times B))$
+-   **推导:** $A \bowtie B = \pi_{\text{去除重复列}}(\sigma_{A.ID = B.ID}(A \times B))$
 -   **SQL 对应:** `NATURAL JOIN`
 -   **示例:**
     -   $Instructor \bowtie Teaches$
