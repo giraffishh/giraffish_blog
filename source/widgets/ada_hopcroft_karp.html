@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hopcroft-Karp 可视化</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --orange: #f59e0b;
+      --orange-soft: #fef3c7;
+      --red: #ef4444;
+      --slate: #475569;
+      --shadow: 0 16px 34px -24px rgba(15, 23, 42, 0.45);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      display: grid;
+      grid-template-rows: 56px 1fr;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 18px;
+      min-width: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .phase-badge {
+      border: 1px solid #bfdbfe;
+      background: var(--blue-soft);
+      color: #1d4ed8;
+      font-family: var(--mono);
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+
+    main {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(330px, 58fr) minmax(230px, 42fr);
+      overflow: hidden;
+    }
+
+    .stage {
+      min-height: 0;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: minmax(420px, 1fr) minmax(280px, 350px);
+      gap: 14px;
+      background-color: #eef2f7;
+      background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 22px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .graph-card,
+    .side-card,
+    .info-card {
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .graph-card {
+      border-radius: 8px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+    }
+
+    .graph-toolbar {
+      min-height: 44px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .step-title {
+      min-width: 0;
+      font-weight: 900;
+      font-size: 0.92rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 3px;
+      border-radius: 999px;
+      background: #cbd5e1;
+    }
+
+    .swatch.match { background: var(--green); }
+    .swatch.path { background: var(--orange); }
+    .swatch.scan { background: var(--blue); }
+
+    .graph-wrap {
+      min-height: 0;
+      display: grid;
+      place-items: stretch;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      min-height: 0;
+    }
+
+    .edge {
+      stroke: #cbd5e1;
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+      opacity: 0.85;
+    }
+
+    .edge.match {
+      stroke: var(--green);
+      stroke-width: 5;
+      opacity: 1;
+    }
+
+    .edge.active {
+      stroke: var(--orange);
+      stroke-width: 6;
+      opacity: 1;
+    }
+
+    .edge.scan {
+      stroke: var(--blue);
+      stroke-width: 5;
+      opacity: 1;
+    }
+
+    .node circle {
+      fill: white;
+      stroke: #94a3b8;
+      stroke-width: 2.5;
+      transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .node.left circle { fill: #eff6ff; }
+    .node.right circle { fill: #f8fafc; }
+    .node.free circle { stroke: var(--blue); stroke-width: 4; }
+    .node.layered circle { fill: var(--blue-soft); stroke: var(--blue); }
+    .node.matched circle { fill: var(--green-soft); stroke: var(--green); }
+    .node.active circle { fill: var(--orange-soft); stroke: var(--orange); stroke-width: 4; }
+
+    .node text.name {
+      font-size: 16px;
+      font-weight: 900;
+      fill: var(--ink);
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    .node text.meta {
+      font-size: 11px;
+      font-weight: 800;
+      fill: var(--muted);
+      text-anchor: middle;
+      pointer-events: none;
+    }
+
+    .side-card {
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, 42px) 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--slate);
+      min-width: 0;
+      height: 38px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 900;
+      display: grid;
+      place-items: center;
+      transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: #f8fafc;
+      color: var(--ink);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .step-count {
+      justify-self: end;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width 0.2s ease;
+    }
+
+    .explain {
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid #eef2f7;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .explain h2 {
+      margin: 0 0 8px 0;
+      font-size: 0.95rem;
+      line-height: 1.3;
+    }
+
+    .explain p {
+      margin: 0;
+      color: #334155;
+      font-size: 0.86rem;
+      line-height: 1.65;
+      font-weight: 600;
+    }
+
+    .bottom {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 14px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .info-card {
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+    }
+
+    .card-title {
+      margin: 0 0 10px 0;
+      font-size: 0.82rem;
+      font-weight: 900;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tables {
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 7px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.72rem;
+      background: #f8fafc;
+    }
+
+    td {
+      font-family: var(--mono);
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .nil {
+      color: #94a3b8;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        overflow: auto;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      main {
+        display: block;
+        overflow: visible;
+      }
+
+      .stage {
+        grid-template-columns: 1fr;
+        min-height: 720px;
+      }
+
+      .bottom {
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+
+      .graph-card {
+        min-height: 430px;
+      }
+
+      .side-card,
+      .info-card {
+        min-height: 260px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      header {
+        height: auto;
+        min-height: 58px;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 10px 12px;
+      }
+
+      body {
+        grid-template-rows: auto 1fr;
+      }
+
+      .stage,
+      .bottom {
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .graph-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .legend {
+        justify-content: flex-start;
+      }
+
+      .tables {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Hopcroft-Karp 二分图最大匹配</h1>
+      <span>BFS 分层 + DFS 批量增广</span>
+    </div>
+    <div class="phase-badge" id="phaseBadge">初始化</div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="graph-card">
+        <div class="graph-toolbar">
+          <div class="step-title" id="stepTitle">初始化</div>
+          <div class="legend">
+            <span class="legend-item"><i class="swatch"></i>普通边</span>
+            <span class="legend-item"><i class="swatch scan"></i>BFS 扫描</span>
+            <span class="legend-item"><i class="swatch path"></i>增广路</span>
+            <span class="legend-item"><i class="swatch match"></i>当前匹配</span>
+          </div>
+        </div>
+        <div class="graph-wrap">
+          <svg id="graph" viewBox="0 0 760 500" role="img" aria-label="Hopcroft-Karp bipartite graph visualization"></svg>
+        </div>
+      </div>
+
+      <aside class="side-card">
+        <div class="controls">
+          <button id="resetBtn" title="重置" aria-label="重置">↺</button>
+          <button id="prevBtn" title="上一步" aria-label="上一步">‹</button>
+          <button id="playBtn" title="播放或暂停" aria-label="播放或暂停">▶</button>
+          <button id="nextBtn" title="下一步" aria-label="下一步">›</button>
+          <div class="step-count" id="stepCount">1 / 1</div>
+        </div>
+        <div class="progress"><span id="progressBar"></span></div>
+        <div class="explain">
+          <h2 id="explainTitle">初始化</h2>
+          <p id="explainText"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="bottom">
+      <div class="info-card">
+        <h3 class="card-title">层级与匹配状态</h3>
+        <div class="tables">
+          <table>
+            <thead>
+              <tr><th>Left</th><th>dist</th><th>pairU</th></tr>
+            </thead>
+            <tbody id="leftTable"></tbody>
+          </table>
+          <table>
+            <thead>
+              <tr><th>Right</th><th>pairV</th><th>状态</th></tr>
+            </thead>
+            <tbody id="rightTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    const left = ["u1", "u2", "u3", "u4", "u5", "u6"];
+    const right = ["v1", "v2", "v3", "v4", "v5"];
+    const positions = {
+      u1: [150, 68], u2: [150, 138], u3: [150, 208], u4: [150, 278], u5: [150, 348], u6: [150, 418],
+      v1: [610, 82], v2: [610, 162], v3: [610, 242], v4: [610, 322], v5: [610, 402]
+    };
+    const edges = [
+      ["u1", "v1"], ["u1", "v2"],
+      ["u2", "v1"],
+      ["u3", "v2"], ["u3", "v3"],
+      ["u4", "v3"], ["u4", "v4"],
+      ["u5", "v4"], ["u5", "v5"],
+      ["u6", "v1"]
+    ];
+
+    const snapshots = [
+      {
+        phase: "初始化",
+        title: "初始化",
+        code: [0],
+        matching: [],
+        dist: {},
+        scan: [],
+        active: [],
+        focus: ["u1", "u2", "u3", "u4", "u5", "u6"],
+        explainTitle: "初始化：建立初始匹配状态",
+        explain: "状态变化：当前 M = empty，所有左侧点 u1 到 u6 都是 free，所有右侧点 v1 到 v5 也都是 free。下一步进入第 1 轮 BFS，把所有 free 的左侧点作为多源起点。"
+      },
+      {
+        phase: "第 1 轮 BFS",
+        title: "第 1 轮 BFS 开始",
+        code: [4, 5, 6, 8],
+        matching: [],
+        dist: { u1: 0, u2: 0, u3: 0, u4: 0, u5: 0, u6: 0 },
+        scan: ["u1-v1", "u2-v1", "u3-v2", "u4-v3", "u5-v4", "u6-v1"],
+        active: [],
+        focus: ["u1", "u2", "u3", "u4", "u5", "u6", "v1", "v2", "v3", "v4"],
+        explainTitle: "第 1 轮 BFS 开始：建立第一张层级图",
+        explain: "状态变化：所有 free 左侧点的 dist 都被设为 0。由于右侧点此时全是 free，只要从左侧走一条未匹配边就能到达增广路终点，所以本轮最短增广路长度为 1。"
+      },
+      {
+        phase: "第 1 轮 DFS",
+        title: "第 1 轮 DFS 开始",
+        code: [10, 11, 12, 13],
+        matching: [["u1", "v1"]],
+        dist: { u1: 0, u2: 0, u3: 0, u4: 0, u5: 0, u6: 0 },
+        scan: [],
+        active: ["u1-v1"],
+        focus: ["u1", "v1"],
+        explainTitle: "第 1 轮 DFS 开始：找到第一条增广路",
+        explain: "状态变化：u1 通过未匹配边 u1-v1 到达 free 的 v1。反转这条长度为 1 的增广路后，u1-v1 加入 M，匹配大小从 0 变为 1。"
+      },
+      {
+        phase: "第 1 轮 DFS",
+        title: "第 1 轮 DFS",
+        code: [10, 11],
+        matching: [["u1", "v1"]],
+        dist: { u1: 0, u2: 0, u3: 0, u4: 0, u5: 0, u6: 0 },
+        scan: ["u2-v1", "u6-v1"],
+        active: [],
+        focus: ["u2", "u6", "v1", "u1"],
+        explainTitle: "第 1 轮 DFS：尝试从 u2、u6 增广",
+        explain: "状态变化：u2 和 u6 都只能走到 v1，但 v1 已经被 u1 占用。第 1 轮层级图只允许长度为 1 的增广路；若经过 v1 回到 u1 再继续走，路径长度会变长，所以 u2、u6 在本轮不会改变匹配。"
+      },
+      {
+        phase: "第 1 轮 DFS",
+        title: "第 1 轮 DFS 结束",
+        code: [1, 2, 13],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u1: 0, u2: 0, u3: 0, u4: 0, u5: 0, u6: 0 },
+        scan: [],
+        active: ["u1-v1", "u3-v2", "u4-v3", "u5-v4"],
+        focus: ["u3", "u4", "u5", "v2", "v3", "v4"],
+        explainTitle: "第 1 轮 DFS 结束：完成批量增广",
+        explain: "状态变化：第 1 轮 DFS 共加入 u1-v1、u3-v2、u4-v3、u5-v4，匹配大小变为 4。u2 和 u6 仍然 free，因此下一轮 BFS 的起点不再是所有左侧点，而是这两个未匹配点。"
+      },
+      {
+        phase: "第 2 轮 BFS",
+        title: "第 2 轮 BFS 开始",
+        code: [4, 5, 6, 7],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0 },
+        scan: ["u2-v1", "u6-v1"],
+        active: [],
+        focus: ["u2", "u6", "v1"],
+        explainTitle: "第 2 轮 BFS 开始：把所有 free 左侧点入队",
+        explain: "状态变化：只有 u2、u6 仍然 free，所以 dist[u2]=0、dist[u6]=0，并把它们同时入队。Queue: [u2, u6]。接下来 BFS 会依次出队处理它们的邻边。"
+      },
+      {
+        phase: "第 2 轮 BFS",
+        title: "第 2 轮 BFS",
+        code: [7],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0, u1: 1 },
+        scan: ["u2-v1", "u6-v1", "u1-v2"],
+        active: [],
+        focus: ["u2", "u6", "v1", "u1", "v2"],
+        explainTitle: "第 2 轮 BFS：pop u2，沿 u2-v1 扫描",
+        explain: "状态变化：出队 u2 后，Queue: [u6]。u2 走未匹配边到 v1；v1 已匹配给 u1，所以把 u1 设为 dist=1 并入队。Queue: [u6, u1]。随后出队 u6 时也会扫到 v1，但 u1 已有 dist，不会重复入队。"
+      },
+      {
+        phase: "第 2 轮 BFS",
+        title: "第 2 轮 BFS",
+        code: [6, 7],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2 },
+        scan: ["u2-v1", "u6-v1", "u1-v2", "u3-v3"],
+        active: [],
+        focus: ["u3", "v3", "u4"],
+        explainTitle: "第 2 轮 BFS：pop u6 后再 pop u1",
+        explain: "状态变化：先出队 u6，Queue: [u1]。u6 也只能扫到 v1，但 v1 的匹配点 u1 已经在 dist=1，所以不入队。接着出队 u1，Queue: []。u1 走未匹配边 u1-v2，v2 匹配给 u3，于是 dist[u3]=2，u3 入队。Queue: [u3]。"
+      },
+      {
+        phase: "第 2 轮 BFS",
+        title: "第 2 轮 BFS",
+        code: [6, 7],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2, u4: 3 },
+        scan: ["u2-v1", "u6-v1", "u1-v2", "u3-v3", "u4-v4"],
+        active: [],
+        focus: ["u4", "v4", "u5"],
+        explainTitle: "第 2 轮 BFS：pop u3，继续扩展层级",
+        explain: "状态变化：出队 u3 后，Queue: []。u3 走未匹配边 u3-v3，v3 匹配给 u4，于是 dist[u4]=3，u4 入队。Queue: [u4]。此时还没有到达 free 的右侧点。"
+      },
+      {
+        phase: "第 2 轮 BFS",
+        title: "第 2 轮 BFS 结束",
+        code: [8],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2, u4: 3, u5: 4 },
+        scan: ["u2-v1", "u6-v1", "u1-v2", "u3-v3", "u4-v4", "u5-v5"],
+        active: [],
+        focus: ["u5", "v5"],
+        explainTitle: "第 2 轮 BFS 结束：继续出队直到碰到 free 右侧点",
+        explain: "状态变化：出队 u4，Queue: []。u4 走 u4-v4，v4 匹配给 u5，所以 dist[u5]=4，u5 入队，Queue: [u5]。再出队 u5，Queue: []。u5 走到 free 的 v5，BFS 确认本轮存在最短增广路，层级图固定。"
+      },
+      {
+        phase: "第 2 轮 DFS",
+        title: "第 2 轮 DFS 开始",
+        code: [10, 11, 12],
+        matching: [["u1", "v1"], ["u3", "v2"], ["u4", "v3"], ["u5", "v4"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2, u4: 3, u5: 4 },
+        scan: [],
+        active: ["u2-v1", "u1-v2", "u3-v3", "u4-v4", "u5-v5"],
+        focus: ["u2", "u1", "u3", "u4", "u5", "v1", "v2", "v3", "v4", "v5"],
+        explainTitle: "第 2 轮 DFS 开始：u2 取走这条最短增广路",
+        explain: "状态变化：DFS 沿层级图得到 u2-v1-u1-v2-u3-v3-u4-v4-u5-v5。这条路从 free 的 u2 到 free 的 v5，反转后会让匹配大小增加 1，并改变链上每个点的配对关系。"
+      },
+      {
+        phase: "第 2 轮增广",
+        title: "第 2 轮增广",
+        code: [13],
+        matching: [["u2", "v1"], ["u1", "v2"], ["u3", "v3"], ["u4", "v4"], ["u5", "v5"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2, u4: 3, u5: 4 },
+        scan: [],
+        active: ["u2-v1", "u1-v2", "u3-v3", "u4-v4", "u5-v5"],
+        focus: ["u2", "u1", "u3", "u4", "u5", "v1", "v2", "v3", "v4", "v5"],
+        explainTitle: "第 2 轮增广：反转 u2 找到的增广路",
+        explain: "状态变化：原匹配边 u1-v1、u3-v2、u4-v3、u5-v4 移出 M；原未匹配边 u2-v1、u1-v2、u3-v3、u4-v4、u5-v5 加入 M。匹配大小从 4 变为 5。"
+      },
+      {
+        phase: "第 2 轮 DFS",
+        title: "第 2 轮 DFS 结束",
+        code: [10, 11],
+        matching: [["u2", "v1"], ["u1", "v2"], ["u3", "v3"], ["u4", "v4"], ["u5", "v5"]],
+        dist: { u2: 0, u6: 0, u1: 1, u3: 2, u4: 3, u5: 4 },
+        scan: ["u6-v1"],
+        active: [],
+        focus: ["u6", "v1", "u2"],
+        explainTitle: "第 2 轮 DFS 结束：u6 再尝试增广",
+        explain: "状态变化：u6 仍只能走到 v1，但 v1 现在匹配给 u2。u2 是本轮起点层 dist=0，不是 u6 后面的下一层，因此 DFS 不能沿 u6-v1 继续递归；u6 在本轮没有改变匹配。"
+      },
+      {
+        phase: "结束",
+        title: "结束",
+        code: [0],
+        matching: [["u2", "v1"], ["u1", "v2"], ["u3", "v3"], ["u4", "v4"], ["u5", "v5"]],
+        dist: {},
+        scan: [],
+        active: [],
+        focus: ["u6"],
+        explainTitle: "结束：检查是否还有增广路",
+        explain: "状态变化：右侧 v1 到 v5 已全部匹配。u6 虽然仍然 free，但它无法到达任何 free 右侧点；下一轮 BFS 找不到增广路。根据 Berge 定理，当前大小为 5 的匹配是最大匹配。"
+      }
+    ];
+
+    const graph = document.getElementById("graph");
+    const stepTitle = document.getElementById("stepTitle");
+    const phaseBadge = document.getElementById("phaseBadge");
+    const explainTitle = document.getElementById("explainTitle");
+    const explainText = document.getElementById("explainText");
+    const leftTable = document.getElementById("leftTable");
+    const rightTable = document.getElementById("rightTable");
+    const stepCount = document.getElementById("stepCount");
+    const progressBar = document.getElementById("progressBar");
+    const resetBtn = document.getElementById("resetBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const playBtn = document.getElementById("playBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    let index = 0;
+    let timer = null;
+
+    function edgeId(a, b) {
+      return `${a}-${b}`;
+    }
+
+    function isMatched(snapshot, id) {
+      return snapshot.matching.some(([u, v]) => edgeId(u, v) === id);
+    }
+
+    function pairMaps(snapshot) {
+      const pairU = Object.fromEntries(left.map(u => [u, null]));
+      const pairV = Object.fromEntries(right.map(v => [v, null]));
+      snapshot.matching.forEach(([u, v]) => {
+        pairU[u] = v;
+        pairV[v] = u;
+      });
+      return { pairU, pairV };
+    }
+
+    function nodeClass(snapshot, id, side, maps) {
+      const classes = ["node", side];
+      if (snapshot.focus.includes(id)) classes.push("active");
+      if (snapshot.dist[id] !== undefined) classes.push("layered");
+      if ((side === "left" && maps.pairU[id]) || (side === "right" && maps.pairV[id])) classes.push("matched");
+      if ((side === "left" && !maps.pairU[id]) || (side === "right" && !maps.pairV[id])) classes.push("free");
+      return classes.join(" ");
+    }
+
+    function renderGraph(snapshot) {
+      const active = new Set(snapshot.active);
+      const scan = new Set(snapshot.scan);
+      const maps = pairMaps(snapshot);
+      const edgeMarkup = edges.map(([u, v]) => {
+        const id = edgeId(u, v);
+        const [x1, y1] = positions[u];
+        const [x2, y2] = positions[v];
+        const cls = ["edge"];
+        if (isMatched(snapshot, id)) cls.push("match");
+        if (scan.has(id)) cls.push("scan");
+        if (active.has(id)) cls.push("active");
+        return `<line class="${cls.join(" ")}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />`;
+      }).join("");
+
+      const leftMarkup = left.map(u => {
+        const [x, y] = positions[u];
+        const dist = snapshot.dist[u] !== undefined ? `dist=${snapshot.dist[u]}` : (maps.pairU[u] ? maps.pairU[u] : "free");
+        return `
+          <g class="${nodeClass(snapshot, u, "left", maps)}">
+            <circle cx="${x}" cy="${y}" r="25"></circle>
+            <text class="name" x="${x}" y="${y - 2}">${u}</text>
+            <text class="meta" x="${x}" y="${y + 35}">${dist}</text>
+          </g>`;
+      }).join("");
+
+      const rightMarkup = right.map(v => {
+        const [x, y] = positions[v];
+        const meta = maps.pairV[v] ? maps.pairV[v] : "free";
+        return `
+          <g class="${nodeClass(snapshot, v, "right", maps)}">
+            <circle cx="${x}" cy="${y}" r="25"></circle>
+            <text class="name" x="${x}" y="${y - 2}">${v}</text>
+            <text class="meta" x="${x}" y="${y + 35}">${meta}</text>
+          </g>`;
+      }).join("");
+
+      graph.innerHTML = `
+        <text x="150" y="28" text-anchor="middle" font-size="13" font-weight="900" fill="#475569">Left U</text>
+        <text x="610" y="28" text-anchor="middle" font-size="13" font-weight="900" fill="#475569">Right V</text>
+        ${edgeMarkup}
+        ${leftMarkup}
+        ${rightMarkup}
+      `;
+    }
+
+    function renderTables(snapshot) {
+      const maps = pairMaps(snapshot);
+      leftTable.innerHTML = left.map(u => {
+        const dist = snapshot.dist[u] === undefined ? '<span class="nil">INF</span>' : snapshot.dist[u];
+        const pair = maps.pairU[u] || '<span class="nil">NIL</span>';
+        return `<tr><td>${u}</td><td>${dist}</td><td>${pair}</td></tr>`;
+      }).join("");
+
+      rightTable.innerHTML = right.map(v => {
+        const pair = maps.pairV[v] || '<span class="nil">NIL</span>';
+        const state = maps.pairV[v] ? "matched" : "free";
+        return `<tr><td>${v}</td><td>${pair}</td><td>${state}</td></tr>`;
+      }).join("");
+    }
+
+    function render() {
+      const snapshot = snapshots[index];
+      stepTitle.textContent = snapshot.title;
+      phaseBadge.textContent = snapshot.phase;
+      explainTitle.textContent = snapshot.explainTitle;
+      explainText.textContent = snapshot.explain;
+      stepCount.textContent = `${index + 1} / ${snapshots.length}`;
+      progressBar.style.width = `${(index / (snapshots.length - 1)) * 100}%`;
+      prevBtn.disabled = index === 0;
+      nextBtn.disabled = index === snapshots.length - 1;
+      renderGraph(snapshot);
+      renderTables(snapshot);
+    }
+
+    function stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      playBtn.textContent = "▶";
+    }
+
+    function next() {
+      if (index < snapshots.length - 1) {
+        index += 1;
+        render();
+      } else {
+        stop();
+      }
+    }
+
+    resetBtn.addEventListener("click", () => {
+      stop();
+      index = 0;
+      render();
+    });
+
+    prevBtn.addEventListener("click", () => {
+      stop();
+      index = Math.max(0, index - 1);
+      render();
+    });
+
+    nextBtn.addEventListener("click", () => {
+      stop();
+      next();
+    });
+
+    playBtn.addEventListener("click", () => {
+      if (timer) {
+        stop();
+        return;
+      }
+      if (index === snapshots.length - 1) index = 0;
+      render();
+      playBtn.textContent = "Ⅱ";
+      timer = setInterval(next, 2100);
+    });
+
+    render();
+  </script>
+</body>
+</html>

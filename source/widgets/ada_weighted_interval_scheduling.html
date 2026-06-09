@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weighted Interval Scheduling 动图详解</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --primary-soft: #eef2ff;
+      --bg-canvas: #f8fafc;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-sub: #64748b;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --orange: #f59e0b;
+      --orange-soft: #fef3c7;
+      --red: #ef4444;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 14px 28px -12px rgba(15, 23, 42, 0.28);
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg-canvas);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      height: 56px;
+      padding: 0 22px;
+      background: white;
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      min-width: 0;
+    }
+
+    .brand span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-family: var(--mono);
+      font-weight: 800;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-rows: minmax(330px, 54fr) minmax(270px, 46fr);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .panel-top {
+      min-height: 0;
+      position: relative;
+      background-color: #f1f5f9;
+      background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+      border-bottom: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    .canvas-stage {
+      position: absolute;
+      inset: 14px 96px 14px 14px;
+      max-width: calc(100% - 112px);
+      background: white;
+      border: 1px solid rgba(226,232,240,0.9);
+      border-radius: 18px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .top-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px 8px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      background: linear-gradient(135deg, #fff, #f8fafc);
+      flex-shrink: 0;
+    }
+
+    .mini-title {
+      font-size: 0.83rem;
+      font-weight: 900;
+      color: #334155;
+      letter-spacing: 0.02em;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-sub);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 2px solid white;
+      box-shadow: 0 0 0 1px #cbd5e1;
+      flex-shrink: 0;
+    }
+
+    #canvasBox {
+      min-height: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: white;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .formula-card {
+      margin: 0 16px 14px 16px;
+      min-width: 0;
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow-md);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      line-height: 1.55;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 14px;
+      align-items: baseline;
+      overflow-wrap: anywhere;
+    }
+
+    .formula-card b {
+      color: #c7d2fe;
+      font-weight: 900;
+    }
+
+    .controls-island {
+      position: absolute;
+      top: 50%;
+      right: 18px;
+      transform: translateY(-50%);
+      width: 52px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.75);
+      box-shadow: var(--shadow-lg);
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+    }
+
+    .btn {
+      border: 0;
+      background: transparent;
+      width: 40px;
+      min-height: 40px;
+      border-radius: 12px;
+      font-family: var(--sans);
+      font-weight: 800;
+      cursor: pointer;
+      color: var(--text-sub);
+      display: grid;
+      place-items: center;
+      gap: 1px;
+      transition: all .18s cubic-bezier(.4,0,.2,1);
+      padding: 4px;
+    }
+
+    .btn svg { width: 18px; height: 18px; }
+    .btn span { font-size: 0.58rem; line-height: 1; }
+    .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 6px 12px -4px rgba(79,70,229,.55);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); color: white; }
+    .btn-danger { background: var(--red); color: white; }
+
+    .panel-bottom {
+      min-height: 0;
+      background: white;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      box-shadow: 0 -4px 20px rgba(15,23,42,0.035);
+    }
+
+    .panel-header {
+      padding: 12px 22px 13px 22px;
+      border-bottom: 1px solid var(--border-color);
+      background: linear-gradient(135deg, #fff, #f8fafc);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 5px;
+      letter-spacing: 0.04em;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 0 5px rgba(79,70,229,0.13);
+    }
+
+    .status-text {
+      font-size: 0.94rem;
+      line-height: 1.45;
+      font-weight: 750;
+      color: #111827;
+      transition: opacity .12s ease;
+    }
+
+    .split {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    }
+
+    .section {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .section.left { border-right: 1px solid var(--border-color); }
+
+    .section-title {
+      padding: 10px 22px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      font-weight: 900;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .scroll {
+      overflow: auto;
+      min-height: 0;
+      background: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 780px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: white;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-sub);
+      font-size: 0.72rem;
+      padding: 8px 10px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid #f1f5f9;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .mono { font-family: var(--mono); }
+    .strong { font-weight: 900; }
+    .primary { color: var(--primary); }
+    .blue { color: var(--blue); }
+    .green { color: var(--green); }
+    .muted { color: var(--text-sub); }
+
+    .empty-row {
+      text-align: center;
+      color: #94a3b8;
+      padding: 22px !important;
+      font-weight: 650;
+    }
+
+    .choice-list {
+      padding: 12px 16px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .choice-card {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: white;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .choice-card.current {
+      background: var(--primary-soft);
+      border-color: #c7d2fe;
+    }
+
+    .choice-card.taken {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+
+    .choice-node {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--text-sub);
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-weight: 900;
+      font-size: 0.75rem;
+    }
+
+    .choice-card.current .choice-node {
+      background: white;
+      color: var(--primary);
+    }
+
+    .choice-card.taken .choice-node {
+      background: var(--green-soft);
+      color: #15803d;
+    }
+
+    .choice-title {
+      font-weight: 900;
+      color: #334155;
+      font-size: 0.84rem;
+    }
+
+    .choice-sub {
+      margin-top: 2px;
+      font-family: var(--mono);
+      color: var(--text-sub);
+      font-size: 0.72rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .choice-weight {
+      font-family: var(--mono);
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .anim-update { animation: highlight-pulse .9s; }
+    @keyframes highlight-pulse {
+      0% { background: #fef3c7; }
+      100% { background: transparent; }
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    @media (max-width: 900px) {
+      header { height: 52px; padding: 0 14px; }
+      .brand { font-size: 0.92rem; }
+      .badge { font-size: 0.68rem; padding: 4px 9px; }
+      main { grid-template-rows: minmax(300px, 52fr) minmax(275px, 48fr); }
+      .canvas-stage { inset: 10px 68px 10px 10px; max-width: calc(100% - 78px); border-radius: 14px; }
+      .controls-island { right: 10px; width: 48px; }
+      .btn { width: 36px; min-height: 36px; }
+      .legend { gap: 7px; font-size: 0.66rem; }
+      .top-strip { padding: 9px 12px 7px; }
+      .formula-card {
+        margin: 0 12px 10px;
+        font-size: 0.68rem;
+        gap: 4px 9px;
+        padding: 8px 10px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .split { grid-template-columns: 1fr; grid-template-rows: 58% 42%; }
+      .section.left { border-right: 0; border-bottom: 1px solid var(--border-color); }
+    }
+
+    @media (max-width: 560px) {
+      .mini-title { display: none; }
+      .legend { justify-content: flex-start; }
+      .formula-card { grid-template-columns: 1fr; }
+      .status-text { font-size: 0.86rem; }
+      .panel-header { padding: 10px 14px; }
+      .section-title { padding: 8px 14px; }
+      .choice-list { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"
+           style="color: var(--primary); flex-shrink:0;">
+        <rect x="3" y="5" width="18" height="4" rx="2"></rect>
+        <rect x="6" y="11" width="12" height="4" rx="2"></rect>
+        <rect x="10" y="17" width="10" height="4" rx="2"></rect>
+      </svg>
+      <span>Weighted Interval Scheduling 动图详解</span>
+    </div>
+    <div class="badge">DP: OPT(j)</div>
+  </header>
+
+  <main>
+    <section class="panel-top">
+      <div class="canvas-stage">
+        <div class="top-strip">
+          <div class="mini-title">Jobs sorted by finish time</div>
+          <div class="legend">
+            <span class="legend-item"><span class="dot" style="background:#e2e8f0;"></span>未处理</span>
+            <span class="legend-item"><span class="dot" style="background:#fef3c7; box-shadow:0 0 0 1px #f59e0b;"></span>当前 j</span>
+            <span class="legend-item"><span class="dot" style="background:#dbeafe; box-shadow:0 0 0 1px #2563eb;"></span>p(j)</span>
+            <span class="legend-item"><span class="dot" style="background:#4f46e5; box-shadow:0 0 0 1px #4338ca;"></span>最终选中</span>
+          </div>
+        </div>
+
+        <div id="canvasBox">
+          <canvas id="timelineCanvas"></canvas>
+        </div>
+
+        <div class="formula-card">
+          <b>递推</b><span>OPT(j) = max( OPT(j − 1), w[j] + OPT(p[j]) )</span>
+          <b>含义</b><span>不选 j vs 选择 j；p(j) 是 j 前面最后一个 finish ≤ start[j] 的 job</span>
+        </div>
+      </div>
+
+      <div class="controls-island">
+        <button id="btnReset" class="btn" title="重置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          <span>重置</span>
+        </button>
+        <button id="btnPrev" class="btn" title="上一步">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>后退</span>
+        </button>
+        <button id="btnPlay" class="btn btn-primary" title="自动播放">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>播放</span>
+        </button>
+        <button id="btnNext" class="btn" title="下一步">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+          <span>前进</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel-bottom">
+      <div class="panel-header">
+        <div class="status-badge"><span class="pulse-dot"></span><span>当前操作</span></div>
+        <div id="statusText" class="status-text">准备就绪：先按结束时间排序，然后逐个填 DP 表。</div>
+      </div>
+
+      <div class="split">
+        <div class="section left">
+          <div class="section-title">DP 表：每一行决定 “选不选 j”</div>
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>j</th>
+                  <th>Job</th>
+                  <th>[s, f]</th>
+                  <th>w</th>
+                  <th>p(j)</th>
+                  <th>OPT(j−1)</th>
+                  <th>w+OPT(p)</th>
+                  <th>OPT(j)</th>
+                  <th>决策</th>
+                </tr>
+              </thead>
+              <tbody id="dpTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">当前最优解 / 回溯结果</div>
+          <div class="scroll">
+            <div id="choiceContainer" class="choice-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+const rawJobs = [
+  { id: 'A', s: 0, f: 6, w: 23 },
+  { id: 'B', s: 1, f: 4, w: 12 },
+  { id: 'C', s: 3, f: 5, w: 20 },
+  { id: 'D', s: 3, f: 8, w: 26 },
+  { id: 'E', s: 4, f: 7, w: 13 },
+  { id: 'F', s: 5, f: 9, w: 20 },
+  { id: 'G', s: 6, f: 10, w: 11 },
+  { id: 'H', s: 8, f: 11, w: 16 }
+];
+
+const jobs = rawJobs
+  .slice()
+  .sort((a,b) => a.f - b.f || a.s - b.s)
+  .map((x, i) => ({...x, j: i + 1}));
+
+const n = jobs.length;
+const p = Array(n + 1).fill(0);
+
+for (let j = 1; j <= n; j++) {
+  let last = 0;
+  for (let i = 1; i < j; i++) {
+    if (jobs[i - 1].f <= jobs[j - 1].s) last = i;
+  }
+  p[j] = last;
+}
+
+function computeDP(upto) {
+  const opt = Array(n + 1).fill(0);
+  const take = Array(n + 1).fill(false);
+  for (let j = 1; j <= upto; j++) {
+    const no = opt[j - 1];
+    const yes = jobs[j - 1].w + opt[p[j]];
+    if (yes > no) {
+      opt[j] = yes;
+      take[j] = true;
+    } else {
+      opt[j] = no;
+      take[j] = false;
+    }
+  }
+  return { opt, take };
+}
+
+function reconstruct(upto, opt, take) {
+  const result = [];
+  let j = upto;
+  while (j > 0) {
+    const yes = jobs[j - 1].w + opt[p[j]];
+    const no = opt[j - 1];
+    if (take[j] && yes > no) {
+      result.push(j);
+      j = p[j];
+    } else {
+      j--;
+    }
+  }
+  return new Set(result.reverse());
+}
+
+const full = computeDP(n);
+const finalSet = reconstruct(n, full.opt, full.take);
+
+const steps = [{
+  type: 'INIT',
+  msg: '初始化：将 jobs 按 finish time 从小到大排序，并令 OPT(0)=0。',
+  current: 0,
+  pFocus: null,
+  upto: 0,
+  finalMode: false
+}];
+
+for (let j = 1; j <= n; j++) {
+  steps.push({
+    type: 'P',
+    msg: `计算 p(${j})：job ${jobs[j-1].id} 的开始时间是 ${jobs[j-1].s}，找左边最后一个 finish ≤ ${jobs[j-1].s} 的 job。结果 p(${j})=${p[j]}。`,
+    current: j,
+    pFocus: p[j],
+    upto: j - 1,
+    finalMode: false
+  });
+
+  const partial = computeDP(j);
+  const no = partial.opt[j - 1];
+  const yes = jobs[j - 1].w + partial.opt[p[j]];
+  steps.push({
+    type: 'DP',
+    msg: `处理 j=${j} (${jobs[j-1].id})：不选=${no}；选=${jobs[j-1].w}+OPT(${p[j]})=${yes}；所以 OPT(${j})=${Math.max(no, yes)}。`,
+    current: j,
+    pFocus: p[j],
+    upto: j,
+    finalMode: false
+  });
+}
+
+steps.push({
+  type: 'DONE',
+  msg: `完成：最大总权重 OPT(${n})=${full.opt[n]}，回溯得到最优集合 ${[...finalSet].map(i => jobs[i-1].id).join(' + ')}。`,
+  current: 0,
+  pFocus: null,
+  upto: n,
+  finalMode: true
+});
+
+const canvas = document.getElementById('timelineCanvas');
+const ctx = canvas.getContext('2d');
+const canvasBox = document.getElementById('canvasBox');
+let currentStepIndex = 0;
+let animationInterval = null;
+
+function setupCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(320, Math.floor(canvasBox.clientWidth));
+  const h = Math.max(180, Math.floor(canvasBox.clientHeight));
+
+  // 只改绘图缓冲区，不再反复写 inline width/height。
+  // 否则在某些预览容器里，canvas 会把父容器撑宽，导致时间轴从右侧溢出。
+  if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h };
+}
+
+function roundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else {
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+  }
+}
+
+function arrow(x1, y1, x2, y2, color) {
+  const angle = Math.atan2(y2-y1, x2-x1);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.25;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 9 * Math.cos(angle - Math.PI / 6), y2 - 9 * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(x2 - 9 * Math.cos(angle + Math.PI / 6), y2 - 9 * Math.sin(angle + Math.PI / 6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function fitFont(base, min, max, scale=1) {
+  return Math.max(min, Math.min(max, base * scale));
+}
+
+function drawTimeline(state) {
+  const { w: width, h: height } = setupCanvas();
+  ctx.clearRect(0, 0, width, height);
+
+  const compact = width < 700 || height < 230;
+  const marginL = compact ? 48 : 58;
+  const marginR = compact ? 42 : 56;
+  const marginT = compact ? 18 : 24;
+  const axisBottom = compact ? 28 : 34;
+  const labelCol = compact ? 34 : 46;
+
+  const usableH = height - marginT - axisBottom - 24;
+  const rowGap = Math.max(20, Math.min(38, usableH / n));
+  const barH = Math.max(14, Math.min(24, rowGap * 0.58));
+  const x0 = marginL + labelCol;
+  const x1 = Math.max(x0 + 120, width - marginR);
+  const yAxis = marginT + rowGap * n + 8;
+  const maxTime = 11;
+  const scaleX = (x1 - x0) / maxTime;
+
+  const { opt, take } = computeDP(state.upto);
+  const chosen = state.finalMode ? finalSet : reconstruct(state.upto, opt, take);
+
+  // grid
+  ctx.font = `700 ${compact ? 10 : 11}px ${getComputedStyle(document.body).getPropertyValue('--mono')}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let t = 0; t <= maxTime; t++) {
+    const x = x0 + t * scaleX;
+    ctx.strokeStyle = t === 0 ? '#94a3b8' : '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, marginT - 3);
+    ctx.lineTo(x, yAxis);
+    ctx.stroke();
+
+    if (!compact || t % 1 === 0) {
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(String(t), x, yAxis + (compact ? 15 : 17));
+    }
+  }
+
+  // axis
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x0, yAxis);
+  ctx.lineTo(x1 + 16, yAxis);
+  ctx.stroke();
+  arrow(x1 - 2, yAxis, x1 + 16, yAxis, '#334155');
+
+  ctx.fillStyle = '#334155';
+  ctx.font = `800 ${compact ? 10 : 12}px var(--sans)`;
+  ctx.textAlign = 'left';
+  ctx.fillText('Time', x1 + 10, yAxis - 13);
+
+  // p arrow
+  if (state.current && state.pFocus) {
+    const cur = jobs[state.current - 1];
+    const pre = jobs[state.pFocus - 1];
+    const sx = x0 + pre.f * scaleX;
+    const sy = marginT + (state.pFocus - 1) * rowGap + barH / 2;
+    const tx = x0 + cur.s * scaleX;
+    const ty = marginT + (state.current - 1) * rowGap + barH / 2;
+    arrow(sx, sy, tx, ty, '#2563eb');
+  }
+
+  jobs.forEach((job, idx) => {
+    const j = idx + 1;
+    const y = marginT + idx * rowGap;
+    const rawX = x0 + job.s * scaleX;
+    const rawEnd = x0 + job.f * scaleX;
+    const x = Math.max(x0, Math.min(rawX, x1));
+    const endX = Math.max(x0, Math.min(rawEnd, x1));
+    const bw = Math.max(18, endX - x);
+
+    let fill = '#e2e8f0';
+    let stroke = '#cbd5e1';
+    let text = '#334155';
+    let shadow = 'transparent';
+    let lw = 1.5;
+
+    if (j === state.pFocus && state.current !== j) {
+      fill = '#dbeafe';
+      stroke = '#2563eb';
+      text = '#1d4ed8';
+      shadow = 'rgba(37,99,235,.18)';
+      lw = 2.25;
+    }
+    if (j === state.current) {
+      fill = '#fef3c7';
+      stroke = '#f59e0b';
+      text = '#92400e';
+      shadow = 'rgba(245,158,11,.28)';
+      lw = 2.7;
+    }
+    if (chosen.has(j) && !state.finalMode) {
+      fill = '#dcfce7';
+      stroke = '#16a34a';
+      text = '#166534';
+      shadow = 'rgba(22,163,74,.18)';
+      lw = 2.25;
+    }
+    if (state.finalMode && chosen.has(j)) {
+      fill = '#4f46e5';
+      stroke = '#4338ca';
+      text = 'white';
+      shadow = 'rgba(79,70,229,.32)';
+      lw = 2.8;
+    }
+
+    ctx.shadowColor = shadow;
+    ctx.shadowBlur = shadow === 'transparent' ? 0 : 12;
+    ctx.shadowOffsetY = 3;
+    roundedRect(x, y, bw, barH, barH / 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+
+    ctx.fillStyle = text;
+    ctx.font = `900 ${compact ? 10 : 12}px var(--sans)`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const label = compact ? `${job.id}:${job.w}` : `${job.id}  w=${job.w}`;
+    ctx.fillText(label, x + bw / 2, y + barH / 2);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = `800 ${compact ? 9 : 10}px var(--mono)`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`j=${j}`, x0 - 9, y + barH / 2);
+  });
+}
+
+function updateUI(state) {
+  const status = document.getElementById('statusText');
+  status.style.opacity = 0.45;
+  setTimeout(() => {
+    status.innerText = state.msg;
+    status.style.opacity = 1;
+  }, 70);
+
+  const { opt, take } = computeDP(state.upto);
+  const chosen = state.finalMode ? finalSet : reconstruct(state.upto, opt, take);
+
+  const body = document.getElementById('dpTableBody');
+  body.innerHTML = '';
+
+  if (state.upto === 0) {
+    body.innerHTML = `<tr><td class="empty-row" colspan="9">等待开始填表：OPT(0)=0</td></tr>`;
+  } else {
+    for (let j = 1; j <= state.upto; j++) {
+      const job = jobs[j-1];
+      const no = opt[j-1];
+      const yes = job.w + opt[p[j]];
+      const selected = yes > no;
+      const tr = document.createElement('tr');
+      if (j === state.current) tr.className = 'anim-update';
+      tr.innerHTML = `
+        <td class="mono strong">${j}</td>
+        <td class="strong">${job.id}</td>
+        <td class="mono">[${job.s}, ${job.f}]</td>
+        <td class="mono">${job.w}</td>
+        <td class="mono strong blue">${p[j]}</td>
+        <td class="mono">${no}</td>
+        <td class="mono">${job.w}+OPT(${p[j]})=${yes}</td>
+        <td class="mono strong primary">${opt[j]}</td>
+        <td class="strong ${selected ? 'green' : 'muted'}">${selected ? '选' : '不选'}</td>
+      `;
+      body.appendChild(tr);
+    }
+  }
+
+  const box = document.getElementById('choiceContainer');
+  box.innerHTML = '';
+
+  if (chosen.size === 0) {
+    box.innerHTML = `<div style="text-align:center; padding:24px; color:#94a3b8; font-size:.86rem; font-weight:650;">当前还没有选择任何 job</div>`;
+  } else {
+    [...chosen].forEach(j => {
+      const job = jobs[j-1];
+      const el = document.createElement('div');
+      el.className = `choice-card taken ${j === state.current ? 'current' : ''}`;
+      el.innerHTML = `
+        <div class="choice-node">${job.id}</div>
+        <div>
+          <div class="choice-title">job ${j}: ${job.id}</div>
+          <div class="choice-sub">[${job.s}, ${job.f}], p(${j})=${p[j]}</div>
+        </div>
+        <div class="choice-weight">+${job.w}</div>
+      `;
+      box.appendChild(el);
+    });
+  }
+
+  const total = state.finalMode ? full.opt[n] : opt[state.upto];
+  const totalCard = document.createElement('div');
+  totalCard.className = 'choice-card current';
+  totalCard.innerHTML = `
+    <div class="choice-node">Σ</div>
+    <div>
+      <div class="choice-title">${state.finalMode ? '最终最大总权重' : '当前 OPT 值'}</div>
+      <div class="choice-sub">${state.finalMode ? '由回溯得到最终集合' : `已处理前 ${state.upto} 个 job`}</div>
+    </div>
+    <div class="choice-weight">${total}</div>
+  `;
+  box.appendChild(totalCard);
+
+  document.getElementById('btnPrev').disabled = currentStepIndex === 0;
+  document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
+}
+
+function render() {
+  const state = steps[currentStepIndex];
+  requestAnimationFrame(() => {
+    drawTimeline(state);
+    updateUI(state);
+  });
+}
+
+function nextStep() {
+  if (currentStepIndex < steps.length - 1) {
+    currentStepIndex++;
+    render();
+  } else stopPlay();
+}
+
+function prevStep() {
+  if (currentStepIndex > 0) {
+    currentStepIndex--;
+    render();
+  }
+}
+
+function reset() {
+  stopPlay();
+  currentStepIndex = 0;
+  render();
+}
+
+const btnPlay = document.getElementById('btnPlay');
+
+function playIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>播放</span>`;
+}
+
+function pauseIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg><span>暂停</span>`;
+}
+
+function togglePlay() {
+  if (animationInterval) {
+    stopPlay();
+  } else {
+    if (currentStepIndex === steps.length - 1) currentStepIndex = 0;
+    btnPlay.classList.remove('btn-primary');
+    btnPlay.classList.add('btn-danger');
+    btnPlay.innerHTML = pauseIcon();
+    nextStep();
+    animationInterval = setInterval(nextStep, 1350);
+  }
+}
+
+function stopPlay() {
+  clearInterval(animationInterval);
+  animationInterval = null;
+  btnPlay.classList.remove('btn-danger');
+  btnPlay.classList.add('btn-primary');
+  btnPlay.innerHTML = playIcon();
+}
+
+document.getElementById('btnNext').addEventListener('click', () => { stopPlay(); nextStep(); });
+document.getElementById('btnPrev').addEventListener('click', () => { stopPlay(); prevStep(); });
+document.getElementById('btnReset').addEventListener('click', reset);
+btnPlay.addEventListener('click', togglePlay);
+
+window.addEventListener('load', render);
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>
