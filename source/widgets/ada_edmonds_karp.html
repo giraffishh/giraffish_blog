@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edmonds-Karp 最大流可视化演示</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --bg-canvas: #f8fafc;
+            --bg-panel: rgba(255, 255, 255, 0.95);
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            
+            /* 图形专属语义颜色 */
+            --color-path: #3b82f6;
+            --color-bottle: #ef4444;
+            --color-reverse: #8b5cf6;
+            --color-scan: #f59e0b;
+            --color-full: #10b981;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 头部 --- */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            height: 50px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            z-index: 50;
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f172a;
+        }
+        
+        .badge-start {
+            background: #eef2ff;
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid #c7d2fe;
+        }
+
+        /* --- 主布局 --- */
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            flex-direction: column;
+        }
+
+        /* 上半部分：图表区 */
+        .panel-top {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background-color: #f1f5f9;
+            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-color);
+            min-height: 0;
+        }
+
+        /* 下半部分：数据区 */
+        .panel-bottom {
+            flex: 1;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.03);
+            z-index: 40;
+            min-height: 0;
+        }
+
+        /* --- Canvas --- */
+        #canvas-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            padding-right: 90px; /* 为右侧控制栏留出空间 */
+            box-sizing: border-box;
+            position: relative;
+        }
+        canvas {
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            background: white;
+            display: block;
+        }
+
+        /* --- 悬浮提示 & 图例 --- */
+        .legend-card {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-md);
+            font-size: 0.8rem;
+            z-index: 10;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+        .legend-item:last-child { margin-bottom: 0; }
+        .dot { 
+            width: 12px; height: 12px; border-radius: 50%; 
+            border: 2px solid white; box-shadow: 0 0 0 1px #cbd5e1; 
+        }
+
+        .note-pill {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--shadow-md);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* --- 悬浮控制栏 (右侧垂直) --- */
+        .controls-island {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 12px 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .btn {
+            border: none;
+            background: transparent;
+            padding: 8px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 48px;
+        }
+        .btn span { font-size: 0.7rem; }
+        .btn:hover:not(:disabled) { background: #f1f5f9; color: var(--text-main); transform: translateY(-1px); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) { background: #4338ca; color: white; box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4); }
+
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; color: white; }
+
+        /* --- 下方数据面板 --- */
+        .panel-header {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #fff, #f8fafc);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15); }
+        .status-text {
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        /* 左右分块 */
+        .split-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            flex-direction: row;
+        }
+
+        .section-left, .section-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .section-left { border-right: 1px solid var(--border-color); }
+
+        .scroll-content {
+            flex: 1;
+            overflow-y: auto;
+            background: #fff;
+        }
+
+        .section-title {
+            padding: 10px 24px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* 状态表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .data-table td {
+            padding: 14px 24px;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+        
+        /* 边列表 & 进度条设计 */
+        .edge-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+        .edge-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: white;
+            transition: all 0.3s ease;
+            gap: 12px;
+        }
+        .edge-card.updated {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+        .edge-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            font-weight: 600;
+            width: 48px;
+            flex-shrink: 0;
+        }
+        .edge-bar-container {
+            flex: 1;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .edge-bar-fill {
+            height: 100%;
+            background: var(--color-path);
+            border-radius: 999px;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .edge-stats {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .edge-weight {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 更新时的脉冲动画 */
+        .anim-update { animation: highlight-pulse 1s; }
+        @keyframes highlight-pulse {
+            0% { background-color: #dcfce7; }
+            100% { background-color: #f0fdf4; }
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media (max-width: 900px) {
+            .legend-card { transform: scale(0.85); transform-origin: top left; }
+            .controls-island { transform: translateY(-50%) scale(0.85); transform-origin: center right; }
+        }
+
+        @media (max-width: 600px) {
+            .split-container { flex-direction: column; }
+            .section-left { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
+            .section-right { height: 50%; }
+            .legend-card { transform: scale(0.5); max-width: 160px; }
+            .controls-island { transform: translateY(-50%) scale(0.5); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            Edmonds-Karp 动图详解
+        </div>
+        <div class="badge-start">Source: 0, Sink: 5</div>
+    </header>
+
+    <main>
+        <!-- 上半部分：图表 -->
+        <div class="panel-top">
+            <div id="canvas-wrapper">
+                <div class="legend-card">
+                    <div class="legend-item"><span class="dot" style="background:var(--color-path); border-color:#93c5fd;"></span>本轮增广路</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-bottle); border-color:#fca5a5;"></span>瓶颈边</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-reverse); border-color:#c4b5fd;"></span>反向残量边</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-scan); border-color:#fcd34d;"></span>BFS 正在检查</div>
+                    <div class="legend-item"><span class="dot" style="background:var(--color-full); border-color:#6ee7b7;"></span>满流边</div>
+                </div>
+
+                <div class="note-pill">实线标正向剩余容量，虚线标反向容量</div>
+
+                <canvas id="graphCanvas"></canvas>
+
+                <div class="controls-island">
+                    <button id="btnReset" class="btn" title="重置">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>重置</span>
+                    </button>
+                    <button id="btnPrev" class="btn" title="上一步">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        <span>后退</span>
+                    </button>
+                    <button id="btnPlay" class="btn btn-primary" title="自动播放">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>播放</span>
+                    </button>
+                    <button id="btnNext" class="btn" title="下一步">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        <span>前进</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 下半部分：数据 -->
+        <div class="panel-bottom">
+            <div class="panel-header">
+                <div class="status-badge">
+                    <div class="pulse-dot"></div>
+                    <span>当前操作</span>
+                </div>
+                <div id="statusText" class="status-text">
+                    准备就绪。
+                </div>
+            </div>
+
+            <div class="split-container">
+                <!-- 左下：状态表 -->
+                <div class="section-left">
+                    <div class="section-title">状态表 (STATE SUMMARY)</div>
+                    <div class="scroll-content">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th style="width: 35%">Metric</th><th>Value</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight:600; color:var(--text-sub);">当前总流量</td>
+                                    <td id="flowValue" style="font-family:'JetBrains Mono'; font-weight:700; font-size:1.1rem; color:var(--text-main);">0</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:600; color:var(--text-sub);">本轮瓶颈</td>
+                                    <td id="bottleValue">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight:600; color:var(--text-sub);">当前路径/队列</td>
+                                    <td id="pathText">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 右下：边列表 -->
+                <div class="section-right">
+                    <div class="section-title">边列表 (EDGE LIST)</div>
+                    <div class="scroll-content">
+                        <div id="edgeList" class="edge-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const nodes = {
+          "0": { x: 0.17, y: 0.52, label: "0" },
+          "1": { x: 0.36, y: 0.27, label: "1" },
+          "2": { x: 0.36, y: 0.77, label: "2" },
+          "3": { x: 0.62, y: 0.23, label: "3" },
+          "4": { x: 0.62, y: 0.75, label: "4" },
+          "5": { x: 0.84, y: 0.52, label: "5" }
+        };
+
+        const edges = [
+          { from: "0", to: "1", cap: 4 },
+          { from: "0", to: "2", cap: 2 },
+          { from: "1", to: "2", cap: 1 },
+          { from: "1", to: "4", cap: 4 },
+          { from: "2", to: "4", cap: 2 },
+          { from: "4", to: "5", cap: 3 },
+          { from: "1", to: "3", cap: 2 },
+          { from: "3", to: "5", cap: 3 }
+        ];
+
+        const steps = [
+          {
+            title: "初始化流网络", detailTitle: "初始状态",
+            text: "所有边的流量都是 0。BFS 从源点 0 出发，按输入边顺序寻找到汇点 5 的最短增广路。",
+            flow: 0, bottle: null, path: [], visited: [], queue: [], flows: {}
+          },
+          {
+            title: "第 1 轮 BFS：从 0 开始", detailTitle: "初始化 BFS 队列",
+            text: "把源点 0 入队，parent[0] 记为起点。接下来只沿正向剩余容量大于 0 的边扩展。",
+            flow: 0, bottle: null, path: [], visited: ["0"], queue: ["0"], flows: {}
+          },
+          {
+            title: "第 1 轮 BFS：展开 0", detailTitle: "发现 1 和 2",
+            text: "从 0 出发，边 0 -> 1 的剩余容量为 4，边 0 -> 2 的剩余容量为 2。BFS 记录 parent[1]=0、parent[2]=0，并把 1、2 入队。",
+            flow: 0, bottle: null, path: [["0", "1"], ["0", "2"]], scan: [["0", "1"], ["0", "2"]], visited: ["0", "1", "2"], queue: ["1", "2"], flows: {}
+          },
+          {
+            title: "第 1 轮 BFS：展开 1", detailTitle: "发现 4 和 3",
+            text: "按输入边顺序检查 1 的出边。1 -> 2 会到达已访问点 2；1 -> 4 和 1 -> 3 都有剩余容量，于是记录 parent[4]=1、parent[3]=1。",
+            flow: 0, bottle: null, path: [["0", "1"], ["1", "4"], ["1", "3"]], scan: [["1", "2"], ["1", "4"], ["1", "3"]], visited: ["0", "1", "2", "4", "3"], queue: ["2", "4", "3"], flows: {}
+          },
+          {
+            title: "第 1 轮 BFS：展开 2", detailTitle: "没有发现新节点",
+            text: "2 出队。检查 2 -> 4，虽然正向剩余容量为 2，但 4 已经被 1 发现过，所以 parent[4] 不会被改写。",
+            flow: 0, bottle: null, path: [], scan: [["2", "4"]], visited: ["0", "1", "2", "4", "3"], queue: ["4", "3"], flows: {}
+          },
+          {
+            title: "第 1 轮 BFS：展开 4 并到达 5", detailTitle: "回溯得到增广路",
+            text: "从 4 沿 4 -> 5 到达汇点 5。根据 parent 回溯得到 0 -> 1 -> 4 -> 5，瓶颈容量 min(4,4,3)=3。",
+            flow: 0, bottle: 3, path: [["0", "1"], ["1", "4"], ["4", "5"]], bottlenecks: [["4", "5"]], scan: [["4", "5"]], visited: ["0", "1", "2", "4", "3", "5"], queue: ["3", "5"], flows: {}
+          },
+          {
+            title: "第 1 轮增广：把 3 单位流送到 5", detailTitle: "更新正向边流量",
+            text: "沿 0 -> 1 -> 4 -> 5 增广 3。边 4 -> 5 被填满，当前流量变为 3。",
+            flow: 3, bottle: 3, path: [["0", "1"], ["1", "4"], ["4", "5"]], bottlenecks: [["4", "5"]], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：重新从 0 开始", detailTitle: "队列重置",
+            text: "上一轮增广后重新构造残量网络。把 0 入队，此时 0 -> 1 还剩 1，0 -> 2 还剩 2。",
+            flow: 3, bottle: null, path: [], visited: ["0"], queue: ["0"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：展开 0", detailTitle: "再次发现 1 和 2",
+            text: "0 -> 1 与 0 -> 2 都仍有正向剩余容量，所以 BFS 记录 parent[1]=0、parent[2]=0。",
+            flow: 3, bottle: null, path: [["0", "1"], ["0", "2"]], scan: [["0", "1"], ["0", "2"]], visited: ["0", "1", "2"], queue: ["1", "2"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：展开 1", detailTitle: "找到通往 3 的剩余边",
+            text: "检查 1 的边：1 -> 4 还有 1 单位剩余容量，1 -> 3 还有 2 单位剩余容量。BFS 记录 parent[4]=1、parent[3]=1。",
+            flow: 3, bottle: null, path: [["0", "1"], ["1", "4"], ["1", "3"]], scan: [["1", "4"], ["1", "3"]], visited: ["0", "1", "2", "4", "3"], queue: ["2", "4", "3"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：展开 2", detailTitle: "4 已经有 parent",
+            text: "2 出队后检查 2 -> 4。虽然这条边仍有 2 单位正向剩余容量，但 4 已经由 1 发现，因此 BFS 不更新 parent[4]。",
+            flow: 3, bottle: null, path: [], scan: [["2", "4"]], visited: ["0", "1", "2", "4", "3"], queue: ["4", "3"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：4 无法到达 5", detailTitle: "跳过满流边",
+            text: "从 4 检查 4 -> 5，但它的正向剩余容量为 0，所以不能沿这条边继续扩展。",
+            flow: 3, bottle: null, path: [], scan: [["4", "5"]], visited: ["0", "1", "2", "4", "3"], queue: ["3"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮 BFS：展开 3 并到达 5", detailTitle: "回溯得到第二条增广路",
+            text: "3 -> 5 的剩余容量为 3，因此到达汇点 5。回溯 parent 得到 0 -> 1 -> 3 -> 5，瓶颈是 0 -> 1 的剩余容量 1。",
+            flow: 3, bottle: 1, path: [["0", "1"], ["1", "3"], ["3", "5"]], bottlenecks: [["0", "1"]], scan: [["3", "5"]], visited: ["0", "1", "2", "4", "3", "5"], queue: ["5"], flows: { "0>1": 3, "1>4": 3, "4>5": 3 }
+          },
+          {
+            title: "第 2 轮增广：当前流量变为 4", detailTitle: "补满 0 -> 1",
+            text: "沿 0 -> 1 -> 3 -> 5 增广 1。现在 0 -> 1 已经满流，1 -> 3 和 3 -> 5 上各有 1 单位流。",
+            flow: 4, bottle: 1, path: [["0", "1"], ["1", "3"], ["3", "5"]], bottlenecks: [["0", "1"]], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "查看残量网络：反向容量已经出现", detailTitle: "反向容量等于当前正向流量",
+            text: "每条已经承载流量的正向边，都会在残量网络中产生一条反向虚线边。此时 1 -> 0、4 -> 1、5 -> 4、3 -> 1、5 -> 3 的反向容量分别等于对应正向边的当前流量。",
+            flow: 4, bottle: null, path: [], bottlenecks: [], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮 BFS：从 0 开始", detailTitle: "0 -> 1 已经不能走",
+            text: "重新从 0 开始 BFS。0 -> 1 的正向剩余容量为 0，所以跳过；0 -> 2 仍有 2 单位剩余容量，记录 parent[2]=0。",
+            flow: 4, bottle: null, path: [["0", "2"]], scan: [["0", "1"], ["0", "2"]], visited: ["0", "2"], queue: ["2"], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮 BFS：展开 2", detailTitle: "沿 2 -> 4 前进",
+            text: "从 2 检查 2 -> 4，正向剩余容量为 2，因此记录 parent[4]=2，并把 4 入队。",
+            flow: 4, bottle: null, path: [["0", "2"], ["2", "4"]], scan: [["2", "4"]], visited: ["0", "2", "4"], queue: ["4"], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮 BFS：展开 4", detailTitle: "用反向边回到 1",
+            text: "4 -> 5 已满，不能向汇点走。但残量网络中存在反向边 4 -> 1，容量为 3，于是 BFS 记录 parent[1]=4。",
+            flow: 4, bottle: null, path: [["0", "2"], ["2", "4"], ["4", "1"]], scan: [["4", "5"], ["4", "1"]], visited: ["0", "2", "4", "1"], queue: ["1"], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮 BFS：展开 1", detailTitle: "继续走到 3",
+            text: "从 1 检查 1 -> 3。它还剩 1 单位正向容量，所以记录 parent[3]=1，并把 3 入队。",
+            flow: 4, bottle: null, path: [["0", "2"], ["2", "4"], ["4", "1"], ["1", "3"]], scan: [["1", "3"]], visited: ["0", "2", "4", "1", "3"], queue: ["3"], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮 BFS：展开 3 并到达 5", detailTitle: "回溯得到第三条增广路",
+            text: "3 -> 5 还剩 2 单位正向容量，BFS 到达汇点。回溯得到 0 -> 2 -> 4 -> 1 -> 3 -> 5，瓶颈容量为 1。",
+            flow: 4, bottle: 1, path: [["0", "2"], ["2", "4"], ["4", "1"], ["1", "3"], ["3", "5"]], bottlenecks: [["1", "3"]], scan: [["3", "5"]], visited: ["0", "2", "4", "1", "3", "5"], queue: ["5"], flows: { "0>1": 4, "1>4": 3, "4>5": 3, "1>3": 1, "3>5": 1 }
+          },
+          {
+            title: "第 3 轮增广：撤销 1 -> 4 的 1 单位流", detailTitle: "重新分配到 1 -> 3",
+            text: "沿反向边 4 -> 1 增广，等价于把 1 -> 4 从 3 降到 2。同时 0 -> 2、2 -> 4、1 -> 3、3 -> 5 各增加 1，当前流量变为 5。",
+            flow: 5, bottle: 1, path: [["0", "2"], ["2", "4"], ["4", "1"], ["1", "3"], ["3", "5"]], bottlenecks: [["1", "3"]], flows: { "0>1": 4, "1>4": 2, "4>5": 3, "1>3": 2, "3>5": 2, "0>2": 1, "2>4": 1 }
+          },
+          {
+            title: "终止：残量网络中不存在 0 到 5 的路径", detailTitle: "得到最大流",
+            text: "此后 0 -> 2 还剩 1，但从 2 到 4 后无法再通过残量网络到达 5。当前流量 5 就是最大流。",
+            flow: 5, bottle: null, path: [], flows: { "0>1": 4, "1>4": 2, "4>5": 3, "1>3": 2, "3>5": 2, "0>2": 1, "2>4": 1 }
+          }
+        ];
+
+        const canvas = document.getElementById("graphCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        // UI 元素
+        const statusText = document.getElementById("statusText");
+        const flowValue = document.getElementById("flowValue");
+        const bottleValue = document.getElementById("bottleValue");
+        const pathText = document.getElementById("pathText");
+        const edgeList = document.getElementById("edgeList");
+        
+        // 控制按钮
+        const btnPrev = document.getElementById("btnPrev");
+        const btnNext = document.getElementById("btnNext");
+        const btnPlay = document.getElementById("btnPlay");
+        const btnReset = document.getElementById("btnReset");
+
+        let index = 0;
+        let animationInterval = null;
+
+        function key(from, to) { return `${from}>${to}`; }
+        function sameEdge(edge, pair) { return edge.from === pair[0] && edge.to === pair[1]; }
+        function reverseEdge(edge, pair) { return edge.from === pair[1] && edge.to === pair[0]; }
+        function edgeIn(edge, pairs = []) { return pairs.some(pair => sameEdge(edge, pair)); }
+        function reverseIn(edge, pairs = []) { return pairs.some(pair => reverseEdge(edge, pair)); }
+        function edgeFlow(step, edge) { return step.flows[key(edge.from, edge.to)] || 0; }
+
+        const reverseStyles = {
+          "0>1": { curve: -60, label: -18, labelPoint: [0.25, 0.40] },
+          "1>4": { curve: -70, label: -18, labelPoint: [0.48, 0.55] },
+          "4>5": { curve: 62, label: 20, labelPoint: [0.74, 0.68] },
+          "1>3": { curve: -58, label: -18, labelPoint: [0.49, 0.18] },
+          "3>5": { curve: -62, label: -18, labelPoint: [0.75, 0.34] },
+          "0>2": { curve: 46, label: 16, labelPoint: [0.25, 0.71] },
+          "2>4": { curve: 44, label: 16, labelPoint: [0.50, 0.84] }
+        };
+
+        const forwardLabelPoints = {
+          "0>1": [0.25, 0.49], "0>2": [0.25, 0.64], "1>2": [0.32, 0.55],
+          "1>4": [0.50, 0.48], "2>4": [0.50, 0.74], "4>5": [0.72, 0.57],
+          "1>3": [0.50, 0.26], "3>5": [0.74, 0.39]
+        };
+
+        function labelChanged(edge) {
+          if (index === 0) return false;
+          const current = edgeFlow(steps[index], edge);
+          const previous = edgeFlow(steps[index - 1], edge);
+          return current !== previous;
+        }
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const cs = getComputedStyle(wrapper);
+            const w = wrapper.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+            const h = wrapper.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+            
+            const ratio = window.devicePixelRatio || 1;
+            canvas.width = Math.max(300, w) * ratio;
+            canvas.height = Math.max(200, h) * ratio;
+            canvas.style.width = `${Math.max(300, w)}px`;
+            canvas.style.height = `${Math.max(200, h)}px`;
+            
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            draw();
+        }
+
+        function point(id) {
+          const rect = canvas.getBoundingClientRect();
+          return {
+            x: nodes[id].x * rect.width,
+            y: nodes[id].y * rect.height
+          };
+        }
+
+        function drawArrow(edge, step) {
+          const forwardActive = edgeIn(edge, step.path);
+          const reverseActive = reverseIn(edge, step.path);
+          const forwardScan = edgeIn(edge, step.scan);
+          const reverseScan = reverseIn(edge, step.scan);
+          const reverseBottle = reverseIn(edge, step.bottlenecks);
+          const reversed = reverseActive || reverseScan;
+          
+          const a = point(edge.from);
+          const b = point(edge.to);
+          const dx = b.x - a.x; const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy);
+          const ux = dx / len; const uy = dy / len;
+          const radius = 24;
+          const start = { x: a.x + ux * radius, y: a.y + uy * radius };
+          const end = { x: b.x - ux * radius, y: b.y - uy * radius };
+          
+          const active = forwardActive || reverseActive;
+          const scanning = forwardScan || reverseScan;
+          const bottle = edgeIn(edge, step.bottlenecks) || reverseBottle;
+          const f = edgeFlow(step, edge);
+          const full = f === edge.cap;
+          const changed = labelChanged(edge);
+
+          ctx.save();
+          ctx.lineWidth = active || scanning ? 5 : 3;
+          ctx.strokeStyle = bottle && !reversed ? "#ef4444" : scanning && !reversed ? "#f59e0b" : active && !reversed ? "#3b82f6" : full ? "#10b981" : "#94a3b8";
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.lineCap = "round";
+          
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+
+          const head = active || scanning ? 12 : 10;
+          ctx.beginPath();
+          ctx.moveTo(end.x, end.y);
+          ctx.lineTo(end.x - ux * head - uy * head * 0.55, end.y - uy * head + ux * head * 0.55);
+          ctx.lineTo(end.x - ux * head + uy * head * 0.55, end.y - uy * head - ux * head * 0.55);
+          ctx.closePath();
+          ctx.fill();
+
+          const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+          const nx = -uy; const ny = ux;
+          const label = `${edge.cap - f}`;
+          ctx.font = "800 13px 'JetBrains Mono', Consolas, monospace";
+          const width = ctx.measureText(label).width + 16;
+          
+          const rect = canvas.getBoundingClientRect();
+          const fixedLabel = forwardLabelPoints[key(edge.from, edge.to)];
+          const lx = fixedLabel ? fixedLabel[0] * rect.width : mid.x + nx * 22;
+          const ly = fixedLabel ? fixedLabel[1] * rect.height : mid.y + ny * 22;
+          
+          ctx.fillStyle = changed ? "#fef3c7" : "#ffffff";
+          roundedRect(lx - width / 2, ly - 13, width, 24, 7);
+          ctx.fill();
+          
+          ctx.strokeStyle = changed ? "#f59e0b" : bottle && !reversed ? "#fecaca" : scanning && !reversed ? "#fde68a" : active && !reversed ? "#bfdbfe" : "#e2e8f0";
+          ctx.lineWidth = changed ? 2 : 1;
+          roundedRect(lx - width / 2, ly - 13, width, 24, 7);
+          ctx.stroke();
+          
+          ctx.fillStyle = changed ? "#92400e" : bottle && !reversed ? "#b91c1c" : scanning && !reversed ? "#b45309" : active && !reversed ? "#1d4ed8" : full ? "#15803d" : "#475569";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, lx, ly);
+          ctx.restore();
+        }
+
+        function drawReverseResidual(edge, step) {
+          const f = edgeFlow(step, edge);
+          if (f <= 0) return;
+
+          const reverseActive = reverseIn(edge, step.path);
+          const reverseScan = reverseIn(edge, step.scan);
+          const reverseBottle = reverseIn(edge, step.bottlenecks);
+          const emphasized = reverseActive || reverseScan || reverseBottle;
+          
+          const a = point(edge.to); const b = point(edge.from);
+          const dx = b.x - a.x; const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy);
+          const ux = dx / len; const uy = dy / len;
+          const radius = 30;
+          const start = { x: a.x + ux * radius, y: a.y + uy * radius };
+          const end = { x: b.x - ux * radius, y: b.y - uy * radius };
+          
+          const nx = uy; const ny = -ux;
+          const style = reverseStyles[key(edge.from, edge.to)] || { curve: 48, label: 16 };
+          const curve = style.curve;
+          const control = {
+            x: (start.x + end.x) / 2 + nx * curve,
+            y: (start.y + end.y) / 2 + ny * curve
+          };
+
+          ctx.save();
+          ctx.strokeStyle = reverseBottle ? "#ef4444" : reverseScan ? "#f59e0b" : "#8b5cf6";
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.lineWidth = emphasized ? 5 : 3;
+          ctx.lineCap = "round";
+          ctx.setLineDash([8, 7]);
+          
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          const head = emphasized ? 12 : 10;
+          const tx = end.x - control.x; const ty = end.y - control.y;
+          const tLen = Math.hypot(tx, ty);
+          const tux = tx / tLen; const tuy = ty / tLen;
+          
+          ctx.beginPath();
+          ctx.moveTo(end.x, end.y);
+          ctx.lineTo(end.x - tux * head - tuy * head * 0.55, end.y - tuy * head + tux * head * 0.55);
+          ctx.lineTo(end.x - tux * head + tuy * head * 0.55, end.y - tuy * head - tux * head * 0.55);
+          ctx.closePath();
+          ctx.fill();
+
+          const mid = {
+            x: 0.25 * start.x + 0.5 * control.x + 0.25 * end.x,
+            y: 0.25 * start.y + 0.5 * control.y + 0.25 * end.y
+          };
+          const label = `${f}`;
+          ctx.font = "850 12px 'JetBrains Mono', Consolas, monospace";
+          const width = ctx.measureText(label).width + 14;
+          
+          const rect = canvas.getBoundingClientRect();
+          const lx = style.labelPoint ? style.labelPoint[0] * rect.width : mid.x + nx * style.label;
+          const ly = style.labelPoint ? style.labelPoint[1] * rect.height : mid.y + ny * style.label;
+          
+          ctx.fillStyle = "#f5f3ff";
+          roundedRect(lx - width / 2, ly - 12, width, 22, 7);
+          ctx.fill();
+          
+          ctx.strokeStyle = "#c4b5fd";
+          ctx.lineWidth = 1;
+          roundedRect(lx - width / 2, ly - 12, width, 22, 7);
+          ctx.stroke();
+          
+          ctx.fillStyle = "#6d28d9";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, lx, ly - 1);
+          ctx.restore();
+        }
+
+        function roundedRect(x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+        }
+
+        function drawNode(id, step) {
+          const p = point(id);
+          const isTerminal = id === "0" || id === "5";
+          const visited = (step.visited || []).includes(id);
+          const queued = (step.queue || []).includes(id);
+          
+          ctx.save();
+          ctx.fillStyle = isTerminal ? "#0f172a" : queued ? "#fffbeb" : visited ? "#eff6ff" : "#ffffff";
+          ctx.strokeStyle = isTerminal ? "#0f172a" : queued ? "#f59e0b" : visited ? "#3b82f6" : "#cbd5e1";
+          ctx.lineWidth = queued || visited ? 4 : 3;
+          
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 24, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          
+          ctx.fillStyle = isTerminal ? "#ffffff" : queued ? "#92400e" : visited ? "#1d4ed8" : "#0f172a";
+          ctx.font = "900 18px 'Plus Jakarta Sans', system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(nodes[id].label, p.x, p.y);
+          ctx.restore();
+        }
+
+        function draw() {
+          const rect = canvas.getBoundingClientRect();
+          ctx.clearRect(0, 0, rect.width, rect.height);
+          const step = steps[index];
+          edges.forEach(edge => drawArrow(edge, step));
+          edges.forEach(edge => drawReverseResidual(edge, step));
+          Object.keys(nodes).forEach(id => drawNode(id, step));
+        }
+
+        function renderEdgeList(step) {
+          edgeList.innerHTML = "";
+          edges.forEach(edge => {
+            const f = edgeFlow(step, edge);
+            const pct = Math.round((f / edge.cap) * 100);
+            const changed = labelChanged(edge);
+            
+            const card = document.createElement("div");
+            card.className = `edge-card ${changed ? 'updated anim-update' : ''}`;
+            card.innerHTML = `
+              <div class="edge-path">${edge.from} &rarr; ${edge.to}</div>
+              <div class="edge-bar-container">
+                  <div class="edge-bar-fill" style="width:${pct}%"></div>
+              </div>
+              <div class="edge-stats">
+                  <span class="edge-weight">f:${edge.cap - f}</span>
+                  <span class="edge-weight" style="background:#e0e7ff; color:#4338ca; font-weight:700;">r:${f}</span>
+              </div>
+            `;
+            edgeList.appendChild(card);
+          });
+        }
+
+        function render() {
+          const step = steps[index];
+          
+          // 更新状态提示
+          statusText.innerHTML = `<strong>${step.detailTitle}</strong>: ${step.text}`;
+          
+          // 更新状态表格
+          flowValue.textContent = step.flow;
+          
+          bottleValue.innerHTML = step.bottle == null ? "-" : `<span class="edge-weight" style="background:#fee2e2; color:#dc2626; font-size:0.9rem; padding:2px 8px;">${step.bottle}</span>`;
+          
+          if (step.path.length) {
+            pathText.innerHTML = `<span class="edge-weight" style="background:#eef2ff; color:#4f46e5; font-size:0.85rem;">${[step.path[0][0], ...step.path.map(pair => pair[1])].join(" &rarr; ")}</span>`;
+          } else if (step.queue && step.queue.length) {
+            pathText.innerHTML = `<span class="edge-weight" style="background:#fef3c7; color:#b45309; font-size:0.85rem;">[ ${step.queue.join(", ")} ]</span>`;
+          } else {
+            pathText.textContent = "-";
+          }
+
+          btnPrev.disabled = index === 0;
+          btnNext.disabled = index === steps.length - 1;
+          
+          renderEdgeList(step);
+          draw();
+        }
+
+        function togglePlay() {
+            if (animationInterval) { stopPlay(); } 
+            else {
+                if (index === steps.length - 1) index = 0;
+                btnPlay.classList.add('btn-danger');
+                btnPlay.classList.remove('btn-primary');
+                const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+                btnPlay.innerHTML = `${svg}<span>暂停</span>`;
+                
+                render();
+                animationInterval = setInterval(() => {
+                    if (index >= steps.length - 1) {
+                        stopPlay();
+                        return;
+                    }
+                    index++;
+                    render();
+                }, 1300);
+            }
+        }
+
+        function stopPlay() {
+            if(animationInterval) {
+                clearInterval(animationInterval); 
+                animationInterval = null;
+            }
+            btnPlay.classList.remove('btn-danger');
+            btnPlay.classList.add('btn-primary');
+            const svg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            btnPlay.innerHTML = `${svg}<span>播放</span>`;
+        }
+
+        btnPrev.addEventListener('click', () => { stopPlay(); if(index > 0) { index--; render(); } });
+        btnNext.addEventListener('click', () => { stopPlay(); if(index < steps.length - 1) { index++; render(); } });
+        btnReset.addEventListener('click', () => { stopPlay(); index = 0; render(); });
+        btnPlay.addEventListener('click', togglePlay);
+
+        window.addEventListener('resize', resizeCanvas);
+        
+        // 初始装载
+        setTimeout(() => {
+            resizeCanvas();
+            render();
+        }, 50);
+    </script>
+</body>
+</html>
