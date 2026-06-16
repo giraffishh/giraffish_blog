@@ -907,6 +907,20 @@ function updateUI(state) {
       const no = opt[j-1];
       const yes = job.w + opt[p[j]];
       const selected = yes > no;
+      const inCurrentSolution = chosen.has(j);
+      let decisionText;
+      let decisionClass;
+
+      if (state.finalMode) {
+        decisionText = inCurrentSolution ? '最终选中' : '未选中';
+        decisionClass = inCurrentSolution ? 'green' : 'muted';
+      } else if (j === state.current) {
+        decisionText = selected ? '本步选' : '本步不选';
+        decisionClass = selected ? 'green' : 'muted';
+      } else {
+        decisionText = inCurrentSolution ? '保留' : '移除';
+        decisionClass = inCurrentSolution ? 'green' : 'muted';
+      }
       const tr = document.createElement('tr');
       if (j === state.current) tr.className = 'anim-update';
       tr.innerHTML = `
@@ -918,7 +932,7 @@ function updateUI(state) {
         <td class="mono">${no}</td>
         <td class="mono">${job.w}+OPT(${p[j]})=${yes}</td>
         <td class="mono strong primary">${opt[j]}</td>
-        <td class="strong ${selected ? 'green' : 'muted'}">${selected ? '选' : '不选'}</td>
+        <td class="strong ${decisionClass}">${decisionText}</td>
       `;
       body.appendChild(tr);
     }

@@ -12,7 +12,7 @@ comments: true
 typora-root-url: ..
 abbrlink: 395236f4
 date: 2026-03-14 11:06:58
-updated: 2026-06-11 10:58:15
+updated: 2026-06-16 18:58:21
 
 ---
 
@@ -1028,6 +1028,8 @@ style="height: 82vh; border: 1px solid #e2e8f0; border-radius: 8px;"
 frameborder="0"
 sandbox="allow-scripts allow-same-origin"
 ></iframe>
+
+
 ### 正确性：最大流最小割定理
 
 最大流算法的正确性通常通过**最大流最小割定理 (Max-Flow Min-Cut Theorem)** 来理解。
