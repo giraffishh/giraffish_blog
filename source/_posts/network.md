@@ -12,7 +12,7 @@ comments: true
 typora-root-url: ..
 abbrlink: 29d037f1
 date: 2026-04-22 00:55:53
-updated: 2026-04-27 11:24:08
+updated: 2026-06-18 00:47:09
 
 ---
 
@@ -173,7 +173,7 @@ $$
 >**1. 应用层 (Application Layer)**
 >
 >- **动作：** 浏览器生成了一段 HTTP 请求报文，内容大意是：`GET / HTTP/1.1`（意思是：我要获取首页内容）。
->- **当前状态：** 这就是纯粹的**【原始数据】**。
+>- **当前状态：** 这就是纯粹的 **【原始数据】**。
 >
 >**2. 传输层 (Transport Layer)**
 >
@@ -2592,3 +2592,3291 @@ QUIC 最重要的一个优势之一，是它支持多个独立的 **streams**。
 
 - **TCP + TLS** 更像传统方案
 - **QUIC over UDP** 更像为现代 Web 优化的新方案
+
+## Network Layer: Data Plane 网络层数据平面
+
+网络层（Network Layer）负责把传输层交下来的 segment 从源主机送到目的主机。
+
+在发送端：
+
+- 网络层把 transport-layer segment 封装成 **datagram（数据报）**
+- 然后把 datagram 交给链路层继续传输
+
+在接收端：
+
+- 网络层从收到的 datagram 中取出 transport-layer segment
+- 再交给对应的传输层协议，例如 TCP 或 UDP
+
+网络层协议不仅存在于主机中，也存在于路由器中。路由器会检查经过自己的 IP datagram 的首部字段，并把 datagram 从输入端口移动到合适的输出端口，使其沿着端到端路径继续前进。
+
+### Network Layer Overview
+
+#### 1. Forwarding 和 Routing
+
+网络层有两个特别核心的功能：
+
+- **Forwarding（转发）**
+  - 是单个路由器内部的本地动作
+  - 作用是把 packet 从输入链路移动到合适的输出链路
+  - 可以理解为：在一个路口，根据当前路标决定该从哪个出口出去
+
+- **Routing（路由选择）**
+  - 是全网范围的路径选择问题
+  - 作用是决定 packet 从源到目的地整体应该走哪条路
+  - 通常由 routing algorithms 或 SDN controller 完成
+
+所以：
+
+- forwarding 关注 **当前 router 怎么转发**
+- routing 关注 **端到端路径怎么决定**
+
+#### 2. Data plane 和 Control plane
+
+网络层可以分成两个平面：
+
+- **data plane：数据平面**
+
+  数据平面关心的是：
+
+  > 一个数据包已经到达某个路由器了，这个路由器应该怎么处理它？
+
+  常见操作包括：
+
+  ```
+  收到包
+    ↓
+  查看 IP 头部中的目的地址
+    ↓
+  查转发表 forwarding table
+    ↓
+  决定从哪个端口发出去
+    ↓
+  排队、转发
+  ```
+
+- **control plane：控制平面**
+
+  控制平面关心的是：
+
+  > 路由器的转发表是怎么来的？
+
+  它处理的是更全局的问题，例如：
+
+  ```
+  网络拓扑是什么？
+  哪条路径最短？
+  链路坏了怎么办？
+  不同自治系统之间怎么选路？
+  ```
+
+  控制平面通过路由协议计算路径，然后生成数据平面使用的转发表。
+
+可以简单记成：
+
+- **data plane 数据平面**：负责“每个路由器收到一个包后，具体怎么处理、怎么转发出去”
+- **control plane 控制平面**：负责“路由表/转发表是怎么被算出来的”，比如路由算法、OSPF、BGP 等
+
+#### 3. Network-layer service model
+
+网络层可以理论上提供很多服务，例如：
+
+- 对单个 datagram 保证一定送达
+- 保证 datagram 在某个 delay bound 内送达
+- 对一个 flow 保证按序交付
+- 对一个 flow 保证最小带宽
+- 限制 packet 间隔变化，也就是 jitter
+
+不同网络体系结构的服务模型可以粗略比较为：
+
+| Network architecture | Service model | Bandwidth guarantee | Loss guarantee | Order guarantee | Timing guarantee |
+|---|---|---|---|---|---|
+| Internet | Best effort | No | No | No | No |
+| ATM | Constant Bit Rate | Constant rate | Yes | Yes | Yes |
+| ATM | Available Bit Rate | Guaranteed minimum | No | Yes | No |
+| Internet Intserv | Guaranteed service | Yes | Yes | Yes | Yes |
+| Internet Diffserv | Differentiated service | Possible | Possible | Possible | No strict guarantee |
+
+但 Internet 的网络层采用的是 **best-effort service model（尽力而为服务模型）**。
+
+这意味着 Internet 不保证：
+
+- datagram 一定成功到达目的地
+- datagram 一定按顺序到达
+- datagram 一定在某个时间内到达
+- 某个端到端 flow 一定有固定带宽
+
+它听起来很弱，但之所以成功，是因为：
+
+- 机制足够简单，容易大规模部署
+- 带宽增加后，很多实时应用已经“足够好用”
+- CDN、数据中心等应用层分布式系统可以把内容放得离用户更近
+- TCP 等端系统协议会在拥塞时自我调节
+
+所以 Internet 的核心设计不是在网络层提供强保证，而是让网络层尽量简单，把很多复杂性放到端系统和应用层。
+
+### Router Architecture 路由器结构
+
+#### 1. 路由器的基本组成
+
+一个典型 router 可以分成四部分：
+
+- **Input ports（输入端口）**
+- **Switching fabric（交换结构）**
+- **Output ports（输出端口）**
+- **Routing processor（路由处理器）**
+
+其中：
+
+- input/output ports 和 switching fabric 主要属于 **data plane**
+- routing processor 主要属于 **control plane**
+
+#### 2. Input port functions
+
+输入端口通常要完成三层工作：
+
+1. **Line termination**
+   - 完成物理层的 bit-level 接收
+
+2. **Link-layer protocol receive logic**
+   - 处理链路层协议，例如 Ethernet
+
+3. **Lookup, forwarding and queueing**
+   - 根据 packet header 查 forwarding table
+   - 决定输出端口
+   - 如果来得太快，可能在 input port 排队
+
+现代路由器通常采用 **decentralized switching（分布式交换）**：
+
+- 每个 input port 自己完成查表
+- forwarding table entry 存在 input port 的内存中
+- 目标是在 line speed 下完成输入端口处理
+
+#### 3. Destination-based forwarding
+
+传统 IP forwarding 是 **destination-based forwarding**：只根据目的 IP 地址决定输出端口
+
+路由器维护 forwarding table，把目的地址范围或前缀映射到输出接口。
+
+但是 IP 地址范围不一定总能整齐分割，因此实际转发中需要使用：**Longest Prefix Matching（最长前缀匹配）**
+
+#### 4. Longest Prefix Matching
+
+最长前缀匹配的规则是：
+
+> 当多个 forwarding table entries 都能匹配目的地址时，选择匹配前缀最长的那个。
+
+例如：
+
+| Destination Address Prefix | Interface |
+|---|---:|
+| `11001000 00010111 00010*** ********` | 0 |
+| `11001000 00010111 00011000 ********` | 1 |
+| `11001000 00010111 00011*** ********` | 2 |
+| Otherwise | 3 |
+
+如果目的地址是：
+
+```text
+11001000 00010111 00011000 10101010
+```
+
+它既可能落入较宽的范围，也可能匹配更具体的前缀。此时要选择最长匹配：
+
+```text
+11001000 00010111 00011000
+```
+
+所以输出接口是 `1`。
+
+最长前缀匹配和 IP 的层次化地址结构密切相关，它也是路由聚合能够工作的基础。
+
+实现上，路由器常使用 **TCAM（Ternary Content Addressable Memory）**：
+
+- 可以在一个 clock cycle 中完成匹配
+- 查找时间基本不依赖表大小
+- ternary 指每一位可以是 `0`、`1` 或 `*`
+
+#### 5. Switching fabric
+
+**Switching fabric（交换结构）** 的作用是：
+
+- 把 packet 从 input link 转移到合适的 output link
+
+交换速率通常用相对于 line rate 的倍数衡量。
+
+如果有 `N` 个输入端口，理想情况下 switching fabric 的速率至少应该达到：
+
+$$
+N \times \text{line rate}
+$$
+
+这样才不容易成为瓶颈。
+
+常见的 switching fabric 有三类：
+
+**（1）Switching via memory**
+
+- 早期 router 像传统计算机
+- packet 先被复制到系统内存，再从内存复制到输出端口
+- 每个 datagram 要穿过系统总线两次
+- 性能受内存带宽限制
+
+**（2）Switching via bus**
+
+- input port 把 datagram 通过共享 bus 传到 output port
+- bus contention 会限制整体交换速度
+- 性能受 bus bandwidth 限制
+
+**（3）Switching via interconnection network**
+
+- 使用 crossbar、Clos network 等互连网络
+- 可以支持更高并行度
+- 有些实现会把 datagram 切成固定长度 cells，进入交换结构后并行转发，出口再重组
+
+高端路由器还可能使用多个 switching planes 并行工作，进一步提高吞吐量。
+
+#### 6. Input port queueing 和 HOL blocking
+
+如果 switching fabric 的处理速度小于所有输入端口的到达总速率，packet 就会在 input port 排队。
+
+这会带来：
+
+- queueing delay
+- input buffer overflow 导致 packet loss
+
+输入排队中特别重要的问题是 **Head-of-the-Line blocking（HOL blocking，队首阻塞）**。
+
+它的意思是：
+
+- 队首 packet 因为目标输出端口繁忙而无法前进
+- 它后面的 packet 即使目标输出端口空闲，也会被挡住
+
+所以 HOL blocking 会让输入队列的吞吐率下降。
+
+#### 7. Output port queueing
+
+如果 switching fabric 把 datagram 送到某个 output port 的速度超过了该输出链路的传输速率，就会发生 output port queueing。
+
+输出端口排队时有两个关键问题：
+
+- **Drop policy**
+  - buffer 满了以后丢哪个 packet
+
+- **Scheduling discipline**
+  - 下一步应该发送哪个 queued packet
+
+所以输出端口不仅影响 packet loss，也影响不同类型流量获得的服务质量。
+
+#### 8. Buffer management
+
+Buffer management 决定两类事情：
+
+**Dropping**
+
+- buffer 满时如何丢包
+- **Tail drop**：直接丢弃新到达的 packet
+- **Priority-based drop**：根据优先级丢弃或移除 packet
+
+**Marking**
+
+- 不一定立刻丢包，也可以给 packet 做拥塞标记
+- 例如 ECN 或 random early drop
+
+关于 buffer 大小，经典经验公式是：
+
+$$
+Buffer \approx RTT \times C
+$$
+
+其中 `C` 是链路容量。
+
+如果有 `N` 条 flow，更现代的经验公式是：
+
+$$
+Buffer \approx \frac{RTT \times C}{\sqrt{N}}
+$$
+
+需要注意的是，buffer 不是越大越好。过大的 buffer 会带来很长的排队时延，也就是常说的 **bufferbloat**。
+
+#### 9. Packet scheduling
+
+**Packet scheduling** 决定输出链路下一步发送哪个 packet。
+
+常见调度策略包括：
+
+**FCFS / FIFO**
+
+- First Come, First Served
+- 按到达顺序发送
+- 最简单，但无法区分流量优先级
+
+**Priority scheduling**
+
+- 根据 header fields 把 packet 分到不同优先级队列
+- 总是优先发送最高优先级的非空队列
+- 同一优先级内部通常使用 FCFS
+- 缺点是低优先级流量可能长期等待
+
+**Round Robin (RR)**
+
+- 把流量分成多个 class queue
+- 调度器轮流扫描各个队列
+- 每个非空队列一次发送一个 packet
+
+**Weighted Fair Queuing (WFQ)**
+
+- 是 generalized round robin
+- 每个 class `i` 有权重 $w_i$
+- class `i` 获得的服务比例约为：
+
+$$
+\frac{w_i}{\sum_j w_j}
+$$
+
+WFQ 可以为不同流量类别提供带宽比例上的保证。
+
+### IP: The Internet Protocol
+
+#### 1. Internet 网络层的组成
+
+Internet 网络层主要包括：
+
+- **IP protocol**
+  - datagram format
+  - addressing
+  - packet handling conventions
+
+- **ICMP**
+  - error reporting
+  - router signaling
+
+- **Path-selection algorithms**
+  - 由 OSPF、BGP 等 routing protocols 实现
+  - 或由 SDN controller 统一计算
+
+#### 2. IPv4 datagram format
+
+IPv4 datagram header 中常见字段如下：
+
+| Field | Meaning |
+|---|---|
+| Version | IP 协议版本，IPv4 中为 4 |
+| Header length | IP header 长度 |
+| Type of service | Diffserv 和 ECN 相关字段 |
+| Length | 整个 IP datagram 的长度 |
+| 16-bit identifier | 分片和重组时用于识别同一个原始 datagram |
+| Flags | 分片控制 |
+| Fragment offset | 分片在原始 datagram 中的位置 |
+| Time to live (TTL) | 剩余最大跳数，每经过一个 router 减 1 |
+| Upper layer | 上层协议，例如 TCP 或 UDP |
+| Header checksum | 只检查 IP header 的差错 |
+| Source IP address | 源 IP 地址 |
+| Destination IP address | 目的 IP 地址 |
+| Options | 可选字段，例如 timestamp、record route |
+| Payload data | 通常是 TCP 或 UDP segment |
+
+补充几点：
+
+- IPv4 地址长度是 32 bits
+- IP datagram 最大长度是 64 KB
+- 常见 Ethernet MTU 是 1500 bytes
+- 不考虑 options 时，IP header 通常是 20 bytes
+- TCP header 通常也是 20 bytes
+
+所以一个常见 TCP/IP packet 的基础首部开销是：
+
+$$
+20 + 20 = 40 \text{ bytes}
+$$
+
+#### 3. IP address 和 interface
+
+IP address 是和 **interface（接口）** 绑定的，而不是简单地和“设备”绑定。
+
+Interface 指的是：
+
+- host/router 和物理链路之间的连接点
+
+通常：
+
+- router 有多个 interfaces
+- host 可能有一个或多个 interfaces，例如有线网卡和 Wi-Fi 网卡
+
+IPv4 地址是 32-bit identifier，通常写成 dotted-decimal notation：
+
+```text
+223.1.1.1
+= 11011111 00000001 00000001 00000001
+```
+
+#### 4. Subnet 子网
+
+**Subnet（子网）** 可以理解为：
+
+- 一组不经过 router 就能彼此物理到达的 device interfaces
+
+IP 地址具有结构：
+
+- 高位部分是 **subnet part**
+- 低位部分是 **host part**
+
+例如：
+
+```text
+223.1.1.0/24
+```
+
+表示：
+
+- 前 24 bits 是 subnet part
+- 剩下 8 bits 是 host part
+
+定义子网的一种方法是：
+
+1. 把每个 interface 从 host 或 router 上“拆开”
+2. 剩下每一个互相连通的 isolated network 就是一个 subnet
+
+#### 5. CIDR
+
+**CIDR（Classless InterDomain Routing，无类别域间路由）** 允许 subnet part 具有任意长度。
+
+格式是：
+
+```text
+a.b.c.d/x
+```
+
+其中：
+
+- `x` 表示 subnet part 的 bit 数
+
+例如：
+
+```text
+200.23.16.0/23
+```
+
+表示前 23 bits 是网络前缀，剩余 9 bits 是 host part。
+
+#### 6. Subnet mask
+
+Subnet mask 用来从 IP address 中取出 subnet part。
+
+例如：
+
+```text
+192.168.10.3/23
+= 11000000.10101000.00001010.00000011
+
+/23 mask
+= 11111111.11111111.11111110.00000000
+= 255.255.254.0
+```
+
+所以该地址对应的子网是：
+
+```text
+192.168.10.0/23
+```
+
+host 地址范围大致覆盖：
+
+```text
+192.168.10.0 ~ 192.168.11.255
+```
+
+一共有：
+
+$$
+2^{32-23} = 2^9 = 512
+$$
+
+个地址。
+
+> 实际可用 host 地址通常还要扣除 network address 和 broadcast address，但课件这里重点是理解 bit 数量关系。
+
+#### 7. DHCP
+
+主机获得 IP 地址有两种方式：
+
+- 管理员手动配置
+- 通过 **DHCP（Dynamic Host Configuration Protocol）** 动态获取
+
+DHCP 的目标是：
+
+- host 加入网络时，从 network server 动态获得 IP 地址
+
+DHCP 的典型四步过程是：
+
+1. **DHCP Discover**
+   - client 广播：“有没有 DHCP server？”
+
+2. **DHCP Offer**
+   - server 回复：“我可以给你这个 IP”
+
+3. **DHCP Request**
+   - client 请求使用这个 IP
+
+4. **DHCP ACK**
+   - server 确认分配
+
+典型端口号：
+
+- DHCP server：UDP 67
+- DHCP client：UDP 68
+
+在 client 还没有 IP 地址时，源地址可能是：
+
+```text
+0.0.0.0
+```
+
+广播目的地址可能是：
+
+```text
+255.255.255.255
+```
+
+DHCP 不只分配 IP 地址，还可以告诉 client：
+
+- first-hop router / gateway
+- DNS server 的名称和 IP 地址
+- subnet mask
+
+虽然 DHCP 是应用层协议，但因为它直接服务于 IP 地址分配，所以经常在网络层章节中讨论。
+
+#### 8. 地址分配和层次化路由
+
+一个网络如何获得自己的 subnet prefix？
+
+通常是：
+
+- 从 provider ISP 的地址空间中分配一块
+
+例如 ISP 拥有：
+
+```text
+200.23.16.0/20
+```
+
+它可以继续切成多个更小的 block 分配给组织：
+
+| Organization | CIDR block |
+|---:|---|
+| 0 | `200.23.16.0/23` |
+| 1 | `200.23.18.0/23` |
+| 2 | `200.23.20.0/23` |
+| ... | ... |
+| 7 | `200.23.30.0/23` |
+
+这种层次化地址结构允许 **route aggregation（路由聚合）**。
+
+例如 ISP 可以对外只宣布：
+
+```text
+Send me anything beginning with 200.23.16.0/20
+```
+
+这样一个聚合前缀就覆盖了多个组织的更小前缀，减少 routing table 规模。
+
+如果某个组织迁移到了另一个 ISP，新的 ISP 可以宣布更具体的 route，例如：
+
+```text
+200.23.18.0/23
+```
+
+由于路由器使用 longest prefix matching，更具体的 `/23` 会优先于更宽泛的 `/20`。
+
+#### 9. ICANN 和 IPv4 地址耗尽
+
+IP 地址块的全球分配由 **ICANN（Internet Corporation for Assigned Names and Numbers）** 负责协调。
+
+ICANN 的职责包括：
+
+- 通过区域注册机构分配 IP 地址
+- 管理 DNS root zone
+- 委派 `.com`、`.edu` 等顶级域名的管理
+
+IPv4 地址只有 32 bits，地址空间有限。2011 年，ICANN 已经把最后一批 IPv4 地址分配给区域注册机构。
+
+应对 IPv4 地址耗尽的两个重要方向是：
+
+- NAT
+- IPv6
+
+### NAT and IPv6
+
+#### 1. NAT 的基本思想
+
+**NAT（Network Address Translation，网络地址转换）** 的核心思想是：
+
+- 局域网内部设备使用 private IP address
+- 对外通信时，共享一个或少数几个 public IP address
+- NAT router 通过端口号区分不同内部连接
+
+常见 private IP address ranges 包括：
+
+- `10.0.0.0/8`
+- `172.16.0.0/12`
+- `192.168.0.0/16`
+
+例如局域网内部是：
+
+```text
+10.0.0.0/24
+```
+
+NAT router 对外 public IP 是：
+
+```text
+138.76.29.7
+```
+
+那么外部网络看到的不是每台内网主机，而是同一个 NAT public IP 加不同端口号。
+
+#### 2. NAT 的实现
+
+对 outgoing datagram：
+
+- NAT router 把源地址和源端口：
+
+```text
+(source IP, source port)
+```
+
+替换成：
+
+```text
+(NAT IP, new port)
+```
+
+同时在 NAT translation table 中记录映射：
+
+```text
+(source IP, source port) <-> (NAT IP, new port)
+```
+
+对 incoming datagram：
+
+- 外部服务器把回复发给 `(NAT IP, new port)`
+- NAT router 查表
+- 把目的地址和目的端口改回内部主机的 `(source IP, source port)`
+
+例子：
+
+| Step | Address |
+|---|---|
+| 内部主机发出 | `10.0.0.1:3345 -> 128.119.40.186:80` |
+| NAT 改写后 | `138.76.29.7:5001 -> 128.119.40.186:80` |
+| 外部回复 | `128.119.40.186:80 -> 138.76.29.7:5001` |
+| NAT 改回后 | `128.119.40.186:80 -> 10.0.0.1:3345` |
+
+#### 3. NAT 的优点和争议
+
+NAT 的优点：
+
+- 整个局域网只需要一个 public IP
+- 内部主机地址改变时，不需要通知外部网络
+- 更换 ISP 时，内部地址可以不变
+- 外部主机通常不能直接访问内部设备，有一定隐藏效果
+
+NAT 的争议：
+
+- router 理想上只应该处理到网络层，但 NAT 需要修改 transport-layer port number
+- 它破坏了 end-to-end argument
+- 内网主机作为 server 时，外部连接进来会比较麻烦
+- NAT traversal 需要额外机制
+
+尽管有争议，NAT 仍然被广泛使用在：
+
+- 家庭网络
+- 企业和校园网络
+- 4G/5G cellular networks
+- Carrier-grade NAT
+
+#### 4. NAT traversal 和 STUN
+
+如果主机在 NAT 后面，它可能不知道外部世界看到的自己是什么地址和端口。
+
+一种思路是使用外部服务器帮助发现映射，例如 STUN 风格的过程：
+
+1. 内网主机向公网 STUN server 发送请求：“外面看到我是谁？”
+2. STUN server 根据收到的 packet 源地址和端口回复
+3. 内网主机得知自己的 public-facing address/port
+
+这类机制常用于需要点对点通信的应用。
+
+#### 5. Carrier-grade NAT
+
+NAT 可以嵌套。
+
+家庭网络中：
+
+- 设备使用 `192.168.0.x`
+- 家庭路由器对 ISP 侧可能使用 `2.2.2.x`
+
+ISP 网络中：
+
+- 运营商再使用 Carrier-grade NAT
+- 把大量客户网络映射到更少的真正 public IPv4 address，例如 `5.5.5.5`
+
+这进一步缓解 IPv4 地址紧张，但也让端到端连接、追踪和 NAT traversal 更复杂。
+
+#### 6. IPv6 的动机
+
+IPv6 最初的核心动机是：
+
+- IPv4 的 32-bit 地址空间不够用
+
+此外 IPv6 还希望：
+
+- 使用固定 40-byte header 加快处理和转发
+- 支持对 flow 的不同网络层处理
+
+IPv6 地址长度是：
+
+$$
+128 \text{ bits}
+$$
+
+远大于 IPv4 的 32 bits。
+
+#### 7. IPv6 datagram format
+
+IPv6 header 中主要字段包括：
+
+| Field | Meaning |
+|---|---|
+| Version | IPv6 版本 |
+| Priority | 标识同一 flow 中 datagram 的优先级 |
+| Flow label | 标识属于同一个 flow 的 datagrams |
+| Payload length | payload 长度 |
+| Next header | 下一个上层协议或扩展头 |
+| Hop limit | 类似 IPv4 TTL |
+| Source address | 128-bit 源地址 |
+| Destination address | 128-bit 目的地址 |
+| Payload | 数据载荷 |
+
+和 IPv4 相比，IPv6 base header 中去掉了：
+
+- **checksum**
+  - router 不需要每跳重新计算 header checksum
+  - 有助于加快处理
+
+- **fragmentation/reassembly by routers**
+  - router 不再负责分片和重组
+
+- **options**
+  - options 不在 base header 中，而是通过 extension headers 处理
+
+#### 8. IPv4 到 IPv6 的过渡：Tunneling
+
+IPv6 不可能让全网 router 在同一天同时升级。
+
+所以过渡阶段会存在：
+
+- IPv6 routers
+- IPv4 routers
+- 混合路径
+
+一种常用方法是 **tunneling（隧道）**：
+
+- IPv6 datagram 被作为 payload 封装进 IPv4 datagram
+- 穿过 IPv4-only network
+- 到达 tunnel endpoint 后再解封装成 IPv6 datagram
+
+可以写成：
+
+```text
+IPv6 datagram
+  -> encapsulated inside IPv4 datagram
+      -> carried across IPv4 network
+  -> decapsulated back to IPv6 datagram
+```
+
+注意：
+
+- outer IPv4 header 的 source/destination 是隧道两端的 IPv4 router
+- inner IPv6 header 的 source/destination 才是真正 IPv6 通信两端
+
+### Generalized Forwarding and SDN
+
+#### 1. Match plus action
+
+传统 destination-based forwarding 只根据目的 IP 地址转发。
+
+**Generalized forwarding（通用转发）** 更一般：
+
+- 匹配 arriving packet header 中的某些字段
+- 然后执行某个 action
+
+这就是 **match plus action** 抽象。
+
+可以匹配的字段可以来自：
+
+- link layer
+- network layer
+- transport layer
+
+可执行的 action 包括：
+
+- forward
+- drop
+- modify
+- copy
+- log
+- send to controller
+
+在 SDN / OpenFlow 语境下，forwarding table 也常被称为 **flow table**。
+
+#### 2. Flow table
+
+一个 generalized forwarding rule 通常包含：
+
+| Component | Meaning |
+|---|---|
+| Match | 要匹配的 header fields |
+| Action | 对匹配 packet 执行的操作 |
+| Priority | 多条规则同时匹配时决定优先级 |
+| Counters / Stats | 统计 packet 数和 byte 数 |
+
+例如：
+
+| Priority | Match | Action |
+|---:|---|---|
+| 1 | `src=10.1.2.3, dest=*.*.*.*` | Send to controller |
+| 2 | `src=1.2.*.*, dest=*.*.*.*` | Drop |
+| 3 | `src=*.*.*.*, dest=3.4.*.*` | Forward to port 2 |
+
+其中 `*` 表示 wildcard。
+
+#### 3. OpenFlow examples
+
+OpenFlow 的 flow table entry 可以匹配多层字段：
+
+| Layer | Fields |
+|---|---|
+| Link layer | ingress port、source MAC、destination MAC、Ethernet type、VLAN ID |
+| Network layer | IP ToS、IP protocol、IP source、IP destination |
+| Transport layer | TCP/UDP source port、TCP/UDP destination port |
+
+几个典型规则：
+
+**Destination-based forwarding**
+
+```text
+Match:  IP Dst = 51.6.0.8
+Action: forward(port 6)
+```
+
+**Firewall blocking SSH**
+
+```text
+Match:  TCP destination port = 22
+Action: drop
+```
+
+**Blocking a source host**
+
+```text
+Match:  IP Src = 128.119.1.1
+Action: drop
+```
+
+**Layer 2 forwarding**
+
+```text
+Match:  MAC Dst = 22:A7:23:11:E1:02
+Action: forward(port 3)
+```
+
+#### 4. Match plus action 的统一视角
+
+match plus action 可以统一解释很多网络设备：
+
+| Device | Match | Action |
+|---|---|---|
+| Router | Longest destination IP prefix | Forward out a link |
+| Switch | Destination MAC address | Forward or flood |
+| Firewall | IP addresses and TCP/UDP port numbers | Permit or deny |
+| NAT | IP address and port | Rewrite address and port |
+
+也就是说，不同设备的区别往往在于：
+
+- 匹配哪些字段
+- 执行什么动作
+
+SDN 的关键在于：
+
+- flow rules 可以由 controller 统一下发
+- 多台 switch/router 的规则组合起来，就能形成 network-wide behavior
+
+#### 5. Network programmability
+
+Generalized forwarding 是一种简单的网络可编程性：
+
+- 对 packet header 做匹配
+- 对匹配 packet 执行预设动作
+
+更进一步的网络可编程技术包括：
+
+- OpenFlow
+- P4
+
+本章重点是 data plane，所以 flow table 怎么计算、怎么下发，属于后续 control plane 章节。
+
+### IP Fragmentation and Reassembly
+
+#### 1. 为什么需要 IP fragmentation
+
+不同链路有不同的 **MTU（Maximum Transmission Unit）**。
+
+MTU 表示：
+
+- 链路层 frame 能承载的最大数据量
+
+如果一个 IP datagram 太大，超过了下一跳链路的 MTU，就可能需要被拆成多个更小的 datagrams，这就是 **IP fragmentation（IP 分片）**。
+
+IPv4 中：
+
+- 一个大 datagram 可以在网络中被分成多个 fragments
+- fragments 只在最终目的主机处 reassemble
+- 中间 router 不负责重组
+
+用于分片和重组的关键 header 字段包括：
+
+- identification
+- flags
+- fragment offset
+
+#### 2. Fragmentation example
+
+假设：
+
+- 原始 IP datagram 长度是 4000 bytes
+- MTU 是 1500 bytes
+- IP header 是 20 bytes
+
+那么每个 full-size fragment 最多携带：
+
+$$
+1500 - 20 = 1480 \text{ bytes}
+$$
+
+原始 datagram 分片如下：
+
+| Fragment | ID | Offset | Fragment flag | Length | Data bytes |
+|---:|---|---:|---:|---:|---:|
+| 1 | x | 0 | 1 | 1500 | 1480 |
+| 2 | x | 185 | 1 | 1500 | 1480 |
+| 3 | x | 370 | 0 | 1040 | 1020 |
+
+这里 offset 的单位不是 byte，而是 8 bytes。
+
+所以：
+
+$$
+\frac{1480}{8} = 185
+$$
+
+因此：
+
+- 第一个 fragment 的 offset 是 `0`
+- 第二个 fragment 的 offset 是 `185`
+- 第三个 fragment 的 offset 是 `370`
+
+Fragment flag 的含义：
+
+- `1` 表示后面还有 fragment
+- `0` 表示这是最后一个 fragment
+
+所以前两个 fragments 的 flag 为 `1`，最后一个 fragment 的 flag 为 `0`。
+
+#### 3. 分片的影响
+
+IP fragmentation 会带来额外复杂性：
+
+- 每个 fragment 都需要自己的 IP header
+- 任何一个 fragment 丢失，原始 datagram 都无法完整重组
+- 分片会增加端系统重组负担
+
+因此现代网络通常倾向于通过路径 MTU 发现等方式避免中间路由器频繁分片。
+
+### Conclusion
+
+#### 1. 本章核心链条
+
+可以把本章串成一条线：
+
+```text
+Network layer service
+  -> router architecture
+  -> IP datagram and addressing
+  -> NAT / IPv6
+  -> generalized forwarding and SDN
+```
+
+其中最重要的是理解：
+
+- network layer 提供 host-to-host 的 datagram delivery
+- router 的 data plane 负责实际 forwarding
+- control plane 负责计算 forwarding table 或 flow table
+- IP addressing 的层次结构让 longest-prefix matching 和 route aggregation 成为可能
+- NAT 通过 address + port translation 让多个内网设备共享公网 IPv4 地址
+- SDN 把 forwarding 抽象成 match plus action，并通过 controller 编排全网行为
+
+#### 2. 容易混淆的概念
+
+| Concept A | Concept B | 区别 |
+|---|---|---|
+| Forwarding | Routing | forwarding 是单个 router 的本地转发动作；routing 是端到端路径选择 |
+| Data plane | Control plane | data plane 处理经过 router 的 packet；control plane 计算路由和表项 |
+| IP address | Interface | IP 地址绑定在 interface 上，不是简单绑定在整台设备上 |
+| Subnet | LAN | subnet 是 IP 层概念，强调不经过 router 可达的一组 interfaces |
+| Longest prefix matching | Exact matching | IP 转发通常不是精确匹配完整地址，而是选最长匹配前缀 |
+| Flow control | Congestion control | flow control 保护接收方；congestion control 保护网络 |
+| NAT | IPv6 | NAT 缓解 IPv4 地址不足；IPv6 从根本上扩大地址空间 |
+| Fragment offset | Byte offset | IPv4 fragment offset 的单位是 8 bytes，不是 1 byte |
+
+## Network Layer: Control Plane 网络层控制平面
+
+上一章的数据平面关注的是：
+
+- router 收到 packet 后，根据 forwarding table / flow table 把它转到哪个 output port
+
+这一章的控制平面关注的是：
+
+- forwarding table / flow table 是怎么被计算出来的
+- 路由器之间如何交换信息
+- Internet 为什么要分成 AS，并分别使用 OSPF 和 BGP
+- SDN controller 如何集中计算和下发表项
+
+本章主线：
+
+1. 控制平面的两种组织方式：per-router control 和 SDN control
+2. 两类传统 routing algorithms：link-state 和 distance-vector
+3. Internet 中的 scalable routing：AS、intra-AS、inter-AS
+4. Intra-AS routing 的代表：OSPF
+5. Inter-AS routing 的代表：BGP
+6. SDN control plane 和 OpenFlow
+7. ICMP 与 traceroute
+
+### Control Plane Overview
+
+#### 1. Forwarding 和 Routing
+
+在网络层中：
+
+- **Forwarding**
+  - 把 packet 从 router input 移动到合适的 router output
+  - 属于 **data plane**
+  - 是局部动作
+
+- **Routing**
+  - 决定 packet 从 source 到 destination 应该走哪条 path
+  - 属于 **control plane**
+  - 是全网范围的路径计算问题
+
+可以简单记成：
+
+- forwarding 是“按表转发”
+- routing 是“算出这张表”
+
+#### 2. Per-router control plane
+
+传统 Internet routing 通常采用 **per-router control plane**。
+
+特点是：
+
+- 每台 router 内部都有自己的 routing algorithm component
+- routers 之间交换 routing information
+- 每台 router 根据收到的信息，自己计算 forwarding table
+
+也就是说：
+
+- control logic 分布在每台 router 中
+- 没有一个单独的中心控制器替所有 router 做决定
+
+#### 3. SDN control plane
+
+**SDN（Software-Defined Networking）** 采用 logically centralized control。
+
+基本思想是：
+
+- data-plane switches / routers 只负责高速转发
+- remote controller 维护全网状态
+- controller 计算 forwarding table / flow table
+- controller 把表项安装到各个交换机或路由器中
+
+注意这里说的是 **logically centralized**，不一定是物理上只有一台机器。实际 SDN controller 往往是分布式系统，只是在逻辑上表现为一个统一控制平面。
+
+### Routing Protocols
+
+#### 1. Routing protocol 的目标
+
+Routing protocol 的目标是：
+
+> 在一组 routers 构成的网络中，为 source 到 destination 找到一条 good path。
+
+其中：
+
+- **Path**：packet 从源到目的地经过的 router sequence
+- **Good**：可能表示 least cost、fastest、least congested
+
+网络可以抽象为一个图：
+
+$$
+G = (N, E)
+$$
+
+其中：
+
+- $N$ 是 routers 的集合
+- $E$ 是 links 的集合
+- $c_{x,y}$ 是 node `x` 到 node `y` 的 link cost
+- 如果 `x` 和 `y` 不是直接邻居，则 $c_{x,y} = \infty$
+
+Link cost 可以由网络管理员定义，例如：
+
+- 所有 link cost 都设为 1
+- 与 bandwidth 相关
+- 与 congestion / delay 相关
+
+#### 2. Routing algorithm 分类
+
+Routing algorithm 可以按两组维度分类。
+
+**按信息是否全局可见：**
+
+| Category | Meaning | Typical algorithm |
+|---|---|---|
+| Global | 所有 router 都知道完整 topology 和 link cost | Link-state |
+| Decentralized | router 只和邻居交换信息，通过迭代逐渐收敛 | Distance-vector |
+
+**按路由变化速度：**
+
+| Category | Meaning |
+|---|---|
+| Static routing | routes 变化很慢，通常手动配置 |
+| Dynamic routing | routes 根据 link cost 或 topology 变化自动更新 |
+
+### Link-State Routing
+
+**Link-state（LS）routing** 的基本思路是：
+
+- 每台 router 通过 link-state broadcast 得到全网 topology 和 link cost
+- 所有 router 拥有相同的网络图
+- 每台 router 以自己为 source，运行 Dijkstra algorithm
+- 算出从自己到所有 destinations 的 least-cost paths
+- 再由 least-cost path tree 生成 forwarding table
+
+Link-state routing 一般可以分成下面几步：
+
+1. 发现邻居
+2. 测量或配置链路代价
+3. 生成链路状态信息
+4. 向全网 flooding
+5. 每台路由器建立完整拓扑图
+6. 每台路由器运行 Dijkstra 算法
+7. 生成路由表 RIB
+8. 生成转发表 FIB
+
+#### 1. 发现邻居
+
+每台路由器会先发现自己直接连接的邻居。
+
+比如 A 周围有 B 和 D：
+
+```text
+B
+|
+A —— D
+```
+
+A 只需要知道：
+
+```text
+我旁边有 B
+我旁边有 D
+```
+
+在 OSPF 中，路由器会通过 **Hello packet** 发现邻居。
+
+大概意思是：
+
+```text
+A 发 Hello：
+我是 A，我在这里。
+
+B 收到：
+我发现 A 是我的邻居。
+```
+
+如果一段时间收不到邻居的 Hello，就认为链路可能断了。
+
+#### 2. 确定链路 cost
+
+发现邻居以后，还需要知道到邻居的代价。
+
+例如：
+
+```text
+A-B cost = 1
+A-D cost = 4
+```
+
+cost 不是“跳数”那么简单。
+
+它可以表示：
+
+- 链路带宽
+- 链路延迟
+- 链路拥塞程度
+- 管理员手动设置的权重
+
+不过在很多课程例子里，cost 就直接给定。
+
+#### 3. 生成 LSA
+
+每台路由器把自己的邻居信息打包成一个通告，叫：
+
+```text
+LSA = Link-State Advertisement
+链路状态通告
+```
+
+例如 A 的 LSA 可以理解成：
+
+```text
+我是 A
+我连接了：
+B，cost = 1
+D，cost = 4
+```
+
+B 的 LSA：
+
+```text
+我是 B
+我连接了：
+A，cost = 1
+C，cost = 2
+```
+
+C 的 LSA：
+
+```text
+我是 C
+我连接了：
+B，cost = 2
+D，cost = 1
+```
+
+D 的 LSA：
+
+```text
+我是 D
+我连接了：
+A，cost = 4
+C，cost = 1
+```
+
+每台路由器都会产生自己的 LSA。
+
+#### 4. Flooding 泛洪
+
+Link-state 的关键操作是 **flooding**。
+
+也就是：
+
+> 每台路由器把自己知道的 LSA 发给所有邻居，邻居再继续转发给它的邻居，直到整个网络都知道。
+
+例如 A 产生 LSA 后：
+
+```text
+A 把 LSA 发给 B 和 D
+B 再转发给 C
+D 也转发给 C
+最终 A 的信息全网都知道
+```
+
+所以最后每台路由器都会收到所有路由器的 LSA。
+
+Flooding 不会无限转发，因为 LSA 里面通常带有：
+
+```text
+router ID
+sequence number 序列号
+age 生存时间
+checksum
+```
+
+比如 A 发出一条新的 LSA：
+
+```text
+A, sequence = 100
+```
+
+如果 B 后来又收到一条旧的：
+
+```text
+A, sequence = 99
+```
+
+B 就知道这是旧消息，可以丢弃。
+
+这样可以避免旧信息覆盖新信息，也可以避免泛洪无限循环。
+
+#### 5. 建立 Link-State Database
+
+每台路由器收到所有 LSA 后，会建立一份数据库：
+
+```text
+LSDB = Link-State Database
+链路状态数据库
+```
+
+LSDB 里面保存的是全网拓扑信息。
+
+比如所有路由器最后都有同样的 LSDB：
+
+```text
+A-B cost 1
+A-D cost 4
+B-C cost 2
+C-D cost 1
+```
+
+于是每台路由器都知道完整拓扑：
+
+```text
+A ——1—— B
+|        |
+4        2
+|        |
+D ——1—— C
+```
+
+这就是 link-state 的核心：
+
+> 每台路由器都拥有一张完整的网络地图。
+
+#### 6. 运行 Dijkstra 算法
+
+有了完整拓扑图以后，每台路由器以自己为起点，运行 **Dijkstra 最短路径算法**。
+
+例如 A 要计算到所有节点的最短路径。
+
+拓扑是：
+
+```text
+A ——1—— B
+|        |
+4        2
+|        |
+D ——1—— C
+```
+
+从 A 出发：
+
+```text
+A 到 B：cost 1
+A 到 D：cost 4
+A 到 C：
+  路径 1：A-B-C，cost = 1 + 2 = 3
+  路径 2：A-D-C，cost = 4 + 1 = 5
+所以选 A-B-C
+```
+
+所以 A 算出来：
+
+```text
+目的地    最短路径      cost
+B         A-B           1
+C         A-B-C         3
+D         A-D           4
+```
+
+但是注意，路由器真正转发包的时候不需要存完整路径。
+
+它只需要知道：
+
+```text
+去某个目的地，下一跳是谁？
+```
+
+所以 A 的结果会变成：
+
+```text
+目的地    下一跳
+B         B
+C         B
+D         D
+```
+
+#### 7. 生成 RIB
+
+Dijkstra 算完以后，控制平面生成路由表，也就是 RIB。
+
+例如 A 的 RIB 可能是：
+
+```text
+Destination     Next Hop     Cost
+B network       B            1
+C network       B            3
+D network       D            4
+```
+
+如果是实际 IP 网络，目的地通常不是单个路由器，而是网络前缀，比如：
+
+```text
+10.1.0.0/16
+10.2.0.0/16
+192.168.3.0/24
+```
+
+所以实际 RIB 更像：
+
+```text
+Destination Prefix     Next Hop     Interface     Cost
+10.1.0.0/16            B            eth0          1
+10.2.0.0/16            B            eth0          3
+10.3.0.0/16            D            eth1          4
+```
+
+#### 8. 生成 FIB
+
+然后路由器会从 RIB 生成 FIB，也就是 forwarding table。
+
+FIB 是数据平面真正查表用的。
+
+例如：
+
+```text
+Destination Prefix     Interface
+10.1.0.0/16            eth0
+10.2.0.0/16            eth0
+10.3.0.0/16            eth1
+```
+
+数据包来了以后：
+
+```text
+看目的 IP
+↓
+最长前缀匹配
+↓
+找到输出接口
+↓
+转发
+```
+
+所以 link-state 最后影响的是：
+
+```text
+路由表怎么生成
+转发表怎么生成
+数据包下一跳怎么选择
+```
+
+#### 9. Dijkstra 的复杂度和问题
+
+如果有 `n` 个 nodes：
+
+- 基础实现中，每轮要扫描未确定 nodes
+- 比较次数大约是：
+
+$$
+\frac{n(n+1)}{2}
+$$
+
+所以复杂度是：
+
+$$
+O(n^2)
+$$
+
+更高效的数据结构可以做到：
+
+$$
+O(n \log n)
+$$
+
+Message complexity 方面：
+
+- 每台 router 都要把自己的 link-state information 广播给其他 routers
+- 整体 message complexity 也可能达到 $O(n^2)$
+
+如果 link cost 会随 traffic volume 改变，LS routing 还可能产生 **route oscillation（路由振荡）**：
+
+1. 当前 route 造成某些 links 拥塞
+2. link cost 因拥塞上升
+3. Dijkstra 重新计算后把 traffic 移到别的 links
+4. 新 links 又变拥塞
+5. route 又发生变化
+
+### Distance-Vector Routing
+
+#### 1. Distance-vector 的核心思想
+
+在 Link-state 里，每台路由器知道完整网络拓扑，然后自己跑 Dijkstra。
+
+但在 Distance Vector 里，每台路由器并不知道完整拓扑。
+
+它只知道两类信息：
+
+```
+1. 自己到直接邻居的距离
+2. 邻居告诉自己的：邻居到其他目的地的距离
+```
+
+然后它根据邻居的信息推算：
+
+```
+我到某个目的地的距离
+=
+我到某个邻居的距离
++
+这个邻居到目的地的距离
+```
+
+所以 DV 的核心是：
+
+```
+我不知道全网地图
+但我可以问邻居：你到目的地有多远？
+```
+
+**Distance-vector（DV）routing** 基于 Bellman-Ford equation。
+
+令：
+
+- $D_x(y)$ 表示 node `x` 到 destination `y` 的 least-cost estimate
+- $c_{x,v}$ 表示 `x` 到邻居 `v` 的直接 link cost
+- $D_v(y)$ 表示邻居 `v` 认为自己到 `y` 的 least-cost estimate
+
+则：
+
+$$
+D_x(y) = \min_v \{c_{x,v} + D_v(y)\}
+$$
+
+其中 `v` 遍历 `x` 的所有 neighbors。
+
+直觉是：
+
+- `x` 想去 `y`
+- 可以先走到某个邻居 `v`
+- 总 cost = 到邻居的 cost + 邻居到目的地的 cost
+- 选择最小的那个邻居作为 next hop
+
+#### 2. Bellman-Ford example
+
+假设 `u` 的邻居 `v`、`w`、`x` 到 destination `z` 的估计如下：
+
+| Neighbor | Estimated cost to `z` |
+|---|---:|
+| `v` | $D_v(z)=5$ |
+| `w` | $D_w(z)=3$ |
+| `x` | $D_x(z)=3$ |
+
+已知：
+
+- $c_{u,v}=2$
+- $c_{u,x}=1$
+- $c_{u,w}=5$
+
+则：
+
+$$
+D_u(z) = \min\{2+5,\ 1+3,\ 5+3\} = 4
+$$
+
+最小值来自 neighbor `x`，所以 `u` 到 `z` 的 next hop 是 `x`。
+
+#### 3. DV 的迭代模型
+
+每个 node 会反复做：
+
+```text
+wait for local link-cost change or message from neighbor
+recompute DV estimates using received DVs
+if DV to any destination changes:
+  notify neighbors
+```
+
+DV 的特点：
+
+- **iterative**
+  - 路由估计通过多轮更新逐渐收敛
+
+- **asynchronous**
+  - 不要求所有 routers 同步更新
+
+- **distributed**
+  - 每台 router 只和邻居交换 distance vector
+
+- **self-stopping**
+  - 如果没有新的变化，就不会继续发送更新
+
+#### 4. Good news travels fast
+
+当某条 link cost 下降时，DV 通常能较快传播好消息。
+
+例如：
+
+```text
+x --4-- y --1-- z
+x --50--------- z
+```
+
+如果 `y` 发现到 `x` 的路径变好了，它通知 `z`，`z` 很快就能通过 `y` 找到更短路径。
+
+#### 5. Count-to-infinity
+
+当 link cost 上升或某条路径失效时，DV 可能出现 **count-to-infinity** 问题。
+
+典型原因是：
+
+- 邻居之间互相误以为对方还有一条好路径
+- 每次更新时 cost 只增加一点
+- 错误信息在局部循环中慢慢变大
+
+课件中的直觉过程是：
+
+1. `y` 到 `x` 的直接 cost 变大
+2. `y` 以为 `z` 还有到 `x` 的好路径，于是选择经 `z`
+3. `z` 又以为 `y` 有路径，于是选择经 `y`
+4. 两者互相依赖，cost 逐步从 6、7、8、9 继续增加
+
+这说明 distributed routing algorithm 很容易出现局部信息不一致带来的问题。
+
+#### 6. Link-state 和 Distance-vector 对比
+
+| Dimension | Link-state (LS) | Distance-vector (DV) |
+|---|---|---|
+| 信息范围 | 每台 router 获取全网 topology 和 link cost | 每台 router 只和 neighbors 交换 |
+| 典型算法 | Dijkstra | Bellman-Ford |
+| 典型协议 | OSPF、IS-IS | RIP |
+| Message complexity | 需要 link-state broadcast，可能 $O(n^2)$ | 只在邻居间交换，但收敛时间不稳定 |
+| Convergence | 通常较快，但可能 route oscillation | 可能 routing loop 和 count-to-infinity |
+| Robustness | 错误 link cost 主要影响本 router 计算 | 错误 DV 可能被其他 routers 继续传播 |
+
+### Scalable Routing and AS
+
+#### 1. 为什么需要层次化 routing
+
+前面讨论的 routing algorithms 假设网络是 flat 的，但真实 Internet 不是这样。
+
+问题主要有两个：
+
+**Scale**
+
+- Internet 有海量 destination prefixes
+- 不可能让每台 router 维护所有细节
+- routing-table exchange 也会占用大量链路资源
+
+**Administrative autonomy**
+
+- Internet 是 network of networks
+- 每个网络由不同组织管理
+- 每个组织希望控制自己网络内部的 routing policy
+
+因此 Internet 使用 **AS（Autonomous System，自治系统）** 进行层次化组织。
+
+#### 2. Intra-AS 和 Inter-AS
+
+Routers 被聚合成不同 AS，也叫 domains。
+
+**Intra-AS routing / intra-domain routing**
+
+- 在同一个 AS 内部做 routing
+- 一个 AS 内部通常运行同一种 intra-domain protocol
+- 不同 AS 可以使用不同 intra-domain protocol
+
+**Inter-AS routing / inter-domain routing**
+
+- 在不同 AS 之间做 routing
+- gateway routers 负责连接其他 AS
+- gateway routers 同时参与 intra-AS 和 inter-AS routing
+
+典型关系：
+
+- Intra-AS routing 决定 AS 内部 destinations 怎么走
+- Inter-AS routing 学习外部 destinations 从哪些 gateway 可达
+- 对 AS 外目的地，forwarding table 通常由 inter-AS 和 intra-AS routing 共同决定
+
+### OSPF: Intra-AS Routing
+
+#### 1. 常见 intra-AS routing protocols
+
+| Protocol | Full name | Notes |
+|---|---|---|
+| RIP | Routing Information Protocol | 经典 DV 协议，周期性交换 DVs，今天不常用 |
+| EIGRP | Enhanced Interior Gateway Routing Protocol | DV-based，曾长期是 Cisco 私有协议 |
+| OSPF | Open Shortest Path First | 经典 LS 协议，Internet 中非常常见 |
+
+#### 2. OSPF 的基本特点
+
+**OSPF（Open Shortest Path First）** 是 link-state routing protocol。
+
+特点：
+
+- Open：协议公开可用
+- 每台 router flood OSPF link-state advertisements
+- 每台 router 获得 AS 内完整 topology
+- 每台 router 使用 Dijkstra algorithm 计算 forwarding table
+- OSPF message 直接承载在 IP 上，不使用 TCP 或 UDP
+- 支持多种 link-cost metrics，例如 bandwidth、delay
+- OSPF messages 可以认证，防止恶意注入 routing information
+
+#### 3. Hierarchical OSPF
+
+为了扩展性，OSPF 可以使用两级层次结构：
+
+- local area
+- backbone
+
+关键思想：
+
+- link-state advertisements 只在 area 内或 backbone 内 flood
+- router 只掌握自己 area 的详细 topology
+- 对其他 area，只知道大致方向或 summarized distance
+
+常见 router roles：
+
+| Router type | Role |
+|---|---|
+| Local routers | 只在本 area 内 flood link-state information，并计算 area 内 routes |
+| Area border routers | 连接 local area 和 backbone，向 backbone 汇总 area 内距离信息 |
+| Backbone routers | 在 backbone 中运行 OSPF |
+| Boundary routers | 连接其他 AS |
+| Internal routers | area 内部普通 routers |
+
+Hierarchical OSPF 的核心目的：
+
+- 降低 LS flooding 范围
+- 缩小每台 router 需要维护的 topology detail
+- 提高大规模网络中的 routing scalability
+
+### BGP: Inter-AS Routing
+
+#### 1. BGP 是什么
+
+**BGP（Border Gateway Protocol）** 是 Internet 的 de facto inter-domain routing protocol。
+
+它的作用是把 Internet 的各个 AS 粘在一起，因此常被称为：
+
+> the glue that holds the Internet together
+
+BGP 允许一个 AS 对外宣布：
+
+- 我在这里
+- 我能到达哪些 prefixes
+- 可以通过哪些 AS path 到达
+
+BGP 给每个 AS 提供能力：
+
+- 使用 **eBGP** 从 neighboring AS 获取 subnet reachability information
+- 使用 **iBGP** 在 AS 内传播这些 reachability information
+- 根据 reachability 和 policy 选择 route
+- 向其他 AS advertised destination reachability information
+
+#### 2. eBGP 和 iBGP
+
+**eBGP（external BGP）**
+
+- 运行在不同 AS 的 gateway routers 之间
+- 用来交换跨 AS 的 reachability information
+
+**iBGP（internal BGP）**
+
+- 运行在同一个 AS 内部的 BGP routers 之间
+- 用来把从外部学到的 reachability information 传播给 AS 内其他 routers
+
+Gateway routers 通常同时运行：
+
+- eBGP
+- iBGP
+- AS 内部的 intra-AS routing protocol，例如 OSPF
+
+#### 3. BGP session 和 path-vector
+
+BGP routers 之间通过 **BGP session** 交换 BGP messages。
+
+BGP session 是：
+
+- 半永久 TCP connection
+- 两端 routers 称为 BGP peers
+
+BGP 是 **path-vector protocol**。
+
+一个 BGP advertisement 可以写成：
+
+```text
+AS3, X
+```
+
+含义是：
+
+- AS3 宣布自己可以到达 prefix `X`
+- 如果别的 AS 把 traffic 发给 AS3，AS3 承诺继续把 datagrams 转向 `X`
+
+如果 AS2 从 AS3 学到：
+
+```text
+AS3, X
+```
+
+并且 AS2 愿意把这个路径继续告诉 AS1，则 AS2 会 advertised：
+
+```text
+AS2, AS3, X
+```
+
+#### 4. BGP route attributes
+
+BGP advertised route 由两部分组成：
+
+```text
+prefix + attributes
+```
+
+其中：
+
+- **prefix**
+  - 被 advertised 的 destination network
+
+- **AS-PATH**
+  - 该 prefix advertisement 经过的 AS sequence
+  - 可用于 loop detection 和 path selection
+
+- **NEXT-HOP**
+  - 指向下一跳 AS 的具体 router interface
+  - AS 内部 router 需要通过 intra-AS routing 找到这个 NEXT-HOP
+
+#### 5. Policy-based routing
+
+BGP 和 OSPF 最大的区别之一是：
+
+- OSPF 更关注 performance / shortest path
+- BGP 更关注 policy
+
+一个 AS 可以使用 import policy 决定：
+
+- 接受哪些 route advertisements
+- 拒绝哪些 routes
+- 例如永远不走某个 AS
+
+也可以使用 export policy 决定：
+
+- 把哪些 routes advertised 给 neighbor AS
+- 哪些 routes 不对外宣布
+
+典型商业 policy：
+
+- ISP 通常愿意转发自己 customer 的 traffic
+- 不愿意免费帮两个非客户 ISP 做 transit
+
+例如：
+
+- `B` 不想帮 `C` 经由 `B` 到达 `A` 的 customer
+- 那么 `B` 可以选择不向 `C` advertised 某些 path
+
+所以 BGP route 不一定是最短的，它首先要符合 policy。
+
+#### 6. Hot potato routing
+
+**Hot potato routing** 的思想是：
+
+> 尽快把 packet 从本 AS 扔出去。
+
+如果 AS 内某个 router 学到了多个出口都能到达 destination `X`，它可能选择：
+
+- intra-AS cost 最小的 gateway
+
+而不一定选择：
+
+- AS-PATH 最短
+- 全局端到端 cost 最小
+
+也就是说，hot potato routing 优先考虑本 AS 内部成本，把外部路径代价交给其他 AS。
+
+#### 7. BGP route selection
+
+当 BGP router 学到多个到同一 destination 的 routes 时，常见选择顺序是：
+
+1. **Local preference**
+   - 本地策略，通常最优先
+
+2. **Shortest AS-PATH**
+   - AS sequence 更短的路径优先
+
+3. **Closest NEXT-HOP**
+   - 使用 hot potato routing，选择 AS 内部代价最低的出口
+
+4. **Additional criteria**
+   - 其他 tie-break rules
+
+#### 8. 为什么 intra-AS 和 inter-AS routing 不一样
+
+| Dimension | Intra-AS | Inter-AS |
+|---|---|---|
+| Policy | 单一管理者内部，policy 不是主要问题 | 不同组织之间，policy 非常重要 |
+| Performance | 可以主要优化 performance | policy 往往压过 performance |
+| Scale | 在一个 AS 内扩展 | 需要支撑整个 Internet 的层次化扩展 |
+| Typical protocol | OSPF | BGP |
+
+### SDN Control Plane
+
+#### 1. 为什么需要 SDN
+
+传统 per-router control plane 中：
+
+- 每个 router 都运行自己的 routing protocols
+- 控制逻辑分散在所有 routers 中
+- traffic engineering 主要靠调整 link weights
+
+这会带来限制：
+
+- 想让 `u -> z` traffic 走指定路径，只能尝试改 link weights
+- 想把 traffic 分摊到多条路径，传统 destination-based routing 很难表达
+- 想让不同 traffic classes 走不同路径，LS/DV 也很难直接做到
+
+SDN 的目标是让网络控制更可编程、更集中、更灵活。
+
+#### 2. SDN 的四个特征
+
+SDN 的核心特征包括：
+
+1. **Generalized flow-based forwarding**
+   - 使用 match plus action
+   - 例如 OpenFlow
+
+2. **Control/data plane separation**
+   - switch 负责 data plane forwarding
+   - controller 负责 control logic
+
+3. **Control-plane functions external to switches**
+   - 控制逻辑不再绑定在每台 switch 内
+
+4. **Programmable control applications**
+   - routing、access control、load balancing 等都可以作为控制应用实现
+
+#### 3. SDN architecture
+
+SDN 通常包含三类角色：
+
+**Data-plane switches**
+
+- 快速、简单、便宜
+- 在硬件中执行 generalized forwarding
+- flow tables 由 controller 计算和安装
+
+**SDN controller / network OS**
+
+- 维护 network-wide state
+- 通过 southbound API 控制 switches
+- 通过 northbound API 向 network-control applications 提供抽象
+- 实际实现通常是分布式系统，以提升 performance、scalability、fault tolerance
+
+**Network-control applications**
+
+- 是控制逻辑的大脑
+- 例如 routing、access control、load balancing
+- 使用 controller 提供的 API 和全网状态来做决策
+
+#### 4. Northbound API 和 Southbound API
+
+| Interface | Between | Role |
+|---|---|---|
+| Northbound API | network-control apps 和 controller | 给应用提供网络抽象，例如 topology、intent、REST API |
+| Southbound API | controller 和 switches | 下发表项、查询状态、接收事件，例如 OpenFlow |
+
+SDN controller 内部通常包括：
+
+| Component | Role |
+|---|---|
+| Communication layer | 和 controlled devices 通信，例如 OpenFlow、SNMP |
+| Network-wide state management | 维护 links、switches、hosts、statistics、flow tables 等状态 |
+| Interface to control apps | 给控制应用提供抽象和 API |
+
+#### 5. OpenFlow protocol
+
+OpenFlow 工作在 controller 和 switch 之间。
+
+特点：
+
+- 使用 TCP 交换 messages
+- encryption 是 optional
+- messages 分为三类：
+  - controller-to-switch
+  - asynchronous，switch-to-controller
+  - symmetric，例如 request/response
+
+常见 controller-to-switch messages：
+
+| Message | Meaning |
+|---|---|
+| `features` | controller 查询 switch features |
+| `configure` | 查询或设置 switch configuration |
+| `modify-state` | 添加、删除、修改 flow table entries |
+| `packet-out` | controller 指示某个 packet 从指定 switch port 发出 |
+
+常见 switch-to-controller messages：
+
+| Message | Meaning |
+|---|---|
+| `packet-in` | 把 packet 或其控制权交给 controller |
+| `flow-removed` | 通知 controller 某个 flow-table entry 被删除 |
+| `port status` | 通知 port 状态变化 |
+
+实际网络管理员通常不会直接手写 OpenFlow messages，而是通过 controller 上层抽象进行网络配置。
+
+#### 6. SDN control/data plane interaction example
+
+一个 link failure 的 SDN 处理过程：
+
+1. `s1` 发现某条 link failure
+2. `s1` 用 OpenFlow `port status` message 通知 controller
+3. controller 更新自己的 link-status information
+4. routing application 被触发，例如运行 Dijkstra
+5. routing application 使用 controller 中的 network graph 和 link-state information 计算新 routes
+6. controller 计算新的 flow tables
+7. controller 通过 OpenFlow 把新表项安装到需要更新的 switches
+
+这个例子体现了 SDN 的关键：
+
+- switches 报告事件
+- controller 维护全局状态
+- control application 计算策略
+- controller 下发表项
+- data plane 继续按表转发
+
+### ICMP
+
+#### 1. ICMP 是什么
+
+**ICMP（Internet Control Message Protocol）** 用于 hosts 和 routers 之间传递 network-level information。
+
+常见用途：
+
+- error reporting
+  - destination network unreachable
+  - destination host unreachable
+  - destination port unreachable
+  - destination protocol unreachable
+
+- echo request / echo reply
+  - `ping` 使用
+
+ICMP 是网络层协议，但它的 messages 被封装在 IP datagrams 中。
+
+一个 ICMP message 通常包含：
+
+- type
+- code
+- 引发错误的 IP datagram 的前若干字节
+
+常见 ICMP messages：
+
+| Type | Code | Description |
+|---:|---:|---|
+| 0 | 0 | echo reply |
+| 3 | 0 | destination network unreachable |
+| 3 | 1 | destination host unreachable |
+| 3 | 2 | destination protocol unreachable |
+| 3 | 3 | destination port unreachable |
+| 8 | 0 | echo request |
+| 11 | 0 | TTL expired |
+| 12 | 0 | bad IP header |
+
+#### 2. Traceroute 如何使用 ICMP
+
+`traceroute` 的核心思路是利用 TTL 逐跳探测。
+
+Source 的行为：
+
+1. 发送一组 UDP segments，TTL = 1
+2. 再发送一组 UDP segments，TTL = 2
+3. 继续增加 TTL
+4. 通常每个 TTL 发 3 个 probes
+
+Router 的行为：
+
+- 当 packet 到达第 `n` 跳 router 且 TTL 减为 0
+- router 丢弃 packet
+- router 返回 ICMP message：
+
+```text
+type = 11, code = 0
+```
+
+也就是 TTL expired。
+
+Source 收到 ICMP 后：
+
+- 记录返回 ICMP 的 router 地址
+- 计算 RTT
+
+什么时候停止？
+
+- 当 UDP segment 最终到达 destination host
+- destination host 发现目标 UDP port 不可达
+- 返回 ICMP port unreachable：
+
+```text
+type = 3, code = 3
+```
+
+source 收到这个消息后就知道 traceroute 已经到达目的主机。
+
+### Conclusion
+
+**易混概念**
+
+| Concept A | Concept B | 区别 |
+|---|---|---|
+| Forwarding | Routing | forwarding 按表转发；routing 计算路径和表项 |
+| Per-router control plane | SDN control plane | Per-router 是每台 router 各自运行控制逻辑并互相交换信息；SDN 是 controller 逻辑集中计算并下发表项 |
+| Link-state | Distance-vector | LS 有全局 topology；DV 只和邻居交换估计 |
+| Dijkstra | Bellman-Ford | Dijkstra 用于 LS；Bellman-Ford 用于 DV |
+| OSPF | BGP | OSPF 是 intra-AS；BGP 是 inter-AS |
+| eBGP | iBGP | eBGP 跨 AS；iBGP 在 AS 内传播 BGP 信息 |
+| AS-PATH | NEXT-HOP | AS-PATH 是经过的 AS 序列；NEXT-HOP 是下一跳 AS 的具体入口 |
+| Policy | Performance | BGP 中 policy 往往比最短路径更重要 |
+| SDN controller | Data-plane switch | controller 算规则；switch 按规则转发 |
+| ICMP TTL expired | ICMP port unreachable | traceroute 中前者表示中间跳，后者表示到达目的主机 |
+
+## Link Layer and LANs 链路层与局域网
+
+链路层（Link Layer）的任务是：
+
+- 把 network-layer datagram 从一个 node 传到同一条 link 上的相邻 node
+
+这里的 **node** 可以是：
+
+- host
+- router
+- switch
+
+这里的 **link** 可以是：
+
+- 有线链路
+- 无线链路
+- LAN
+
+链路层传输的数据单位是：
+
+- **frame（帧）**
+
+可以理解为：
+
+```text
+IP datagram
+  -> encapsulated into link-layer frame
+  -> transmitted over one physical link
+```
+
+注意：一个端到端 IP datagram 在路径上经过多条 links 时，每一跳可能使用不同的 link-layer protocol。例如第一跳 Wi-Fi，下一跳 Ethernet，再下一跳光纤链路。
+
+### Link Layer Overview
+
+#### 1. Link layer 的位置
+
+链路层通常实现在：
+
+- host 的 NIC（Network Interface Card）
+- router / switch 的接口硬件
+- 一部分软件、硬件和 firmware 的组合
+
+发送端：
+
+- network layer 把 datagram 交给 link layer
+- link layer 把 datagram 封装成 frame
+- 加上 header、trailer、error checking bits 等
+
+接收端：
+
+- link layer 检查 frame 是否出错
+- 如果通过检查，就取出 datagram
+- 交给上层 network layer
+
+#### 2. Link layer services
+
+链路层可能提供以下服务：
+
+**Framing**
+
+- 把 network-layer datagram 封装进 frame
+- 添加 link-layer header 和 trailer
+
+**Link access**
+
+- 如果链路是 shared medium，需要决定谁可以发送
+- 这就是 MAC protocol 要解决的问题
+
+**Reliable delivery between adjacent nodes**
+
+- 在相邻节点之间提供可靠传输
+- 对低误码率有线链路通常不常用
+- 对无线链路更有意义，因为无线误码率更高
+
+**Flow control**
+
+- 控制相邻发送方和接收方之间的发送节奏
+
+**Error detection**
+
+- 检测 bit errors
+- 发现错误后可以丢弃 frame 或触发重传
+
+**Error correction**
+
+- 接收方不仅检测错误，还能直接纠正某些 bit errors
+
+**Half-duplex / full-duplex**
+
+- half-duplex：两端都能发，但不能同时发
+- full-duplex：两端可以同时发送
+
+#### 3. IP hourglass
+
+Internet 可以理解为一个 hourglass：
+
+- 上层有很多应用和传输协议：HTTP、SMTP、QUIC、TCP、UDP 等
+- 下层有很多链路层和物理层技术：Ethernet、Wi-Fi、Bluetooth、fiber、radio 等
+- 中间“细腰”是 IP
+
+IP 的作用是：
+
+- 给各种上层协议提供统一的网络层接口
+- 屏蔽底层多种 link-layer technologies 的差异
+
+### Error Detection and Correction
+
+#### 1. EDC 的基本思想
+
+链路层会在 data bits 后面加上一些冗余位：
+
+- **EDC（Error Detection and Correction bits）**
+
+发送方发送：
+
+```text
+D + EDC
+```
+
+接收方收到：
+
+```text
+D' + EDC'
+```
+
+然后检查是否满足编码规则。
+
+需要注意：
+
+- error detection 不是 100% 可靠
+- 冗余位越多，检测和纠错能力通常越强
+
+#### 2. Parity checking
+
+**Single-bit parity**
+
+- 用 1 个 parity bit 检测 single-bit error
+- even parity 的规则是：让总的 `1` 的个数为偶数
+
+例如：
+
+```text
+data bits 中 1 的个数是奇数 -> parity bit = 1
+data bits 中 1 的个数是偶数 -> parity bit = 0
+```
+
+它可以检测单个 bit 翻转，但不能可靠处理多个 bit 同时出错。
+
+**Two-dimensional parity**
+
+- 把 data bits 排成二维矩阵
+- 对每一行和每一列都计算 parity
+- 如果只有一个 bit 出错，可以通过“出错行”和“出错列”的交点定位并纠正
+
+所以：
+
+- one-dimensional parity 主要用于 detection
+- two-dimensional parity 可以 detect and correct single-bit error
+
+#### 3. Internet checksum
+
+Internet checksum 在传输层已经见过。
+
+发送方：
+
+- 把内容看成一串 16-bit integers
+- 做 one's complement sum
+- 把结果放进 checksum field
+
+接收方：
+
+- 重新计算 checksum
+- 如果结果和 checksum field 不一致，说明 detected error
+- 如果一致，只能说“没有检测到错误”，不能保证一定没错
+
+#### 4. CRC
+
+**CRC（Cyclic Redundancy Check，循环冗余检测）** 是链路层中非常常见的强 error-detection 方法。
+
+它使用 modulo-2 arithmetic，也就是 XOR：
+
+| a | b | a XOR b |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+在 modulo-2 中：
+
+- 加法和减法都是 XOR
+- 没有进位
+- 没有借位
+
+#### 5. CRC 的计算
+
+设：
+
+- $r$ 是CRC检验位的长度
+- $D$ 是 data bits
+- $G$ 是 generator，长度为 $r+1$ bits
+- $R$ 是要计算出的 $r$ 个 CRC bits
+
+目标是选择 $R$，使得：
+
+$$
+\langle D,R \rangle = D \cdot 2^r \oplus R
+$$
+
+能够被 $G$ 整除，也就是 modulo-2 division 的 remainder 为 0。
+
+等价地：
+
+$$
+R = \operatorname{remainder}\left(\frac{D \cdot 2^r}{G}\right)
+$$
+
+接收方：
+
+- 用相同的 generator $G$ 去除收到的 bit pattern
+- 如果 remainder 非 0，则 detected error
+- 如果 remainder 为 0，则认为通过检查
+
+课件例子中：
+
+- $G = 1001$（选定的generator）
+- $D \cdot 2^r = 101110000$（在数据D后面补`r`个0）
+- 计算出的 remainder 是：
+
+```text
+R = 011
+```
+
+**实际计算时可以按这几步做：**
+
+1. 看 generator $G$ 的长度。若 $G$ 有 $r+1$ bits，则 CRC 长度是 $r$ bits
+2. 在原始 data $D$ 后面补 $r$ 个 0，得到 $D \cdot 2^r$
+3. 用 $G$ 对 $D \cdot 2^r$ 做 modulo-2 division，也就是每一步都用 XOR 消去最高位
+4. 除法最后剩下的 $r$ bits remainder 就是 CRC bits $R$
+5. 发送方真正发送的是 $D$ 后面接 $R$，也就是 $\langle D,R\rangle$
+6. 接收方再次用 $G$ 去除 $\langle D,R\rangle$，如果余数不是 0，就说明检测到 bit error
+
+CRC 的核心直觉是：发送方故意补上一段 $R$，让整个 bit string 刚好能被 $G$ 整除；传输中如果某些 bit 被翻转，整除关系大概率会被破坏。
+
+#### 6. CRC 的检测能力
+
+CRC 的常见性质：
+
+- 如果 $G(x)$ 中 $x^r$ 和 $x^0$ 的系数都是 1，可以检测所有 single-bit errors
+- 如果 $G(x)$ 有至少三项的 factor，可以检测所有 double-bit errors
+- 可以检测所有长度小于 $r+1$ bits 的 burst errors
+
+CRC 广泛用于：
+
+- Ethernet
+- 802.11 Wi-Fi
+
+### Multiple Access Protocols
+
+> 从这部分开始还不如直接看课件，太繁杂琐碎了
+
+#### 1. 两类 links
+
+链路可以分成两类：
+
+**Point-to-point link**
+
+- 两端直接相连
+- 例如 host 到 Ethernet switch 的链路
+- 也包括早期 PPP dial-up
+
+**Broadcast link / shared medium**
+
+- 多个 nodes 共享同一个通信介质
+- 例如早期 bus Ethernet、Wi-Fi、cable access upstream
+
+在 shared medium 中，如果两个或多个 nodes 同时发送，就会发生：
+
+- interference
+- collision
+
+所以需要 **multiple access protocol** 决定每个 node 什么时候可以发送。
+
+#### 2. 理想的 multiple access protocol
+
+假设 shared channel rate 是 $R$ bps。
+
+理想协议希望满足：
+
+1. 只有一个 node 要发送时，它可以以 rate $R$ 发送
+2. 有 $M$ 个 nodes 要发送时，每个平均能获得 $R/M$
+3. fully decentralized
+   - 没有特殊协调节点
+   - 不依赖全局时钟同步
+4. simple
+
+现实协议通常只能在这些目标之间折中。
+
+#### 3. MAC protocol 分类
+
+| Category | Idea | Examples |
+|---|---|---|
+| Channel partitioning | 把 channel 切成 time / frequency / code 等小块 | TDMA、FDMA、CDMA |
+| Random access | 不预先分配 channel，允许 collision，再从 collision 中恢复 | ALOHA、CSMA、CSMA/CD、CSMA/CA |
+| Taking turns | nodes 轮流发送，有数据多的 node 可以占用更久 | Polling、Token passing |
+
+#### 4. TDMA 和 FDMA
+
+**TDMA（Time Division Multiple Access）**
+
+- 时间被划分成 rounds
+- 每个 station 在每轮中获得固定长度 slot
+- slot 长度通常等于传一个 packet 的时间
+- 没有数据要发时，该 station 的 slot 会 idle
+
+优点：
+
+- 高负载下公平、无 collision
+
+缺点：
+
+- 低负载下效率低，因为没有数据的 slot 被浪费
+
+**FDMA（Frequency Division Multiple Access）**
+
+- channel spectrum 被分成多个 frequency bands
+- 每个 station 分配固定 frequency band
+- station 没数据时，对应 frequency band idle
+
+#### 5. Random access protocols
+
+Random access 的基本思想：
+
+- node 有 frame 要发时，以 full channel rate $R$ 发送
+- 不提前协调
+- 如果发生 collision，再用某种机制恢复
+
+协议需要定义：
+
+- 如何检测 collision
+- collision 后如何重传，例如随机延迟后重传
+
+#### 6. Slotted ALOHA
+
+Slotted ALOHA 的假设：
+
+- 所有 frames 大小相同
+- 时间被分成等长 slots
+- 一个 slot 正好可以传一个 frame
+- nodes 只能在 slot 开始时发送
+- nodes 之间 slot 同步
+- 如果两个或多个 nodes 在同一个 slot 发送，则 collision
+
+操作：
+
+- node 有新 frame，就在下一个 slot 发送
+- 如果成功，下个 slot 可以继续发新 frame
+- 如果 collision，则之后每个 slot 以概率 $p$ 重传，直到成功
+
+优点：
+
+- 单个 active node 可以占满 channel
+- decentralized
+- simple
+
+缺点：
+
+- collision slots 被浪费
+- idle slots 被浪费
+- 需要 clock synchronization
+
+#### 7. Slotted ALOHA efficiency
+
+假设：
+
+- 有 $N$ 个 nodes
+- 每个 node 在某个 slot 以概率 $p$ 发送
+
+给定某个 node 成功的概率是：
+
+$$
+p(1-p)^{N-1}
+$$
+
+某个 slot 中有任意一个 node 成功的概率是：
+
+$$
+Np(1-p)^{N-1}
+$$
+
+当 nodes 很多时，最大 efficiency 趋近于：
+
+$$
+\frac{1}{e} \approx 0.37
+$$
+
+也就是说，Slotted ALOHA 最理想情况下也只有约 37% 的 slots 用于成功传输。
+
+#### 8. Pure ALOHA
+
+Pure ALOHA 更简单：
+
+- 没有 slot
+- frame 一到就立刻发送
+- 不需要同步
+
+但 collision window 更大。
+
+如果一个 frame 在 $t_0$ 开始发送，那么任何在：
+
+$$
+[t_0 - 1, t_0 + 1]
+$$
+
+这个范围内开始发送的其他 frame 都可能与它重叠。
+
+Pure ALOHA efficiency 约为：
+
+$$
+18\%
+$$
+
+低于 Slotted ALOHA。
+
+#### 9. CSMA 和 CSMA/CD
+
+**CSMA（Carrier Sense Multiple Access）**
+
+核心思想：
+
+> listen before transmit
+
+规则：
+
+- 如果 channel idle，就发送整个 frame
+- 如果 channel busy，就 defer transmission
+
+但 CSMA 仍可能 collision，因为 propagation delay 存在：
+
+- A 开始发时，B 可能还没听到 A 的信号
+- B 也以为 channel idle，于是发送
+- 两个 frame 仍然 collision
+
+**CSMA/CD（Collision Detection）**
+
+- 一边发送，一边检测 collision
+- 一旦检测到 collision，就 abort transmission
+- 发送 jam signal
+- 然后 binary exponential backoff
+
+CSMA/CD 在 wired Ethernet 中容易实现，但在 wireless 中很难，因为无线节点发送时通常很难同时可靠监听 collision。
+
+#### 10. Ethernet CSMA/CD algorithm
+
+Ethernet CSMA/CD 的过程：
+
+1. NIC 从 network layer 收到 datagram，创建 frame
+2. NIC 监听 channel
+   - idle：开始发送
+   - busy：等待到 idle 后发送
+3. 如果整个 frame 发完都没有 collision，则完成
+4. 如果发送过程中检测到其他 transmission：
+   - abort
+   - 发送 jam signal
+5. 进入 binary exponential backoff
+   - 第 $m$ 次 collision 后，随机选择：
+
+$$
+K \in \{0,1,2,\dots,2^m-1\}
+$$
+
+   - 等待：
+
+$$
+K \cdot 512 \text{ bit times}
+$$
+
+   - 再回到监听 channel
+
+collision 越多，backoff interval 越长。
+
+#### 11. CSMA/CD efficiency
+
+设：
+
+- $t_{prop}$ 是 LAN 中两个 nodes 之间最大 propagation delay
+- $t_{trans}$ 是发送最大 frame 的 transmission time
+
+CSMA/CD efficiency 近似为：
+
+$$
+\text{efficiency} = \frac{1}{1 + 5t_{prop}/t_{trans}}
+$$
+
+当：
+
+- $t_{prop} \to 0$
+- 或 $t_{trans} \to \infty$
+
+efficiency 趋近于 1。
+
+#### 12. Taking turns protocols
+
+Channel partitioning：
+
+- 高负载下公平高效
+- 低负载时浪费 slot / frequency band
+
+Random access：
+
+- 低负载下效率高
+- 高负载下 collision overhead 大
+
+Taking turns protocols 试图结合两者优点。
+
+**Polling**
+
+- master node 轮流邀请其他 nodes 发送
+- 常用于 dumb devices
+
+问题：
+
+- polling overhead
+- latency
+- master 是 single point of failure
+
+**Token passing**
+
+- 一个 token 在 nodes 间顺序传递
+- 只有拿到 token 的 node 可以发送
+
+问题：
+
+- token overhead
+- latency
+- token 丢失或故障会影响系统
+
+### LAN Addressing and ARP
+
+#### 1. IP address 和 MAC address
+
+**IP address**
+
+- 32-bit network-layer address
+- 用于 layer 3 forwarding
+- 和 subnet / routing 相关
+
+**MAC address**
+
+- link-layer address
+- 多数 LAN 中是 48 bits
+- 常写成 hexadecimal notation，例如：
+
+```text
+1A-2F-BB-76-09-AD
+```
+
+作用：
+
+- 在同一个 LAN / subnet 内，把 frame 从一个 interface 送到另一个 physically connected interface
+
+关键区别：
+
+- IP address 用于跨网络的端到端寻址和路由
+- MAC address 用于本地链路上的下一跳 frame delivery
+
+#### 2. ARP 的作用
+
+**ARP（Address Resolution Protocol）** 解决的问题是：
+
+> 已知同一 LAN 内某个 interface 的 IP address，如何得到它的 MAC address？
+
+每个 host / router 在 LAN 上维护一个 ARP table。
+
+ARP table entry 通常包含：
+
+| Field | Meaning |
+|---|---|
+| IP address | 某个 LAN node/interface 的 IP |
+| MAC address | 对应的 link-layer address |
+| TTL | 该映射还能保留多久，常见约 20 min |
+
+#### 3. ARP protocol in action
+
+假设 host A 想发送 datagram 给同一 LAN 内的 host B，但 A 不知道 B 的 MAC address。
+
+过程：
+
+1. A 查询自己的 ARP table
+2. 如果没有 B 的 entry，A 广播 ARP query
+3. ARP query 的 destination MAC 是广播地址：
+
+```text
+FF-FF-FF-FF-FF-FF
+```
+
+4. LAN 上所有 nodes 都收到这个 ARP query
+5. 只有目标 IP 对应的 B 回 ARP reply
+6. B 的 ARP reply 直接发回 A，告诉 A 自己的 MAC address
+7. A 把 `(B IP, B MAC, TTL)` 写入 ARP table
+
+课件例子：
+
+ARP query：
+
+| Field | Value |
+|---|---|
+| Destination MAC | `FF-FF-FF-FF-FF-FF` |
+| Source MAC | `71-65-F7-2B-08-53` |
+| Source IP | `137.196.7.23` |
+| Target IP | `137.196.7.14` |
+
+ARP reply：
+
+| Field | Value |
+|---|---|
+| Destination MAC | `71-65-F7-2B-08-53` |
+| Source IP | `137.196.7.14` |
+| Source MAC | `58-23-D7-FA-20-B0` |
+
+#### 4. Routing to another subnet
+
+如果 A 要发送 datagram 给不同 subnet 的 B：
+
+- IP destination 仍然是 B 的 IP
+- 但 link-layer frame 的 destination MAC 不是 B 的 MAC
+- 而是 first-hop router 的 MAC
+
+原因：
+
+- B 不在本 LAN 内
+- A 不能直接用 Ethernet frame 找到 B
+- A 只能先把 frame 交给默认网关 router
+
+过程：
+
+1. A 创建 IP datagram：
+
+```text
+IP src  = A's IP
+IP dest = B's IP
+```
+
+2. A 创建 Ethernet frame：
+
+```text
+MAC src  = A's MAC
+MAC dest = first-hop router's MAC
+```
+
+3. Router 收到 frame，取出 IP datagram
+4. Router 根据 IP destination 查 forwarding table
+5. Router 在下一条 link 上重新封装 frame：
+
+```text
+IP src  = A's IP
+IP dest = B's IP
+MAC src  = router outgoing interface MAC
+MAC dest = B's MAC 或下一跳 router MAC
+```
+
+关键点：
+
+- IP source/destination 在端到端路径上通常保持不变
+- MAC source/destination 每一跳都会变化
+
+### Ethernet
+
+#### 1. Ethernet 的特点
+
+Ethernet 是 dominant wired LAN technology。
+
+原因：
+
+- 最早广泛使用的 LAN 技术之一
+- simple
+- cheap
+- speed 持续提高，从 Mbps 到 Gbps / hundreds of Gbps
+
+#### 2. Ethernet topology
+
+早期 Ethernet：
+
+- bus topology
+- 所有 nodes 在同一个 collision domain
+- 多个 nodes 可能互相 collision
+
+现代 Ethernet：
+
+- switched topology
+- 中心是 active layer-2 switch
+- 每个 host 与 switch 之间是独立 link
+- 通常 full-duplex
+- 不同 links 之间不会互相 collision
+
+#### 3. Ethernet frame structure
+
+Ethernet frame 主要字段：
+
+| Field | Purpose |
+|---|---|
+| Preamble | 同步 sender 和 receiver clock |
+| Destination address | destination MAC address |
+| Source address | source MAC address |
+| Type | 指示上层协议，例如 IP、ARP |
+| Data / payload | 封装的 network-layer packet |
+| CRC | error detection |
+
+Preamble：
+
+- 7 bytes 的 `10101010`
+- 后接 1 byte 的 `10101011`
+- 用于让接收方同步时钟
+
+MAC addresses：
+
+- source / destination MAC 都是 6 bytes
+- 如果 destination MAC 匹配本机，或是 broadcast address，adapter 会把 payload 交给上层
+- 否则丢弃 frame
+
+Type field：
+
+- 用于 demultiplexing
+- 告诉接收端 payload 应该交给 IP、ARP 或其他协议
+
+CRC：
+
+- 接收端发现 error 就 drop frame
+
+#### 4. Ethernet 是 connectionless 和 unreliable
+
+Ethernet 是：
+
+- **connectionless**
+  - 发送 NIC 和接收 NIC 之间没有 handshaking
+
+- **unreliable**
+  - 接收 NIC 不发送 ACK / NAK
+  - 出错 frame 被 drop
+  - 是否恢复由上层协议决定，例如 TCP
+
+### LAN Switches
+
+#### 1. Ethernet switch 是什么
+
+Ethernet switch 是 link-layer device。
+
+它会：
+
+- store and forward Ethernet frames
+- 检查 incoming frame 的 destination MAC
+- 决定把 frame 转发到哪个 output link
+
+Switch 的特点：
+
+- transparent：hosts 不需要知道 switch 存在
+- plug-and-play
+- self-learning
+- 不需要人工配置每个 MAC entry
+
+#### 2. Switch 和 collision domain
+
+在 switched Ethernet 中：
+
+- hosts 通常和 switch 有 dedicated direct connection
+- switch 会 buffer frames
+- 每条 link 是独立 collision domain
+- full-duplex link 中基本没有 collision
+- 多组通信可以同时发生
+
+例如：
+
+- A 到 A' 可以传
+- B 到 B' 也可以同时传
+- 只要它们不竞争同一个输出端口
+
+#### 3. Switch forwarding table
+
+Switch table entry 通常是：
+
+| Field | Meaning |
+|---|---|
+| MAC address | host 的 MAC |
+| Interface | 通过哪个 switch port 可到达 |
+| Timestamp / TTL | entry 的时间信息 |
+
+看起来像 routing table，但区别是：
+
+- router table 通常由 routing algorithms 计算
+- switch table 通过 self-learning 建立
+
+#### 4. Self-learning
+
+Switch 的 self-learning 规则：
+
+> 当 switch 收到 frame 时，记录 source MAC 是从哪个 interface 进来的。
+
+例如：
+
+- frame 从 interface 1 到达
+- source MAC 是 `A`
+- switch 记录：
+
+```text
+A -> interface 1
+```
+
+#### 5. Forwarding / flooding
+
+当 switch 收到 frame 后：
+
+1. 学习 source MAC 对应的 incoming interface
+2. 查 destination MAC
+
+如果 destination MAC 在 table 中：
+
+- selective forwarding
+- 只发到对应 interface
+
+如果 destination MAC 不在 table 中：
+
+- flood
+- 发到除 incoming interface 以外的所有 interfaces
+
+如果 destination interface 就是 incoming interface：
+
+- filter
+- 不需要转发
+
+#### 6. Interconnecting switches
+
+多个 self-learning switches 可以互联。
+
+它们仍然使用同样规则：
+
+- 从 incoming frame 学 source MAC location
+- 对 unknown destination flood
+- 对 known destination selectively forward
+
+所以不需要复杂配置，也能逐渐学会跨多台 switches 的路径。
+
+#### 7. Switches vs Routers
+
+| Dimension | Switch | Router |
+|---|---|---|
+| Layer | Link layer | Network layer |
+| Data unit | Frame | Datagram / packet |
+| Header examined | MAC address | IP address |
+| Forwarding table | self-learning + flooding | routing algorithms / manual config |
+| Addressing | MAC address | IP address |
+| Scope | LAN 内部 | 跨网络 |
+
+共同点：
+
+- 都是 store-and-forward
+- 都有 forwarding tables
+
+### VLANs
+
+#### 1. 为什么需要 VLAN
+
+如果一个大型 LAN 是 single broadcast domain，会有问题：
+
+- ARP、DHCP、unknown MAC flooding 等广播流量会扩散到整个 LAN
+- 效率下降
+- 安全和隐私问题增加
+- 用户移动物理位置时，逻辑部门划分不灵活
+
+例如：
+
+- CS 系用户搬到 EE 楼
+- 物理上接入 EE switch
+- 但逻辑上仍希望属于 CS network
+
+#### 2. Port-based VLAN
+
+**VLAN（Virtual LAN）** 可以把一套物理 LAN infrastructure 划分成多个 virtual LANs。
+
+Port-based VLAN 的做法是：
+
+- switch ports 被划分到不同 VLAN
+- 同一个 VLAN 内的 ports 像一个独立 LAN
+- 不同 VLAN 之间二层隔离
+
+例如：
+
+- ports 1-8 属于 EE VLAN
+- ports 9-15 属于 CS VLAN
+
+效果：
+
+- frames from/to ports 1-8 只能到 ports 1-8
+- frames from/to ports 9-15 只能到 ports 9-15
+
+VLAN membership 也可以基于：
+
+- switch port
+- endpoint MAC address
+
+不同 VLAN 之间通信需要 routing，就像两个独立 subnet 之间通信一样。
+
+#### 3. VLAN trunk
+
+如果 VLAN 跨越多台 switches，就需要 trunk port。
+
+**Trunk port**：
+
+- 在 switches 之间传输多个 VLAN 的 frames
+- frame 必须携带 VLAN ID
+
+普通 Ethernet frame 没有 VLAN ID，所以需要：
+
+- **802.1Q**
+
+#### 4. 802.1Q VLAN frame
+
+802.1Q 会在 standard Ethernet frame 中插入 VLAN tag，位置在 source address 后面。
+
+VLAN tag 包含：
+
+| Field | Meaning |
+|---|---|
+| Tag Protocol Identifier | 2 bytes，值为 `81-00` |
+| Tag Control Information | 包含 12-bit VLAN ID 和 3-bit priority |
+| CRC | 因 frame 改变，需要重新计算 |
+
+所以 802.1Q 的作用是：
+
+- 让 trunk link 上的 frame 带有 VLAN identity
+- 接收 switch 根据 VLAN ID 判断 frame 属于哪个 VLAN
+
+### Data Center Networking
+
+#### 1. 数据中心网络的特点
+
+Datacenter 通常包含：
+
+- tens to hundreds of thousands of hosts
+- 大量 servers 近距离互联
+- 服务 e-business、content serving、search、data mining 等应用
+
+主要挑战：
+
+- 多个 applications 同时服务海量 clients
+- reliability
+- load balancing
+- 避免 processing、networking、data bottlenecks
+
+#### 2. Fat-tree 结构
+
+数据中心常用多层 switch architecture，例如 fat-tree。
+
+典型元素：
+
+- **Top-of-Rack (ToR) switch**
+  - 每个 rack 一个
+  - 连接 rack 内 servers
+
+- **Tier-2 switches**
+  - 连接多个 ToR switches
+
+- **Tier-1 switches**
+  - 更高层 aggregation
+
+- **Border routers**
+  - 连接数据中心外部网络
+
+Fat-tree 的好处：
+
+- racks 之间有多条 paths
+- 提高 aggregate throughput
+- 提供 redundancy，提高 reliability
+
+#### 3. Load balancer
+
+数据中心中的 load balancer 做 application-layer routing：
+
+- 接收外部 client requests
+- 把 workload 分配给数据中心内部 servers
+- 对外隐藏数据中心内部结构
+- 将结果返回给 client
+
+#### 4. 数据中心中的协议创新
+
+课件提到的方向包括：
+
+- Link layer
+  - RoCE：RDMA over Converged Ethernet
+
+- Transport layer
+  - ECN 用于数据中心拥塞控制
+  - DCTCP、DCQCN
+  - hop-by-hop backpressure congestion control
+
+- Routing / management
+  - SDN 在数据中心广泛使用
+  - 尽量把相关服务和数据放近，例如同 rack 或 nearby rack，减少跨高层交换的通信
+
+### A Day in the Life of a Web Request
+
+这一部分把前面所有层串起来，看一个用户请求网页时发生了什么。
+
+场景：
+
+- laptop 接入校园网络
+- 用户访问 `www.baidu.com`
+
+#### 1. DHCP：先获得网络配置
+
+刚接入网络时，laptop 需要知道：
+
+- 自己的 IP address
+- first-hop router / default gateway
+- DNS server address
+
+它使用 DHCP。
+
+DHCP message 封装过程：
+
+```text
+DHCP
+  -> UDP
+    -> IP
+      -> Ethernet
+        -> Physical
+```
+
+DHCP request 通过 Ethernet broadcast 发送：
+
+```text
+Destination MAC = FF-FF-FF-FF-FF-FF
+```
+
+DHCP server 回复 DHCP ACK，其中包含：
+
+- client IP address
+- first-hop router IP
+- DNS server name / IP
+
+#### 2. ARP：获得 first-hop router 的 MAC
+
+在发送 DNS query 之前，client 已经知道 DNS server 的 IP，但 DNS server 通常不在本 LAN。
+
+所以 client 需要先把 frame 发给 first-hop router。
+
+此时 client 需要知道：
+
+- first-hop router interface 的 MAC address
+
+于是 client 发送 ARP query：
+
+- 广播询问 default gateway 的 MAC
+- router 返回 ARP reply
+- client 把 gateway IP/MAC 写入 ARP table
+
+#### 3. DNS：解析域名
+
+client 构造 DNS query：
+
+```text
+DNS
+  -> UDP
+    -> IP
+      -> Ethernet
+```
+
+Ethernet frame：
+
+- destination MAC 是 first-hop router 的 MAC
+
+IP datagram：
+
+- destination IP 是 DNS server 的 IP
+
+DNS query 经过 LAN switch、first-hop router、ISP 网络，被路由到 DNS server。
+
+DNS server 返回：
+
+- `www.baidu.com` 对应的 IP address
+
+#### 4. TCP：建立连接
+
+client 要发送 HTTP request 前，需要先和 web server 建立 TCP connection。
+
+过程：
+
+1. client 发送 TCP SYN
+2. web server 回复 TCP SYNACK
+3. client 再发送 ACK
+
+这就是 TCP 3-way handshake。
+
+这些 TCP segments 被封装在 IP datagrams 中，并通过链路层 frames 一跳一跳传输。
+
+#### 5. HTTP：请求和响应网页
+
+TCP connection 建立后：
+
+1. browser 把 HTTP request 写入 TCP socket
+2. HTTP request 被封装成 TCP segment
+3. TCP segment 被封装成 IP datagram
+4. 每一跳再封装成对应 link-layer frame
+5. web server 收到 HTTP request
+6. web server 返回 HTTP reply，包含网页内容
+7. browser 最终显示网页
+
+这个例子串起了：
+
+- DHCP
+- ARP
+- DNS
+- TCP
+- HTTP
+- IP routing
+- Ethernet frame forwarding
+
+### Conclusion
+
+**易混概念**
+
+| Concept A | Concept B | 区别 |
+|---|---|---|
+| IP address | MAC address | IP 用于网络层路由；MAC 用于本地链路 frame delivery |
+| Datagram | Frame | datagram 是网络层单位；frame 是链路层单位 |
+| Error detection | Error correction | detection 只发现错误；correction 能定位并修正某些错误 |
+| Parity | CRC | parity 简单但能力弱；CRC 更强，广泛用于 Ethernet/Wi-Fi |
+| TDMA/FDMA | Random access | 前者预先分配资源；后者允许竞争和 collision |
+| Slotted ALOHA | Pure ALOHA | Slotted 需要同步，效率最高约 37%；Pure 不同步，效率约 18% |
+| CSMA | CSMA/CD | CSMA 先听再发；CSMA/CD 还能检测 collision 并中止发送 |
+| ARP query | ARP reply | query 广播；reply 单播返回 |
+| Switch | Router | switch 看 MAC，工作在 link layer；router 看 IP，工作在 network layer |
+| VLAN | Subnet | VLAN 是二层逻辑隔离；不同 VLAN 间通信通常需要三层 routing |
