@@ -15,7 +15,8 @@ comments: true
 
 Giraffish，坐标广东，南方科技大学，大三，计算机科学与工程
 
-<img src="https://cdn.giraffish.top/github-metrics.svg" alt="Metrics" style="float: left;">
+<img src="https://cdn.giraffish.top/github-metrics.svg" alt="Metrics" width="100%">
+
 
 ## 项目经历
 
