@@ -10,7 +10,7 @@ tags:
 comments: true
 abbrlink: 730c6bb4
 date: 2026-08-30 21:33:05
-updated: 2026-09-01 15:27:45
+updated: 2026-09-01 21:54:52
 
 ---
 
@@ -69,7 +69,7 @@ DreamDojo 先用连续潜动作从 4.4 万小时第一人称人类视频中自�
                   ▼
        44k hours Human Videos
                   │
-                  │ 没有 action 怎么办？
+                  │ Human Videos 没有 action 怎么办？
                   ▼
        Continuous Latent Action
                   │
@@ -112,8 +112,6 @@ Teleoperation  Policy     Model-based
 
 
 ## 📊 Citation Landscape
-
-> 数据快照：Semantic Scholar，2026-08-30。引用数字会随时间变化。
 
 **TLDR** (Semantic Scholar): *Condensed: OOD evaluations support open-world, contact-rich simulation and progress toward general-purpose robot world models.*
 
