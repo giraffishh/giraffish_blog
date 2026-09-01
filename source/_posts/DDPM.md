@@ -3,7 +3,7 @@ index_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999762761.webp
 banner_img: >-
   https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp
-title: 'Denoising-Diffusion-Probabilistic-Models：[NeurIPS 2020] DDPM'
+title: 'Diffusion：[NeurIPS 2020] DDPM'
 categories:
   - 论文批读
 tags:
@@ -12,7 +12,7 @@ tags:
 comments: true
 abbrlink: 3085140e
 date: 2026-08-29 17:20:30
-updated: 2026-08-29 18:38:35
+updated: 2026-09-01 15:27:45
 
 ---
 
@@ -2375,10 +2375,6 @@ To represent the reverse process, we use a U-Net backbone similar to an unmasked
 > - **网络结构**：所有时间步共享同一个 U-Net，通过正弦时间嵌入区分噪声强度。卷积负责局部建模，self-attention 只放在 $16\times16$ 特征层，用较低成本引入全局交互。
 
 ### 4.1 Sample quality
-
-
-
-
 
 *Table 1: CIFAR10 results. NLL measured in bits/dim. Table 2: Unconditional CIFAR10 reverse process parameterization and training objective ablation. Blank entries were unstable to train and generated poor samples with out-of-range scores.*
 
