@@ -22,7 +22,7 @@ Giraffish，坐标广东，南方科技大学，大三，计算机科学与工�
 
 ### 基于扩散与流模型的眼动轨迹生成
 
-**2026.8 - 至今**  
+**2026.8 - 至今** 
 *Computational Linguistics and Consciousness Sciences Lab (CLCS), SUSTech*
 
 - 面向基于 DDPM 的 ScanDL 2.0 的高采样开销及长文本建模难，探索生成加速、长序列眼动建模与跨数据集适配。
