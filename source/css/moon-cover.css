@@ -1,3 +1,11 @@
+@font-face {
+  font-family:"SanJiXiuSongTi-XianXi";
+  src:url("../fonts/SanJiXiuSongTi-XianXi-2.ttf") format("truetype");
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
+
 /* This illustration follows Fluid's resolved theme, including manual overrides. */
 :root { --room:#f6f1e8; --room-ink:#514c43; --room-muted:#888376; --room-accent:#a76f53;
   --wall-inset:#ede5d8; --floor-shadow:#d6c9b750; --rug:#e8ddd0;
@@ -35,9 +43,11 @@
   --cat:#b38e6d; --cat-tail:#96745c; --cat-face:#c3a07b; --cat-paw:#a78467; --cat-ear:#a0786a; --cat-ink:#5b493c;
   --leaf-dark:#4c6b5d; --leaf-light:#718570; --pot:#a97f69; --pot-rim:#c39a7d;
   --day-visible:0; --night-visible:1; --nav-ink:#e8dfcf; } }
-body.home-moon .header-inner { height:94vh!important; height:min(94svh,1040px)!important; min-height:710px; max-height:none; }
-#banner.moon-cover { background:var(--room); isolation:isolate; transition:background-color .6s; }
-.moon-cover::after { content:""; position:absolute; z-index:2; inset:84% 0 0; background:linear-gradient(transparent,var(--body-bg-color)); pointer-events:none; }
+body.home-moon .header-inner { height:100vh!important; height:100svh!important; min-height:0; max-height:none; }
+body.home-moon { transition:color .2s ease-in-out, background-color .6s ease; }
+#banner.moon-cover { background:var(--room); isolation:isolate; transition:background-color .6s ease, transform .05s ease-out; }
+/* A fixed opacity mask lets the endpoint color interpolate with the page background. */
+.moon-cover::after { content:""; position:absolute; z-index:2; inset:78% 0 0; background-color:var(--body-bg-color); -webkit-mask-image:linear-gradient(transparent,#000); mask-image:linear-gradient(transparent,#000); transition:background-color .6s ease; pointer-events:none; }
 .cozy-art { position:absolute; right:max(3%,calc((100% - 1450px)/2)); top:10%; width:54%; max-width:870px; height:82%; z-index:1; }
 .moon-cover .moon-landscape { width:100%; height:100%; overflow:visible; }
 .moon-landscape * { transition:fill .6s,stroke .6s; }
@@ -47,15 +57,15 @@ body.home-moon .header-inner { height:94vh!important; height:min(94svh,1040px)!i
 .moon-cover .moon-copy { position:absolute; left:max(7%,calc((100% - 1280px)/2)); top:29%; width:34%; max-width:480px; z-index:3; color:var(--room-ink); }
 .moon-cover .cozy-eyebrow { display:flex; align-items:center; gap:11px; font-size:9px; letter-spacing:2.4px; color:var(--room-muted); margin:0 0 26px; }
 .moon-cover .cozy-eyebrow span { width:18px; height:1px; background:var(--room-accent); }
-.moon-cover .moon-scroll { position:absolute; left:50%; transform:translateX(-50%); bottom:58px; z-index:3; color:var(--room-muted); padding:8px 16px; font-size:23px; }
-.moon-cover .moon-scroll span { display:block; animation:cozy-arrow 3s ease-in-out infinite; }
-.moon-cover a:focus-visible { outline:2px solid var(--room-accent); outline-offset:6px; }
+.moon-cover .scroll-down-bar { z-index:3; display:block; border:0; padding:0; background:transparent; }
+.moon-cover .scroll-down-bar i.iconfont { color:var(--room-muted); }
+.moon-cover .scroll-down-bar:focus-visible { outline:2px solid var(--room-accent); outline-offset:6px; }
 body.home-moon .navbar:not(.top-nav-collapse):not(.navbar-col-show) { background:transparent; box-shadow:none; }
 body.home-moon .navbar:not(.top-nav-collapse):not(.navbar-col-show) .navbar-brand,
 body.home-moon .navbar:not(.top-nav-collapse):not(.navbar-col-show) .nav-link,
 body.home-moon .navbar:not(.top-nav-collapse):not(.navbar-col-show) .nav-link i { color:var(--nav-ink); text-shadow:none; }
 body.home-moon .navbar:not(.top-nav-collapse):not(.navbar-col-show) .animated-icon span { background:var(--nav-ink); }
-body.home-moon #board { margin-top:-28px!important; padding-top:35px; border-radius:16px; border:1px solid color-mix(in srgb,var(--room-muted) 15%,transparent); box-shadow:0 12px 36px #1723330a; scroll-margin-top:82px; }
+body.home-moon #board { margin-top:0!important; padding-top:35px; border-radius:16px; border:1px solid color-mix(in srgb,var(--room-muted) 15%,transparent); box-shadow:0 12px 36px #1723330a; scroll-margin-top:82px; }
 .moon-cover .cozy-cloud { animation:cozy-cloud 18s ease-in-out infinite alternate; }
 .moon-cover .cozy-steam { animation:cozy-steam 5s ease-in-out infinite; }
 .moon-cover .cozy-cat-body { transform-origin:568px 533px; animation:cozy-breathe 6s ease-in-out infinite; }
@@ -69,28 +79,24 @@ body.home-moon #board { margin-top:-28px!important; padding-top:35px; border-rad
 @keyframes cozy-plant { to { transform:rotate(1deg); } }
 @keyframes cozy-stars { from { opacity:.4; } to { opacity:1; } }
 @keyframes cozy-glow { from { transform:scale(1); } to { transform:scale(1.015); } }
-@keyframes cozy-arrow { 50% { transform:translateY(4px); opacity:.5; } }
 @media(max-width:991px) and (min-width:768px) {
   .moon-cover .moon-copy { left:6%; width:37%; top:30%; }
   .cozy-art { right:0; width:55%; }
 }
 @media(max-width:767px) {
-  body.home-moon .header-inner { height:94vh!important; height:94svh!important; min-height:790px; }
   .moon-cover .moon-copy { top:95px; left:7%; width:86%; max-width:none; text-align:center; }
   .moon-cover .cozy-eyebrow { justify-content:center; font-size:8px; letter-spacing:2px; margin-bottom:15px; }
   .cozy-art { right:0; left:0; margin:auto; top:auto; bottom:67px; width:100%; max-width:560px; height:45%; }
-  .moon-cover .moon-scroll { bottom:43px; }
-  .moon-cover::after { top:88%; }
-  body.home-moon #board { margin-top:-16px!important; border-radius:16px 16px 0 0; padding-top:26px; }
+  body.home-moon #board { border-radius:16px 16px 0 0; padding-top:26px; }
   body.home-moon .navbar-brand { font-size:16px; }
 }
 @media(prefers-reduced-motion:reduce) { .moon-cover *, .moon-cover *::before, .moon-cover *::after { animation:none!important; transition:none!important; } }
 
 /* The original rotating slogan is the sole headline. */
-.moon-cover h1.moon-slogan { margin:0; max-width:480px; min-height:180px; font-family:"Songti SC","Noto Serif CJK SC",SimSun,serif; font-size:clamp(25px,2.15vw,34px); font-weight:400; line-height:1.75; letter-spacing:.04em; color:var(--room-ink); text-wrap:pretty; }
+.moon-cover h1.moon-slogan { margin:0; max-width:480px; min-height:180px; font-family:"SanJiXiuSongTi-XianXi","Songti SC","Noto Serif CJK SC",SimSun,serif; font-size:clamp(25px,2.15vw,34px); font-weight:400; line-height:1.75; letter-spacing:0; color:var(--room-ink); text-wrap:pretty; }
 .moon-cover #subtitle,.moon-cover .typed-cursor { font-size:inherit; font-weight:inherit; color:inherit; }
 @media(max-width:767px) {
-  .moon-cover h1.moon-slogan { max-width:360px; margin:auto; min-height:160px; font-size:21px; line-height:1.65; letter-spacing:.02em; }
+  .moon-cover h1.moon-slogan { max-width:360px; margin:auto; min-height:160px; font-size:21px; line-height:1.65; letter-spacing:0; }
 }
 
 /* Slow, staggered details keep the room alive without distracting from reading. */
@@ -127,13 +133,11 @@ body.home-moon #board { margin-top:-28px!important; padding-top:35px; border-rad
 .moon-cover .cozy-cat.is-awake .cozy-eyes-open { animation:cozy-wake-eyes 2.8s ease-in-out both; }
 .moon-cover .cozy-cat.is-awake .cozy-eyes-closed { animation:cozy-rest-eyes 2.8s ease-in-out both; }
 .moon-cover .cozy-cat.is-awake .cozy-cat-head { animation:cozy-wake-head 2.8s ease-in-out both; }
-.moon-cover .cozy-cat-tail { transform-origin:603px 517px; }
 .moon-cover .cozy-cat.is-awake .cozy-cat-tail { animation:cozy-tail-pet 2.8s ease-in-out both; }
-/* Keep the root anchored; the curled tip moves only about 1.5 SVG units. */
+/* One continuous dip and return: the tip travels furthest, with the root fixed. */
 @keyframes cozy-tail-pet {
-  0%,12%,90%,100% { transform:skewY(0); }
-  38% { transform:skewY(2deg); }
-  65% { transform:skewY(-.6deg); }
+  0%,100% { d:path("M603 517C611 517 615 523 610 529C603 537 579 535 563 532C560 531 559 529 561 528C563 527 568 529 573 529C587 531 602 530 603 526C604 524 600 523 600 521C600 519 601 518 603 517Z"); }
+  42% { d:path("M603 517C611 517 615 523 610 529C603 537 579 537 563 536.5C560 535.5 559 533.5 561 532.5C563 531.5 568 533 573 532C587 532.5 602 530 603 526C604 524 600 523 600 521C600 519 601 518 603 517Z"); }
 }
 @keyframes cozy-wake-head { 0%,90%,100% { transform:translateY(4px); } 30%,55% { transform:translateY(0); } }
 @keyframes cozy-wake-eyes { 0%,10%,75%,100% { opacity:0; } 25%,55% { opacity:1; } }

@@ -1,4 +1,4 @@
-<div id="banner" class="banner moon-cover">
+<div id="banner" class="banner moon-cover" <%- theme.banner && theme.banner.parallax && 'parallax="true"' %>>
   <div class="cozy-art">
     <svg class="moon-landscape" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid meet" role="group" aria-label="窗边小屋，可点击落地灯和猫咪">
       <desc>一扇拱窗，一杯热茶，书本旁睡着一只猫。白天阳光照进房间，夜晚灯下有柔软的月色。</desc>
@@ -135,8 +135,14 @@
   </div>
   <div class="moon-copy">
     <p class="cozy-eyebrow"><span></span> A LITTLE CORNER OF MY WORLD</p>
-    <h1 class="moon-slogan"><span id="subtitle" data-typed-text="<%= subtitle %>"><%= subtitle %></span></h1>
+    <h1 class="moon-slogan">
+      <% if (theme.fun_features.typing.enable && in_scope(theme.fun_features.typing.scope)) { %>
+        <span id="subtitle" data-typed-text="<%= subtitle %>"></span>
+      <% } else { %>
+        <span id="subtitle"><%= subtitle %></span>
+      <% } %>
+    </h1>
   </div>
-  <a class="moon-scroll" href="#board" aria-label="向下浏览文章"><span aria-hidden="true">↓</span></a>
+  <button class="scroll-down-bar" type="button" aria-label="向下浏览文章"><i class="iconfont icon-arrowdown" aria-hidden="true"></i></button>
 </div>
 <script src="<%- cover_asset('js/moon-cover.js') %>" defer></script>
