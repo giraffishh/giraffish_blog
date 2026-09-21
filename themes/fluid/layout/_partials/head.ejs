@@ -40,6 +40,9 @@ var ogConfig = Object.assign({ image: ogImage && url_for(ogImage) }, theme.open_
   <title><%= title %></title>
 
   <%- partial('_partials/css.ejs') %>
+  <% if (is_home()) { %>
+    <link rel="stylesheet" href="<%- cover_asset('css/moon-cover.css') %>">
+  <% } %>
   <%- export_config() %>
   <%- js_ex(theme.static_prefix.internal_js, 'utils.js') %>
   <%- js_ex(theme.static_prefix.internal_js, 'color-schema.js') %>

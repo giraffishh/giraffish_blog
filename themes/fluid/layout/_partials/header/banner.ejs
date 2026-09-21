@@ -5,6 +5,9 @@ var banner_mask_alpha = parseFloat(page.banner_mask_alpha || theme.index.banner_
 var subtitle = page.subtitle || page.title
 %>
 
+<% if (is_home()) { %>
+  <%- partial('_partials/header/moon-cover', { subtitle: subtitle }) %>
+<% } else { %>
 <div id="banner" class="banner" <%- theme.banner && theme.banner.parallax && 'parallax=true' %>
      style="background: url('<%- url_for(banner_img) %>') no-repeat center center; background-size: cover;">
   <div class="full-bg-img">
@@ -31,3 +34,5 @@ var subtitle = page.subtitle || page.title
     </div>
   </div>
 </div>
+
+<% } %>
