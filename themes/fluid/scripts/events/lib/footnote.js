@@ -2,6 +2,15 @@
 
 const { stripHTML } = require('hexo-util');
 
+function escapeAttr(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // Register footnotes filter
 module.exports = (hexo) => {
   const config = hexo.theme.config;
@@ -76,11 +85,11 @@ module.exports = (hexo) => {
         if (!indexMap[index]) {
           return match;
         }
-        const tooltip = indexMap[index].content;
+        const tooltip = escapeAttr(stripHTML(indexMap[index].content));
         return '<sup id="fnref:' + index + '" class="footnote-ref">'
           + '<a href="#fn:' + index + '" rel="footnote">'
           + '<span class="hint--top hint--rounded" aria-label="'
-          + stripHTML(tooltip)
+          + tooltip
           + '">[' + index + ']</span></a></sup>';
       });
 
@@ -94,7 +103,7 @@ module.exports = (hexo) => {
       html += '<li><span id="fn:' + item.index + '" class="footnote-text">';
       html += '<span>';
       const fn = hexo.render.renderSync({ text: item.content, engine: 'markdown' });
-      html += fn.replace(/(<p>)|(<\/p>)/g, '');
+      html += fn.replace(/(<p>)|(<\/p>)/g, '').replace(/<br>/g, '');
       html += '<a href="#fnref:' + item.index + '" rev="footnote" class="footnote-backref"> ↩</a></span></span></li>';
     });
 
