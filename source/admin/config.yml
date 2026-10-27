@@ -38,9 +38,9 @@ collections:      # https://www.netlifycms.org/docs/configuration-options/#colle
   - name: "pages"
     label: "Pages"
     files:
-      - file: "source/storage/index.md"
-        name: "storage"
-        label: "储物间"
+      - file: "source/tools/index.md"
+        name: "tools"
+        label: "工具集"
         fields:
           - {label: "标题", name: "title", widget: "string"}
           - {label: "内容", name: "body", widget: "markdown", required: false}

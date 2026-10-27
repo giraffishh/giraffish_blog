@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mindmap 思维导图 · Giraffish 工具</title>
+<meta name="description" content="在浏览器中编辑 Markdown 思维导图，支持拖拽、撤销、草稿恢复和 SVG 导出。文件在本地处理。">
+<link rel="stylesheet" href="mindmap.css?v=ed558dc214fa">
+</head>
+<body>
+<header id="header">
+ <div class="toolbar">
+<a class="back-link" href="/tools/" aria-label="返回工具列表" title="返回工具列表"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+<button id="new">新建</button>
+<button id="open">打开</button>
+<button id="save" title="保存 Markdown 并关联本地文件" data-state="dirty">
+<span class="save-icon" aria-hidden="true">
+<svg class="save-dirty" viewBox="0 0 24 24" fill="none"><path d="M5 3h12l4 4v14H3V3h2Zm2 0v6h10V3M7 21v-8h10v8"/></svg>
+<svg class="save-busy" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8"/></svg>
+<svg id="saveCheck" class="save-done" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg>
+<svg class="save-error" viewBox="0 0 24 24" fill="none"><path d="M12 8v5m0 4h.01M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+</span><span id="saveLabel">未保存</span></button>
+<button id="saveAs" title="保存副本，保留原文件关联">另存为</button>
+<select id="branches" aria-label="定位主分支">
+<option value="">定位分支</option>
+</select>
+<button id="undo" aria-label="撤销" title="撤销（Ctrl+Z）" aria-keyshortcuts="Control+z Meta+z" disabled>↶</button>
+<button id="redo" aria-label="重做" title="重做（Ctrl+Shift+Z）" aria-keyshortcuts="Control+Shift+z Meta+Shift+z" disabled>↷</button>
+<button id="expand">全部展开</button>
+<button id="export" title="导出 SVG（Ctrl+S）" aria-keyshortcuts="Control+s Meta+s">导出 SVG</button>
+<button id="shortcuts" aria-label="快捷键说明" title="快捷键">?</button>
+</div>
+</header>
+<span id="status" class="sr-only" role="status" aria-live="polite"></span>
+<main id="viewport" aria-label="思维导图画布">
+<svg id="svg" xmlns="http://www.w3.org/2000/svg" aria-label="思维导图">
+<g id="scene"></g>
+</svg>
+<div id="selectionRect" hidden></div>
+<div id="dropHint" hidden></div>
+<div id="dragActions" aria-label="拖动操作" hidden>
+<div class="drop-zone delete" data-drop-action="delete">
+<svg viewBox="0 0 24 24" aria-hidden="true">
+<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"/>
+</svg>
+<span>拖入删除</span>
+</div>
+<div class="drop-zone" data-drop-action="cancel">
+<svg viewBox="0 0 24 24" aria-hidden="true">
+<path d="M9 5 4 10l5 5M4 10h10a5 5 0 0 1 0 10h-3"/>
+</svg>
+<span>拖入取消</span>
+</div>
+</div>
+<div id="empty">
+<div>请选择 Markdown 文件</div>
+<p id="error"></p>
+</div>
+<div id="nodeEditor" hidden>
+<textarea id="nodeText" aria-label="节点名称" maxlength="1000" rows="1" spellcheck="false"></textarea>
+<div id="editError" role="alert"></div>
+</div>
+<div id="fileInfo" aria-label="当前文件与节点数" hidden>
+<div class="file-label">
+<button id="storageStatus" type="button" aria-label="文件模式" aria-live="polite" disabled></button>
+<span id="fileName" aria-label="当前文件"></span>
+</div>
+<span id="count" aria-live="polite" aria-label="当前可见节点数与总节点数"></span>
+</div>
+<div class="zoom">
+<button id="minus" aria-label="缩小">−</button>
+<span id="zoomLabel">100%</span>
+<button id="plus" aria-label="放大">＋</button>
+<button id="reset">1:1</button>
+</div>
+</main>
+
+<div id="nodeMenu" role="menu" aria-label="节点操作" hidden>
+ <button type="button" role="menuitem" data-action="root">新建根节点</button>
+ <button type="button" role="menuitem" data-action="edit">编辑节点</button>
+ <button type="button" role="menuitem" data-action="child">新增子节点</button>
+ <button type="button" role="menuitem" data-action="sibling">新增同级节点</button>
+ <button type="button" role="menuitem" data-action="detach">独立节点</button>
+ <button type="button" role="menuitem" data-action="toggle">收起子节点</button>
+ <div class="menu-separator" role="separator"></div>
+ <button type="button" role="menuitem" data-action="delete" class="menu-delete">删除节点及子节点</button>
+</div>
+<dialog id="shortcutHelp" aria-labelledby="shortcutTitle">
+ <div class="help-head">
+<strong id="shortcutTitle">快捷键</strong>
+<div id="shortcutPlatform" class="shortcut-platform" role="radiogroup" aria-label="快捷键系统" data-platform="win">
+ <label><input id="shortcutWin" class="sr-only" type="radio" name="shortcut-platform" value="win" checked><span>Win</span></label>
+ <label><input id="shortcutMac" class="sr-only" type="radio" name="shortcut-platform" value="mac"><span>Mac</span></label>
+</div>
+<button id="closeHelp" aria-label="关闭快捷键说明">×</button>
+</div>
+ <table>
+<tbody>
+ <tr><td>选择节点</td><td>左键</td></tr>
+ <tr><td>框选节点</td><td>右键</td></tr>
+ <tr><td>复选</td><td><kbd data-shortcut-key="shift">Shift</kbd></td></tr>
+ <tr><td>展开 / 收起子节点</td><td>圆点 / <kbd data-shortcut-key="tab">Tab</kbd></td></tr>
+ <tr><td>编辑节点</td><td>双击 / <kbd>F2</kbd></td></tr>
+ <tr><td>新增子节点</td><td><kbd data-shortcut-key="alt">Alt</kbd> +（左键 / <kbd data-shortcut-key="enter">Enter</kbd>）</td></tr>
+ <tr><td>新增同级节点</td><td><kbd data-shortcut-key="command">Ctrl</kbd> +（左键 / <kbd data-shortcut-key="enter">Enter</kbd>）</td></tr>
+ <tr><td>删除节点及其子节点</td><td><kbd data-shortcut-key="delete">Delete</kbd></td></tr>
+ <tr><td>导出 SVG</td><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd>S</kbd></td></tr>
+ <tr><td>撤销</td><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd>Z</kbd></td></tr>
+ <tr><td>重做</td><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd data-shortcut-key="shift">Shift</kbd> + <kbd>Z</kbd></td></tr>
+</tbody>
+</table>
+</dialog>
+<aside id="appNotice" class="app-notice" role="status" aria-live="polite" aria-atomic="true" hidden>
+ <div class="notice-head"><strong id="noticeTitle"></strong><button id="noticeClose" type="button" aria-label="关闭提示">×</button></div>
+ <p id="noticeMessage"></p>
+ <div id="noticeActions"><button id="noticeRetry" type="button">重试保存</button><button id="noticeCopy" type="button">另存为</button></div>
+</aside>
+<dialog id="appConfirm" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+ <strong id="confirmTitle"></strong><p id="confirmMessage"></p>
+ <div class="confirm-actions"><button id="confirmCancel" type="button">取消</button><button id="confirmAccept" type="button">继续</button></div>
+</dialog>
+<noscript>请启用 JavaScript 使用思维导图。<a href="/tools/">返回工具列表</a></noscript>
+<input id="file" type="file" accept=".md,.markdown,.txt" hidden>
+
+<script src="mindmap-core.js"></script>
+<script src="mindmap-feedback.js?v=8ddc4461c1c8"></script>
+<script src="mindmap-file-store.js"></script>
+<script src="mindmap-touch.js?v=c1bc1ff72e31"></script>
+<script src="mindmap.js?v=98cf0f67cb58"></script>
+</body>
+</html>

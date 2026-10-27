@@ -1,0 +1,13 @@
+.tools-directory{padding:1rem 0}
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:1rem}
+.tool-card{display:flex;align-items:center;gap:.75rem;max-width:300px;padding:.85rem 1rem;border:1px solid color-mix(in srgb,currentColor 12%,transparent);border-radius:12px;color:var(--text-color,#3c4858);background:var(--board-bg-color,#fff);transition:border-color .2s,box-shadow .2s}
+.tool-card:hover,.tool-card:focus-visible{color:var(--text-color,#3c4858);border-color:color-mix(in srgb,currentColor 28%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.08);text-decoration:none}
+.tool-card:focus-visible{outline:2px solid currentColor;outline-offset:4px}
+.tool-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(75,132,178,.1);color:#4b84b2}
+.tool-icon svg{width:26px;height:26px}
+.tool-info{min-width:0}
+.tool-card h2{font-size:1rem;margin:0 0 .3rem;font-weight:600}
+.tool-card p{font-size:.8rem;line-height:1.5;color:var(--sec-text-color,#718096);margin:0}
+.tool-arrow{display:flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;margin-left:auto;color:inherit}
+.tool-arrow svg{display:block;width:20px;height:20px}
+@media(prefers-reduced-motion:reduce){.tool-card{transition:none}}
