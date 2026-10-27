@@ -12,7 +12,7 @@ document.documentElement.classList.toggle('touch-ui',touchMode);
 let root=null,roots=[],nodes=[],visible=[],visibleEdges=[],collapsed=new Set(),raw='',handle=null,mode='manual',sourceName='新建思维导图.md',sourceEtag='',handleStamp='',pollTimer=null,pollDelay=2000,readController=null,scale=1,tx=0,ty=0,busy=false,revision=0,editing=null,saving=false;
 // The published tool is fully static. Only a user-selected file handle is polled.
 const DRAFT_KEY='giraffish.tools.mindmap.draft.v1';
-const INITIAL_MAP='# 中心主题\n## 想法\n### 双击编辑节点\n## 计划\n### 拖动整理分支\n';
+const INITIAL_MAP='# 中心主题\n';
 let draftSaved=true, markdownDirty=false,saveError=false,associatedText=null;
 let activeFileId=null,pendingHandle=null,pendingReason='',associationError='',associationSaved=true;
 const fileStore=MindmapFileStore.create(window.indexedDB);
@@ -558,18 +558,23 @@ async function createDraft(){
  if(touchMode||editing||saving||drag||!(await canReplaceSource()))return;
  setSaving(true);
  try{
-  await loadSource('# 中心主题\n','新建思维导图.md','manual',null);
+  await loadSource(INITIAL_MAP,'新建思维导图.md','manual',null);
   $('status').textContent='已新建草稿';
  }finally{setSaving(false);schedulePoll();}
 }
 $('new').onclick=createDraft;
+async function readMarkdownFile(file){
+ if(!/\.(md|markdown|txt)$/i.test(file.name))throw Error('请选择 .md、.markdown 或 .txt 文件。');
+ const text=await file.text();
+ return {text,prepared:parseMarkdown(text)};
+}
 $('open').onclick=async()=>{
  if(editing||saving||drag||!(await canReplaceSource()))return;
  if(touchMode||!window.showOpenFilePicker){$('file').click();return;}
  setSaving(true);
  try{
   const [chosen]=await window.showOpenFilePicker({types:[{description:'Markdown',accept:{'text/plain':['.md','.markdown','.txt']}}]});
-  const text=await(await chosen.getFile()).text(),prepared=parseMarkdown(text);
+  const {text,prepared}=await readMarkdownFile(await chosen.getFile());
   await loadSource(text,chosen.name,'handle',chosen,prepared);
  }catch(error){
   if(error.name==='SecurityError')$('file').click();
@@ -580,7 +585,7 @@ $('file').onchange=async e=>{
  const file=e.target.files[0];if(!file||editing||saving)return;
  setSaving(true);
  try{
-  const text=await file.text(),prepared=parseMarkdown(text);
+  const {text,prepared}=await readMarkdownFile(file);
   await loadSource(text,file.name,'manual',null,prepared);$('status').textContent='已加载 · 编辑完成后请保存';
  }catch(error){showFileError(error,'打开失败');}
  finally{setSaving(false);e.target.value='';}
@@ -984,6 +989,15 @@ const shortcutKeys={
  enter:{win:['Enter','Enter'],mac:['↩','Return']},
  delete:{win:['Delete','Delete / Backspace'],mac:['⌫','Delete / Backspace']}
 };
+// Draw Mac key symbols directly so Safari cannot substitute emoji or font glyphs.
+const shortcutKeyPaths={
+ command:'M8 8H5a3 3 0 1 1 3-3v14a3 3 0 1 1-3-3h14a3 3 0 1 1-3 3V5a3 3 0 1 1 3 3H8',
+ alt:'M3 5h6l6 14h6M15 5h6',
+ shift:'m12 3 9 9h-5v9H8v-9H3z',
+ tab:'M3 12h17m-6-6 6 6-6 6M21 4v16',
+ enter:'M20 5v7H4m6-6-6 6 6 6',
+ delete:'M9 5h12v14H9L2 12zM12 9l6 6m0-6-6 6'
+};
 function detectShortcutPlatform(environment=navigator){
  const platform=environment.userAgentData?.platform||environment.platform||environment.userAgent||'';
  return /Mac|iPhone|iPad|iPod/i.test(platform)?'mac':'win';
@@ -999,6 +1013,7 @@ function setShortcutPlatform(platform,remember=false){
  for(const key of document.querySelectorAll('[data-shortcut-key]')){
   const [label,title]=shortcutKeys[key.dataset.shortcutKey][platform];
   key.textContent=label;key.title=title;key.setAttribute('aria-label',title);
+  if(platform==='mac')key.innerHTML='<svg class="shortcut-key-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="'+shortcutKeyPaths[key.dataset.shortcutKey]+'"/></svg>';
  }
  const command=shortcutKeys.command[platform][0],shift=shortcutKeys.shift[platform][0];
  $('undo').title=`撤销（${command}+Z）`;
@@ -1013,7 +1028,7 @@ function initializeShortcutPlatform(){
 }
 initializeShortcutPlatform();
 
-$('shortcuts').onclick=()=>{$('shortcutHelp').showModal();};
+$('shortcuts').onclick=()=>{$('shortcutHelp').showModal();$('shortcutTitle').focus({preventScroll:true});};
 $('closeHelp').onclick=()=>$('shortcutHelp').close();
 async function exportFromShortcut(){
  if(saving||drag)return;
@@ -1086,7 +1101,9 @@ async function initializeMap(){
  try{
   const draft=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
   if(draft&&typeof draft.text==='string'&&typeof draft.name==='string'){
-   apply(draft.text,draft.name);markdownDirty=!!draft.dirty;
+   // Retire only the untouched, auto-cached demo; preserve edits and file associations.
+   const oldExample=!draft.fileId&&draft.dirty===false&&draft.name==='新建思维导图.md'&&draft.text==='# 中心主题\n## 想法\n### 双击编辑节点\n## 计划\n### 拖动整理分支\n';
+   apply(oldExample?INITIAL_MAP:draft.text,draft.name);markdownDirty=!!draft.dirty;
    activeFileId=typeof draft.fileId==='string'?draft.fileId:null;
    pendingReason=draft.fileReason==='missing'?'missing':'';
    associatedText=activeFileId?(typeof draft.baseText==='string'?draft.baseText:markdownDirty?null:draft.text):null;

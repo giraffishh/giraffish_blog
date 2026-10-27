@@ -615,3 +615,10 @@ kbd {
 #confirmMessage{font-size:14px;line-height:1.75;margin:12px 0 22px}
 #confirmAccept{background:#354555;border-color:#354555;color:#fff}
 .touch-ui #noticeActions{display:none}
+
+/* Fixed geometry avoids platform-specific key glyphs and emoji rendering. */
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;line-height:18px;vertical-align:middle;box-sizing:border-box}
+.shortcut-key-icon{display:block;width:16px;height:16px;min-width:16px;flex:0 0 16px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.toolbar-icon{display:block;width:18px;height:18px;min-width:18px;flex:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#undo,#redo{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+#shortcutTitle:focus{outline:none}
