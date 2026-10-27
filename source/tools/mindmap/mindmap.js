@@ -6,7 +6,8 @@ const colors=[
  '#5a70b3','#ae7956','#5f9865','#aa71b8'
 ];
 const textColor='#333333';
-let touchMode=window.matchMedia('(pointer: coarse)').matches;
+const finePointerQuery=window.matchMedia('(any-pointer: fine)');
+let touchMode=window.matchMedia('(pointer: coarse)').matches&&!finePointerQuery.matches;
 document.documentElement.classList.toggle('touch-ui',touchMode);
 let root=null,roots=[],nodes=[],visible=[],visibleEdges=[],collapsed=new Set(),raw='',handle=null,mode='manual',sourceName='新建思维导图.md',sourceEtag='',handleStamp='',pollTimer=null,pollDelay=2000,readController=null,scale=1,tx=0,ty=0,busy=false,revision=0,editing=null,saving=false;
 // The published tool is fully static. Only a user-selected file handle is polled.
@@ -713,14 +714,31 @@ function cancelGesture(){if(!drag)return;const old=clearGesture();if(old.kind===
 window.addEventListener('pointercancel',cancelGesture);viewport.addEventListener('lostpointercapture',()=>{if(drag)cancelGesture();});window.addEventListener('blur',cancelGesture);
 viewport.addEventListener('wheel',e=>{if(e.target.closest('.zoom,#nodeEditor'))return;e.preventDefault();if(drag)return;zoom(Math.exp(-e.deltaY*.0015),e.clientX-viewRect.left,e.clientY-viewRect.top);},{passive:false});
 let touchPanView=null,pinchView=null;
-function enableTouchMode(){
- if(touchMode||window.innerWidth>900||editing||saving)return;
- touchMode=true;document.documentElement.classList.add('touch-ui');
- closeNodeMenu();updateStorageStatus();updateViewport();
+function enablePointerEditing(){
+ if(!touchMode)return;
+ // Once a mouse or keyboard is used, touching the canvas must not revoke editing.
+ touchMode=false;document.documentElement.classList.remove('touch-ui');
+ for(const [id,rec] of nodeCache){
+  rec.g.setAttribute('tabindex','0');rec.g.setAttribute('role','button');
+  const node=nodeById.get(id);
+  if(node)rec.g.setAttribute('aria-label',node.label+'，双击编辑');
+ }
+ updateHistoryControls();updateViewport();
 }
+function onEditingPointer(e){
+ if(e.isTrusted&&e.pointerType==='mouse'&&!e.sourceCapabilities?.firesTouchEvents)enablePointerEditing();
+}
+function onEditingKey(e){
+ if(!e.isTrusted||e.isComposing||['Unidentified','Process','Dead'].includes(e.key))return;
+ // A key outside a text field is evidence of a keyboard, not the touch IME.
+ if(!e.target.closest('input,textarea,[contenteditable="true"]'))enablePointerEditing();
+}
+document.addEventListener('pointerdown',onEditingPointer,true);
+document.addEventListener('pointermove',onEditingPointer,true);
+document.addEventListener('keydown',onEditingKey,true);
+finePointerQuery.addEventListener('change',e=>{if(e.matches)enablePointerEditing();});
 const touchController=MindmapTouch.create({
  accept(e){
-  enableTouchMode();
   return !editing&&!saving&&!e.target.closest('button,#nodeEditor,.zoom,#fileInfo');
  },
  onPanStart(){closeNodeMenu();touchPanView={tx,ty};},

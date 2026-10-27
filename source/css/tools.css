@@ -1,13 +1,21 @@
-.tools-directory{padding:1rem 0}
-.tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:1rem}
-.tool-card{display:flex;align-items:center;gap:.75rem;max-width:300px;padding:.85rem 1rem;border:1px solid color-mix(in srgb,currentColor 12%,transparent);border-radius:12px;color:var(--text-color,#3c4858);background:var(--board-bg-color,#fff);transition:border-color .2s,box-shadow .2s}
+/* Only the tools directory uses a full-width, compact board inset. */
+#board:has(.tools-directory){padding:2rem 2.5rem}
+#board:has(.tools-directory)>.container{max-width:none;padding:0}
+#board:has(.tools-directory)>.container>.row{margin:0}
+#board:has(.tools-directory)>.container>.row>.col-12{flex:0 0 100%;max-width:100%;padding:0}
+.tools-directory{padding:0}
+@media(max-width:767px){#board:has(.tools-directory){padding:1.5rem}}
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:.75rem}
+.tool-card{display:flex;align-items:center;gap:.75rem;min-width:0;min-height:88px;max-width:340px;padding:.85rem 1rem;border:1px solid color-mix(in srgb,currentColor 12%,transparent);border-radius:12px;color:var(--text-color,#3c4858);background:var(--board-bg-color,#fff);transition:border-color .2s,box-shadow .2s}
 .tool-card:hover,.tool-card:focus-visible{color:var(--text-color,#3c4858);border-color:color-mix(in srgb,currentColor 28%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.08);text-decoration:none}
 .tool-card:focus-visible{outline:2px solid currentColor;outline-offset:4px}
-.tool-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(75,132,178,.1);color:#4b84b2}
-.tool-icon svg{width:26px;height:26px}
+.tool-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:40px;height:40px;border-radius:10px;background:rgba(75,132,178,.1);color:#4b84b2}
+.tool-icon svg{width:29px;height:29px}
 .tool-info{min-width:0}
-.tool-card h2{font-size:1rem;margin:0 0 .3rem;font-weight:600}
-.tool-card p{font-size:.8rem;line-height:1.5;color:var(--sec-text-color,#718096);margin:0}
+.tool-card h2{font-size:1.05rem;margin:0 0 .2rem;font-weight:600}
+.tool-card p{font-size:.85rem;line-height:1.4;color:var(--sec-text-color,#718096);margin:0}
 .tool-arrow{display:flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;margin-left:auto;color:inherit}
-.tool-arrow svg{display:block;width:20px;height:20px}
+.tool-arrow svg{display:block;width:21px;height:21px}
 @media(prefers-reduced-motion:reduce){.tool-card{transition:none}}
+
+@media(max-width:767px){.tools-grid{grid-template-columns:minmax(0,1fr)}}
