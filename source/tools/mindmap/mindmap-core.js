@@ -4,7 +4,7 @@
 
   function parseMarkdown(text) {
     let nodes = []; const stack = [], roots = [];
-    let root = null, fence = null, inComment = false, pendingFloat = null;
+    let root = null, fence = null, inComment = false, pendingFloat = null, pendingColor = null;
     const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/);
     for (let i = 0; i < rows.length; i++) {
       let line = rows[i];
@@ -25,6 +25,10 @@
         } catch { pendingFloat = null; }
         continue;
       }
+      const colorMarker = !inComment && line.match(/^\s*<!-- mindmap:color (\d+|#[0-9a-f]{6}) -->\s*$/i);
+      if (colorMarker && (colorMarker[1][0] === '#' || Number.isSafeInteger(Number(colorMarker[1])))) {
+        pendingColor = { value: colorMarker[1][0] === '#' ? colorMarker[1].toLowerCase() : Number(colorMarker[1]), line: i + 1 }; continue;
+      }
       if (inComment) {
         if (!line.includes('-->')) continue;
         line = line.slice(line.indexOf('-->') + 3); inComment = false;
@@ -43,12 +47,13 @@
       const parent = depth ? stack[depth - 1] : null;
       const node = {
         label, depth, parent,
-        children: [], line: i + 1, startLine: depth <= 1 && pendingFloat ? pendingFloat.line : i + 1,
+        children: [], line: i + 1, startLine: Math.min(i + 1, depth <= 1 && pendingFloat ? pendingFloat.line : i + 1, pendingColor ? pendingColor.line : i + 1),
+        explicitColor: pendingColor ? pendingColor.value : null,
         floating: depth <= 1 && pendingFloat ? { x: pendingFloat.x, y: pendingFloat.y } : null,
         side: 0, branch: 0
       };
       if (parent) parent.children.push(node); else { roots.push(node); root ||= node; }
-      pendingFloat = null;
+      pendingFloat = null; pendingColor = null;
       stack[depth] = node; stack.length = depth + 1; nodes.push(node);
     }
     if (!root) throw Error('没有找到 # 根标题');
@@ -82,6 +87,8 @@
     }
     for (const n of nodes) {
       if (n.depth > 1) { n.side = n.parent.side; n.branch = n.parent.branch; }
+      const explicit = typeof n.explicitColor === 'string' || n.depth === 1 ? n.explicitColor : null;
+      n.color = explicit ?? (n.depth > 1 || n.depth === 1 && typeof n.parent.explicitColor === 'string' ? n.parent.color : n.branch);
       n.end = n.index + n.total;
     }
     return { root: roots[0], roots, nodes, byId: new Map(nodes.map(n => [n.id, n])), hasLegacyFloating };
@@ -462,7 +469,7 @@
   function rootsOf(model) { return model.roots || model.nodes.filter(n => !n.parent); }
 
   // Keep each heading's notes with it, even when old floating-topic source order differs.
-  function rewriteForest(text, model, roots, children, positions, extra = new Map()) {
+  function rewriteForest(text, model, roots, children, positions, extra = new Map(), preserveColors = false, colorOverrides = new Map()) {
     if (!roots.length) throw Error('至少保留一个根节点');
     const offsets = [0]; let match;
     const newline = /\r?\n/g, eol = text.includes('\r\n') ? '\r\n' : '\n';
@@ -471,7 +478,7 @@
     sourceOrder.forEach((n, i) => {
       const start = offsets[n.startLine - 1];
       const end = i + 1 < sourceOrder.length ? offsets[sourceOrder[i + 1].startLine - 1] : text.length;
-      const prefix = text.slice(start, offsets[n.line - 1]).replace(/^[^\S\r\n]*<!-- mindmap:float \{[^\r\n]*\} -->[^\S\r\n]*(?:\r?\n)?/, '');
+      const prefix = text.slice(start, offsets[n.line - 1]).replace(/^[^\S\r\n]*<!-- mindmap:(?:float \{[^\r\n]*\}|color (?:\d+|#[0-9a-fA-F]{6})) -->[^\S\r\n]*(?:\r?\n|$)/gm, '');
       chunks.set(n, { prefix, body: text.slice(offsets[n.line - 1], end) });
     });
     const order = [], stack = roots.slice().reverse().map(n => ({ n, depth: 0 })), indices = new Map();
@@ -486,6 +493,11 @@
     for (const { n, depth } of order) {
       if (needsNewline) parts.push(eol);
       if (depth === 0 && positions.has(n)) parts.push('<!-- mindmap:float ' + JSON.stringify(positions.get(n)) + ' -->' + eol);
+      const explicitColor = colorOverrides.has(n) ? colorOverrides.get(n) : n.explicitColor;
+      if (typeof explicitColor === 'string' || depth === 1 && (preserveColors || explicitColor != null)) {
+        const color = typeof explicitColor === 'string' ? explicitColor : n.color ?? n.branch;
+        parts.push('<!-- mindmap:color ' + color + ' -->' + eol);
+      }
       const chunk = chunks.get(n), body = typeof chunk === 'string' ? chunk : chunk.body;
       const part = (typeof chunk === 'string' ? '' : chunk.prefix) + body.replace(/^\uFEFF/, '').replace(/^#+(?=[ \t])/, () => '#'.repeat(depth + 1));
       parts.push(part); needsNewline = !part.endsWith('\n');
@@ -554,8 +566,90 @@
       else if (!chosen.has(n)) order.push(n);
     }
     state.children.set(target.parent, order);
-    const change = rewriteForest(text, model, state.roots, state.children, state.positions);
+    const change = rewriteForest(text, model, state.roots, state.children, state.positions, new Map(), !target.parent.parent);
     return { ...change, movedIndices: moving.map(n => change.indices.get(n)) };
+  }
+  function siblingGaps(visible, excluded = new Set(), scale = 1) {
+    const groups = new Map(), gaps = [];
+    for (const n of visible) {
+      if (!n.parent || excluded.has(n.index)) continue;
+      let sides = groups.get(n.parent);
+      if (!sides) groups.set(n.parent, sides = new Map());
+      let list = sides.get(n.side);
+      if (!list) sides.set(n.side, list = []);
+      list.push(n);
+    }
+    for (const [parent, sides] of groups) for (const list of sides.values()) {
+      list.sort((a, b) => a.y - b.y);
+      const first = list[0], last = list[list.length - 1], reach = 24 / scale;
+      gaps.push({ parent, upper: null, lower: first, x: first.x, right: first.x + first.w,
+        y: first.y - reach / 2, top: first.y - reach, bottom: first.y });
+      for (let i = 1; i < list.length; i++) {
+        const upper = list[i - 1], lower = list[i];
+        const top = upper.y + upper.h, bottom = lower.y;
+        if (bottom <= top) continue;
+        gaps.push({ parent, upper, lower, x: Math.min(upper.x, lower.x),
+          right: Math.max(upper.x + upper.w, lower.x + lower.w), y: (top + bottom) / 2, top, bottom });
+      }
+      const end = last.y + last.h;
+      gaps.push({ parent, upper: last, lower: null, x: last.x, right: last.x + last.w,
+        y: end + reach / 2, top: end, bottom: end + reach });
+    }
+    return gaps;
+  }
+  function unchangedInsertionSlot(moving) {
+    const parent = moving[0]?.parent;
+    if (!parent || moving.some(n => n.parent !== parent)) return null;
+    const start = parent.children.indexOf(moving[0]);
+    if (start < 0 || !moving.every((n, i) => parent.children[start + i] === n)) return null;
+    return { parent, before: parent.children[start - 1] || null, after: parent.children[start + moving.length] || null };
+  }
+  function isInsertionNoop(moving, lower) {
+    return !!lower && unchangedInsertionSlot(moving)?.after === lower;
+  }
+  function createInsertionIndex(gaps, moving) {
+    // Only one destination can preserve the current order. Find it once per drag.
+    const unchanged = unchangedInsertionSlot(moving);
+    const items = gaps.map(gap => ({ ...gap, noop: !!unchanged && gap.parent === unchanged.parent && (gap.lower ? gap.lower === unchanged.after : gap.upper === unchanged.before),
+      hitBox: { x: gap.x, y: gap.top, right: gap.right, bottom: gap.bottom } }));
+    return { items, boxes: items.length > 128 ? createBoxIndex(items, 'hitBox') : null };
+  }
+  function queryInsertion(index, x, y, scale) {
+    if (!index) return null;
+    const padding = 8 / scale;
+    const candidates = index.boxes ? queryBoxes(index.boxes, { x: x - padding, y, right: x + padding, bottom: y }) : index.items;
+    let best = null, distance = Infinity;
+    for (const gap of candidates) {
+      const dy = Math.abs(y - gap.y);
+      if (x < gap.x - padding || x > gap.right + padding || y <= gap.top || y >= gap.bottom || (!gap.noop && dy > 12 / scale)) continue;
+      if (dy < distance) { best = gap; distance = dy; }
+    }
+    return best;
+  }
+  function insertSubtrees(text, model, ids, upperId, lowerId) {
+    const moving = selectionRoots(model, ids), upper = model.byId.get(upperId), lower = model.byId.get(lowerId);
+    if (!moving.length) throw Error('请选择要插入的节点');
+    const anchor = upper || lower, parent = anchor?.parent;
+    if (!parent || upperId != null && !upper || lowerId != null && !lower || upper && lower && (upper.parent !== lower.parent || upper === lower || upper.side !== lower.side)) throw Error('请选择有效的同级节点插入位置');
+    const contains = n => n && moving.some(m => n.index >= m.index && n.index < m.end);
+    if (contains(parent) || contains(upper) || contains(lower)) throw Error('不能插入自身或子节点之间');
+    const chosen = new Set(moving), remaining = parent.children.filter(n => !chosen.has(n));
+    const side = remaining.filter(n => n.side === anchor.side), slot = side.indexOf(upper);
+    if (!upper ? side[0] !== lower : !lower ? side[side.length - 1] !== upper : slot < 0 || side[slot + 1] !== lower) throw Error('插入位置已变化，请重新拖动');
+    const order = remaining.slice(), at = lower ? order.indexOf(lower) : order.indexOf(upper) + 1;
+    order.splice(at, 0, ...moving);
+    if (moving.every(n => n.parent === parent) && order.every((n, i) => n === parent.children[i])) {
+      return { text, model, remap: index => index, movedIndices: moving.map(n => n.index), expandIndex: parent.index };
+    }
+    const state = structureMaps(model);
+    for (const n of moving) {
+      if (n.parent) state.children.set(n.parent, state.children.get(n.parent).filter(c => c !== n));
+      else state.roots = state.roots.filter(r => r !== n);
+      state.positions.delete(n);
+    }
+    state.children.set(parent, order);
+    const change = rewriteForest(text, model, state.roots, state.children, state.positions, new Map(), !parent.parent || moving.some(n => n.depth <= 1));
+    return { ...change, movedIndices: moving.map(n => change.indices.get(n)), expandIndex: change.indices.get(parent) };
   }
   function moveSubtrees(text, model, ids, targetId, positions = {}) {
     const moving = selectionRoots(model, ids), state = structureMaps(model);
@@ -577,6 +671,20 @@
     const change = rewriteForest(text, model, state.roots, state.children, state.positions);
     return { ...change, movedIndices: moving.map(n => change.indices.get(n)), expandIndex: target ? change.indices.get(target) : null };
   }
+  function setBranchColor(text, model, ids, color) {
+    if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) throw Error('颜色格式无效');
+    color = color.toLowerCase();
+    const selected = selectionRoots(model, ids);
+    if (!selected.length) throw Error('请选择要更改颜色的分支');
+    const overrides = new Map();
+    for (const node of selected) {
+      // Applying a branch color deliberately replaces descendant overrides too.
+      for (let i = node.index; i < node.end; i++) overrides.set(model.nodes[i], null);
+      overrides.set(node, color);
+    }
+    const state = structureMaps(model);
+    return rewriteForest(text, model, state.roots, state.children, state.positions, new Map(), false, overrides);
+  }
   function deleteSubtrees(text, model, ids) {
     const moving = selectionRoots(model, ids), state = structureMaps(model);
     if (!moving.length) throw Error('请选择要删除的节点');
@@ -587,7 +695,7 @@
     return rewriteForest(text, model, state.roots, state.children, state.positions);
   }
 
-  const api = { parseMarkdown, createMetricsCache, prepare, layout, bounds, createViewportIndex, selectViewport, createHistory, changeStructure, selectionRoots, swapSiblings, moveSubtrees, deleteSubtrees, addRoot, normalizedSource, avoidRootOverlap, settleRootPositions, queryNodes };
+  const api = { parseMarkdown, createMetricsCache, prepare, layout, bounds, createViewportIndex, selectViewport, createHistory, changeStructure, selectionRoots, swapSiblings, siblingGaps, isInsertionNoop, createInsertionIndex, queryInsertion, insertSubtrees, moveSubtrees, setBranchColor, deleteSubtrees, addRoot, normalizedSource, avoidRootOverlap, settleRootPositions, queryNodes };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else scope.MindmapCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

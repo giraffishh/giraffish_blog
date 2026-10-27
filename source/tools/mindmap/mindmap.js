@@ -5,16 +5,19 @@ const colors=[
  '#c76562','#378f9d','#b9618a','#8c9748',
  '#5a70b3','#ae7956','#5f9865','#aa71b8'
 ];
+// Arrange picker swatches by hue without changing persisted palette indices.
+const colorPresets=[4,9,0,7,10,2,5,1,8,3,11,6].map(index=>colors[index]);
+const colorPicker=MindmapColor.create(document,colorPresets);
 const textColor='#333333';
 const finePointerQuery=window.matchMedia('(any-pointer: fine)');
 let touchMode=window.matchMedia('(pointer: coarse)').matches&&!finePointerQuery.matches;
 document.documentElement.classList.toggle('touch-ui',touchMode);
-let root=null,roots=[],nodes=[],visible=[],visibleEdges=[],collapsed=new Set(),raw='',handle=null,mode='manual',sourceName='新建思维导图.md',sourceEtag='',handleStamp='',pollTimer=null,pollDelay=2000,readController=null,scale=1,tx=0,ty=0,busy=false,revision=0,editing=null,saving=false;
+let root=null,roots=[],nodes=[],visible=[],visibleEdges=[],collapsed=new Set(),raw='',handle=null,mode='manual',sourceName='新建思维导图.md',handleStamp='',pollTimer=null,pollDelay=2000,scale=1,tx=0,ty=0,busy=false,revision=0,editing=null,saving=false;
 // The published tool is fully static. Only a user-selected file handle is polled.
 const DRAFT_KEY='giraffish.tools.mindmap.draft.v1';
 const INITIAL_MAP='# 中心主题\n';
 let draftSaved=true, markdownDirty=false,saveError=false,associatedText=null;
-let activeFileId=null,pendingHandle=null,pendingReason='',associationError='',associationSaved=true;
+let activeFileId=null,pendingHandle=null,pendingReason='',associationSaved=true;
 const fileStore=MindmapFileStore.create(window.indexedDB);
 const feedback=MindmapFeedback.create(document,{retry:()=>saveFromNotice(),copy:()=>saveFromNotice(true)});
 let saveBusyVisible=false,saveBusyTimer=null;
@@ -61,7 +64,6 @@ function fileConflictError(){
 function suspendFile(error,chosen=handle||pendingHandle){
  pendingHandle=chosen;mode='manual';saveError=true;
  pendingReason=isMissingFile(error)?'missing':error?.name==='NotAllowedError'?'permission':error?.name==='ConflictError'?'conflict':'error';
- associationError=fileErrorMessage(error);
  updateStorageStatus();
 }
 function showFileError(error,title='保存失败',automatic=false){
@@ -203,6 +205,7 @@ const scene = $('scene'), edgeLayer = el('g'), nodeLayer = el('g');
 scene.append(edgeLayer, nodeLayer);
 const ghostLayer=el('g',{id:'dragGhost','pointer-events':'none'});scene.append(ghostLayer);
 
+function branchColor(n){return typeof n.color==='string'?n.color:colors[n.color%colors.length];}
 function parseMarkdown(text) { return Core.parseMarkdown(text); }
 function layout() {
   const start = performance.now();
@@ -232,8 +235,8 @@ function makeNode() {
 }
 function updateNode(rec, n) {
   perf.nodesUpdated++; rec.layoutVersion = perf.layouts;
-  const color = colors[n.branch % colors.length];
-  const signature = [n.label, n.depth, n.branch, n.side, n.w, n.h, n.children.length].join('|');
+  const color = branchColor(n);
+  const signature = [n.label, n.depth, n.color, n.side, n.w, n.h, n.children.length].join('|');
   if (rec.signature !== signature) {
     rec.signature = signature;
     rec.g.style.setProperty('--branch-color',n.parent?color:textColor);
@@ -316,7 +319,7 @@ function patchScene() {
     let path = edgeCache.get(n.id);
     if (!path) { path = el('path', { class: 'edge' }); edgeCache.set(n.id, path); perf.edgesCreated++; }
     if (sceneDirty || !mountedEdges.has(n.id)) {
-      attr(path, 'd', n.edgePath); attr(path, 'stroke', colors[n.branch % colors.length]);
+      attr(path, 'd', n.edgePath); attr(path, 'stroke', branchColor(n));
     }
     if (!mountedEdges.has(n.id)) newEdges.append(path);
   }
@@ -416,7 +419,7 @@ function showNodeMenu(n,x,y){
  const selected=n?selectedNodes().sort((a,b)=>a.index-b.index):[];
  const single=selected.length===1;
  const siblings=selected.length>0&&selected.every(item=>item.parent===selected[0].parent&&item.depth===selected[0].depth);
- const allowed={root:!n,edit:single,child:single,sibling:siblings,detach:!!n,toggle:!!n,delete:!!n};
+ const allowed={root:!n,edit:single,child:single,sibling:siblings,detach:!!n,toggle:!!n,color:!!n,delete:!!n};
  for(const item of menu.querySelectorAll('button[data-action]')){
   const action=item.dataset.action;
   item.hidden=!allowed[action];
@@ -448,6 +451,7 @@ function onNodeMenuClick(e){
  const action=button.dataset.action,n=action==='child'||action==='sibling'?nodeById.get(button.dataset.nodeId):menuTarget,position=menuPoint,ids=[...selectedIds];closeNodeMenu();
  if(action==='root'){createRoot(position);return;}
  if(!n||nodeById.get(n.id)!==n||editing||saving)return;
+ if(action==='color'){openBranchColor(ids,n);return;}
  if(action==='edit')startEdit(n);
  else if(action==='toggle')toggleNodes(ids.map(id=>nodeById.get(id)),n);
  else if(action==='detach')return detachNodes(ids);
@@ -487,7 +491,7 @@ function buildExportSVG() {
   const edges = el('g'), boxes = el('g'); svg.append(edges, boxes);
   // Export the complete expanded model, never the culled on-screen DOM.
   for (const n of visible) {
-    if (n.edgePath) edges.append(el('path', { d: n.edgePath, stroke: colors[n.branch % colors.length], class: 'edge' }));
+    if (n.edgePath) edges.append(el('path', { d: n.edgePath, stroke: branchColor(n), class: 'edge' }));
     const rec = makeNode(); updateNode(rec, n); rec.toggle?.remove(); boxes.append(rec.g);
   }
   return svg;
@@ -528,25 +532,25 @@ function schedulePoll(){
  clearTimeout(pollTimer);pollTimer=null;
  if(!document.hidden&&mode!=='manual')pollTimer=setTimeout(()=>refresh(),pollDelay);
 }
-async function refresh(force=false){
- if(busy||editing||saving||drag){schedulePoll();return;}
- busy=true;const version=revision;readController=new AbortController();
+async function refresh(){
+ if(busy||editing||saving||drag||$('branchColorDialog')?.open){schedulePoll();return;}
+ busy=true;const version=revision;
  try{
-  let text,etag=null,stamp=null;
+  let text,stamp=null;
   if(mode==='handle'&&handle){
    const file=await handle.getFile();stamp=file.lastModified+':'+file.size;
-   if(!force&&stamp===handleStamp)return;text=await file.text();
-  }else{if(force)$('file').click();return;}
-  if(version!==revision||editing||drag)return;
-  apply(text,sourceName);saveError=false;associatedText=text;rememberDraft();if(etag)sourceEtag=etag;if(stamp)handleStamp=stamp;pollDelay=2000;
+   if(stamp===handleStamp)return;text=await file.text();
+  }else{return;}
+  if(version!==revision||editing||drag||$('branchColorDialog')?.open)return;
+  apply(text,sourceName);saveError=false;associatedText=text;rememberDraft();if(stamp)handleStamp=stamp;pollDelay=2000;
  }catch(error){
   if(error.name==='AbortError'||version!==revision)return;
   suspendFile(error,handle);rememberDraft();showFileError(error,'本地文件暂不可用');
   pollDelay=Math.min(pollDelay*2,30000);$('status').textContent='读取失败，保留上次图';
   if(!root)$('error').textContent=fileErrorMessage(error);
- }finally{busy=false;readController=null;schedulePoll();}
+ }finally{busy=false;schedulePoll();}
 }
-function switchSource(){editHistory.reset();updateHistoryControls();revision++;sourceEtag='';handleStamp='';readController?.abort();clearTimeout(pollTimer);}
+function switchSource(){editHistory.reset();updateHistoryControls();revision++;handleStamp='';clearTimeout(pollTimer);}
 async function loadSource(text,name,newMode,newHandle,prepared){
  switchSource();feedback.clear();handle=newHandle;mode=newMode;
  activeFileId=null;pendingHandle=null;pendingReason='';associationSaved=true;associatedText=newHandle?text:null;
@@ -592,19 +596,39 @@ $('file').onchange=async e=>{
 };
 $('expand').onclick=()=>{collapsed.clear();render();fit();};
 $('branches').onchange=e=>{const n=nodeById.get(e.target.value);if(!n)return;for(let p=n;p;p=p.parent)collapsed.delete(p.key);render();const descendants=visible.filter(v=>v.index>=n.index&&v.index<n.end);fit(descendants);};
-$('plus').onclick=()=>zoom(1.25);$('minus').onclick=()=>zoom(.8);$('reset').onclick=()=>zoom(1/scale);
+$('plus').onclick=()=>zoom(1.25);$('minus').onclick=()=>zoom(.8);$('reset').onclick=()=>fit();
 $('export').onclick=()=>{const svg=buildExportSVG();if(!svg)return;const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=sourceName.replace(/\.(md|markdown|txt)$/i,'')+'.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);};
 let drag=null,dragMoved=false;
 const viewport=$('viewport');
 viewport.addEventListener('selectstart',e=>{if(!e.target.closest('#nodeEditor'))e.preventDefault();});
 viewport.addEventListener('dragstart',e=>{if(!e.target.closest('#nodeEditor'))e.preventDefault();});
 viewport.addEventListener('contextmenu',e=>{if(!e.target.closest('#nodeEditor'))e.preventDefault();});
-function hitNode(clientX,clientY){
+function hitNodes(clientX,clientY){
  const x=(clientX-viewRect.left-tx)/scale,y=(clientY-viewRect.top-ty)/scale;
  const candidates=viewportIndex?Core.queryNodes(viewportIndex,{x,y,right:x,bottom:y}):visible;
- let hit=null;
- for(const n of candidates)if(x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h&&(!hit||n.index>hit.index))hit=n;
- return hit;
+ let target=null,source=null;
+ for(const n of candidates){
+  if(x<n.x||x>n.x+n.w||y<n.y||y>n.y+n.h)continue;
+  if(drag?.movingIndices?.has(n.index)){if(!source||n.index>source.index)source=n;}
+  else if(!target||n.index>target.index)target=n;
+ }
+ return {target,source};
+}
+function hitInsertion(clientX,clientY){
+ return Core.queryInsertion(drag.insertionIndex,(clientX-viewRect.left-tx)/scale,(clientY-viewRect.top-ty)/scale,scale);
+}
+function paintInsertionGuide(insertion){
+ const marker=$('insertMarker');marker.hidden=!insertion;
+ if(!insertion)return;
+ const side=(insertion.upper||insertion.lower).side,parent=insertion.parent;
+ const outer=side<0?insertion.x:insertion.right,inner=side<0?insertion.right:insertion.x;
+ const end=side<0?parent.x:parent.x+parent.w,endY=parent.y+parent.h/2;
+ const bend=Math.min(24,Math.abs(end-inner)/2);
+ attr($('insertPath'),'d',`M${outer},${insertion.y}H${inner}C${inner-side*bend},${insertion.y} ${end+side*bend},${endY} ${end},${endY}`);
+ attr($('insertPath'),'transform',`translate(${tx},${ty}) scale(${scale})`);
+ for(const [id,x] of [['insertStart',outer],['insertEnd',inner]]){
+  attr($(id),'cx',x*scale+tx);attr($(id),'cy',insertion.y*scale+ty);
+ }
 }
 function creationAction(e){
  if(e.shiftKey)return null;
@@ -631,6 +655,7 @@ function beginNodeDrag(){
  drag.movingIndices=new Set();
  for(const n of drag.roots){for(let i=n.index;i<n.end;i++)drag.movingIndices.add(i);const rec=nodeCache.get(n.id)||makeNode();if(rec.layoutVersion!==perf.layouts)updateNode(rec,n);const copy=rec.g.cloneNode(true);copy.classList.remove('drag-source','drop-target','drop-invalid');copy.removeAttribute('tabindex');copy.querySelectorAll('.toggle-control').forEach(e=>e.remove());ghostLayer.append(copy);}
  for(const n of visible)if(drag.movingIndices.has(n.index))nodeCache.get(n.id)?.g.classList.add('drag-source');
+ drag.insertionIndex=Core.createInsertionIndex(Core.siblingGaps(visible,drag.movingIndices,scale),drag.roots);
 }
 function paintGesture(){
  if(!drag||!dragMoved)return;
@@ -654,26 +679,32 @@ function paintGesture(){
    for(const {element} of drag.zones)element.classList.toggle('is-active',element.dataset.dropAction===action);
    drag.dropAction=action;
   }
-  const target=action?null:hitNode(drag.cx,drag.cy);
+  const hits=action?null:hitNodes(drag.cx,drag.cy),hovered=hits?.target;
+  const candidate=!action&&!hovered?hitInsertion(drag.cx,drag.cy):null;
+  const originalTarget=hovered||(!candidate?hits?.source:null);
+  const noop=!action&&(candidate?.noop||!!originalTarget&&drag.movingIndices.has(originalTarget.index));
+  const insertion=noop?null:candidate,target=noop?null:originalTarget;
+  drag.insertion=insertion;
+  paintInsertionGuide(insertion);
   const pointerX=(drag.cx-viewRect.left-tx)/scale;
-  const innerHalf=!!target?.parent&&(target.side<0?pointerX>=target.x+target.w/2:pointerX<target.x+target.w/2);
+  const leftHalf=!!target?.parent&&pointerX<target.x+target.w/2;
   const sameParent=!!target?.parent&&drag.roots.every(n=>n.parent===target.parent);
   const invalid=!!target&&drag.movingIndices.has(target.index);
-  drag.intent=target?(sameParent&&innerHalf?'swap':'child'):'detach';
-  const feedbackKey=(target?.id||'free')+':'+drag.intent+':'+invalid;
+  drag.intent=noop?'noop':insertion?'insert':target?(sameParent&&leftHalf?'swap':'child'):'detach';
+  const feedbackKey=(insertion?(insertion.upper?.id||'start')+'|'+(insertion.lower?.id||'end'):target?.id||'free')+':'+drag.intent+':'+invalid;
   if(drag.feedbackKey!==feedbackKey){
    if(dropTargetId)nodeCache.get(dropTargetId)?.g.classList.remove('drop-target','drop-invalid');
    dropTargetId=target?.id||null;dropInvalid=invalid;
    if(target)nodeCache.get(target.id)?.g.classList.add(dropInvalid?'drop-invalid':'drop-target');
    drag.feedbackKey=feedbackKey;
   }
-  const hint=$('dropHint');hint.hidden=!!action;
-  if(action){drag.hintKey=null;return;}
+  const hint=$('dropHint');hint.hidden=!!action||noop;
+  if(action||noop){drag.hintKey=null;return;}
   const hintKey=feedbackKey;
   if(drag.hintKey!==hintKey){
    hint.classList.toggle('invalid',dropInvalid);
    hint.dataset.mode=invalid?'invalid':drag.intent;
-   hint.textContent=invalid?'不能拖入自身或子节点':target?(drag.intent==='swap'?'与「'+target.label+'」交换位置':'成为「'+target.label+'」的子节点'):'独立到此处';
+   hint.textContent=invalid?'不能拖入自身或子节点':insertion?(!insertion.upper?'插入「'+insertion.lower.label+'」上方':!insertion.lower?'插入「'+insertion.upper.label+'」下方':'插入「'+insertion.upper.label+'」和「'+insertion.lower.label+'」之间'):target?(drag.intent==='swap'?'与「'+target.label+'」交换位置':'成为「'+target.label+'」的子节点'):'独立到此处';
    drag.hintWidth=hint.offsetWidth;drag.hintHeight=hint.offsetHeight;drag.hintKey=hintKey;
   }
   hint.style.left=Math.max(8,Math.min(viewWidth-drag.hintWidth-8,drag.cx-viewRect.left+16))+'px';
@@ -692,7 +723,7 @@ window.addEventListener('pointermove',e=>{
 function clearGesture(){
  const old=drag;drag=null;viewport.classList.remove('dragging');
  if(old&&viewport.hasPointerCapture(old.id))viewport.releasePointerCapture(old.id);
- $('selectionRect').hidden=true;$('dropHint').hidden=true;ghostLayer.replaceChildren();ghostLayer.removeAttribute('transform');
+ $('selectionRect').hidden=true;$('dropHint').hidden=true;$('insertMarker').hidden=true;ghostLayer.replaceChildren();ghostLayer.removeAttribute('transform');
  $('dragActions').hidden=true;for(const zone of $('dragActions').children)zone.classList.remove('is-active');
  for(const id of mountedNodes)nodeCache.get(id)?.g.classList.remove('drag-source','drop-target','drop-invalid');
  dropTargetId=null;dropInvalid=false;return old;
@@ -707,8 +738,9 @@ function onViewportPointerUp(e){
    if(!moved){showNodeMenu(old.nodeId?nodeById.get(old.nodeId):null,e.clientX,e.clientY);}
   }
  }else if(old.kind==='nodes'&&moved&&!invalid){
-  if(old.dropAction==='cancel'){setSelection(old.initialSelection);return;}
+  if(old.intent==='noop'||old.dropAction==='cancel'){setSelection(old.initialSelection);return;}
   if(old.dropAction==='delete'){deleteSelection(old.roots.map(n=>n.id));return;}
+  if(old.intent==='insert'&&old.insertion){return commitInsert(old.roots.map(n=>n.id),old.insertion.upper?.id??null,old.insertion.lower?.id??null);}
   if(old.intent==='swap'){return commitSwap(old.roots.map(n=>n.id),target);}
   const positions={};for(const n of old.roots)positions[n.id]={x:n.x+(old.cx-old.x)/scale,y:n.y+(old.cy-old.y)/scale};
   return commitMove(old.roots.map(n=>n.id),target,positions);
@@ -771,7 +803,7 @@ function currentModel(){return {root,roots,nodes,byId:nodeById};}
 function setSaving(value){
  saving=value;clearTimeout(saveBusyTimer);saveBusyTimer=null;saveBusyVisible=false;
  if(value){
-  revision++;readController?.abort();
+  revision++;
   saveBusyTimer=setTimeout(()=>{if(saving){saveBusyVisible=true;updateSaveControls();}},150);
  }
  updateHistoryControls();
@@ -796,10 +828,26 @@ async function commitStructure(build){
  }catch(error){$('status').textContent=error.message;feedback.show({title:'操作未完成',message:error.message,category:'operation',actions:false});}
  finally{setSaving(false);}
 }
+function openBranchColor(ids,node){
+ const expected=raw;
+ colorPicker.open(branchColor(node),color=>{
+  if(raw!==expected){feedback.show({title:'导图已变化',message:'请重新选择要更改颜色的分支。',category:'operation',actions:false});return;}
+  void commitStructure((text,model,view)=>{
+   const change=Core.setBranchColor(text,model,ids,color);
+   return {change,afterView:mappedView(view,change,view.selectedIndices.map(change.remap)),status:'已更改分支颜色'};
+  });
+ });
+}
 function commitSwap(ids,targetId){
  return commitStructure((text,model,view)=>{
   const change=Core.swapSiblings(text,model,ids,targetId);
   return {change,afterView:mappedView(view,change,change.movedIndices),status:'已交换节点位置'};
+ });
+}
+function commitInsert(ids,upperId,lowerId){
+ return commitStructure((text,model,view)=>{
+  const change=Core.insertSubtrees(text,model,ids,upperId,lowerId);
+  return {change,afterView:mappedView(view,change,change.movedIndices,change.expandIndex),status:'已插入节点'};
  });
 }
 function commitMove(ids,targetId,positions){
@@ -924,7 +972,7 @@ function updateHistoryControls(){
  $('undo').disabled=!editHistory.canUndo||!!editing||saving;
  $('redo').disabled=!editHistory.canRedo||!!editing||saving;
 }
-async function persistSource(expected,updated,nodeEdit=null){
+async function persistSource(expected,updated){
  if(touchMode)throw Error('移动端为只读模式');
  if(mode==='handle'&&handle){
   try{
@@ -958,7 +1006,7 @@ async function saveEdit(){
   const beforeView=captureView(),change=deleting?Core.deleteSubtrees(edit.expected,currentModel(),[edit.id]):editedSource(edit.expected,edit.line,label);
   setSaving(true);$('nodeText').disabled=true;$('editError').textContent='';
   const normalized=Core.normalizedSource(change.text,change.model);
-  const updated=await persistSource(edit.expected,normalized,!deleting&&normalized===change.text?{line:edit.line,label}:null);
+  const updated=await persistSource(edit.expected,normalized);
   const id=deleting?null:edit.id,afterView=deleting?mappedView(beforeView,change):null;
   hideEditor();applyLocalChange(updated,id,afterView,updated===change.text?change.model:null);editHistory.record(edit.expected,updated,id,{before:beforeView,after:captureView()});
   $('status').textContent=mode==='manual'?'已应用 · 请保存 Markdown 留存':deleting?'已删除空节点':'已保存';
@@ -1039,7 +1087,7 @@ async function exportFromShortcut(){
 }
 function onDocumentKeydown(e){
  if(touchMode||e.defaultPrevented||e.isComposing)return;
- if(feedback.confirmOpen){if(e.ctrlKey||e.metaKey)e.preventDefault();return;}
+ if(feedback.confirmOpen||$('branchColorDialog')?.open){if(e.ctrlKey||e.metaKey)e.preventDefault();return;}
  if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='s'){
   e.preventDefault();
   if(!e.repeat&&!$('shortcutHelp').open&&$('nodeMenu').hidden)void exportFromShortcut();
@@ -1091,10 +1139,10 @@ new ResizeObserver(()=>{const r=viewport.getBoundingClientRect();viewWidth=r.wid
 window.addEventListener('resize',updateViewport);updateViewport();
 document.addEventListener('visibilitychange',()=>{
  clearTimeout(pollTimer);pollTimer=null;
- if(document.hidden){readController?.abort();if(frameId){cancelAnimationFrame(frameId);frameId=0;}}
+ if(document.hidden){revision++;if(frameId){cancelAnimationFrame(frameId);frameId=0;}}
  else{transform();refresh();}
 });
-window.addEventListener('pagehide',()=>{clearTimeout(pollTimer);readController?.abort();cancelAnimationFrame(frameId);frameId=0;});
+window.addEventListener('pagehide',()=>{revision++;clearTimeout(pollTimer);cancelAnimationFrame(frameId);frameId=0;});
 window.addEventListener('pageshow',()=>{updateViewport();schedulePoll();});
 async function initializeMap(){
  setSaving(true);

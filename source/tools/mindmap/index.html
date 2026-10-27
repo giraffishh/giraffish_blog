@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mindmap 思维导图 · Giraffish 工具</title>
 <meta name="description" content="在浏览器中编辑 Markdown 思维导图，支持拖拽、撤销、草稿恢复和 SVG 导出。文件在本地处理。">
-<link rel="stylesheet" href="mindmap.css?v=faf5f4aa6067">
+<link rel="stylesheet" href="mindmap.css?v=5daaf518cb1c">
 </head>
 <body>
 <header id="header">
@@ -38,6 +38,7 @@
 </svg>
 <div id="selectionRect" hidden></div>
 <div id="dropHint" hidden></div>
+<div id="insertMarker" aria-hidden="true" hidden><svg focusable="false"><path id="insertPath" vector-effect="non-scaling-stroke"/><circle id="insertStart" r="3.5"/><circle id="insertEnd" r="3.5"/></svg></div>
 <div id="dragActions" aria-label="拖动操作" hidden>
 <div class="drop-zone delete" data-drop-action="delete">
 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -71,7 +72,7 @@
 <button id="minus" aria-label="缩小">−</button>
 <span id="zoomLabel">100%</span>
 <button id="plus" aria-label="放大">＋</button>
-<button id="reset">1:1</button>
+<button id="reset" aria-label="定位导图" title="定位导图（保留展开状态）"><svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/></svg></button>
 </div>
 </main>
 
@@ -81,6 +82,7 @@
  <button type="button" role="menuitem" data-action="child">新增子节点</button>
  <button type="button" role="menuitem" data-action="sibling">新增同级节点</button>
  <button type="button" role="menuitem" data-action="detach">独立节点</button>
+ <button type="button" role="menuitem" data-action="color">更改分支颜色</button>
  <button type="button" role="menuitem" data-action="toggle">收起子节点</button>
  <div class="menu-separator" role="separator"></div>
  <button type="button" role="menuitem" data-action="delete" class="menu-delete">删除节点及子节点</button>
@@ -99,8 +101,7 @@
  <tr><td>选择节点</td><td>左键</td></tr>
  <tr><td>框选节点</td><td>右键</td></tr>
  <tr><td>复选</td><td><kbd data-shortcut-key="shift">Shift</kbd></td></tr>
- <tr><td>展开 / 收起子节点</td><td>圆点 / <kbd data-shortcut-key="tab">Tab</kbd></td></tr>
- <tr><td>编辑节点</td><td>双击 / <kbd>F2</kbd></td></tr>
+ <tr><td>展开 / 收起子节点</td><td><kbd data-shortcut-key="tab">Tab</kbd></td></tr>
  <tr><td>新增子节点</td><td><kbd data-shortcut-key="alt">Alt</kbd> +（左键 / <kbd data-shortcut-key="enter">Enter</kbd>）</td></tr>
  <tr><td>新增同级节点</td><td><kbd data-shortcut-key="command">Ctrl</kbd> +（左键 / <kbd data-shortcut-key="enter">Enter</kbd>）</td></tr>
  <tr><td>删除节点及其子节点</td><td><kbd data-shortcut-key="delete">Delete</kbd></td></tr>
@@ -109,6 +110,20 @@
  <tr><td>重做</td><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd data-shortcut-key="shift">Shift</kbd> + <kbd>Z</kbd></td></tr>
 </tbody>
 </table>
+</dialog>
+<dialog id="branchColorDialog" aria-labelledby="branchColorTitle">
+ <form id="colorForm" novalidate>
+  <strong id="branchColorTitle">更改分支颜色</strong>
+  <div id="colorSwatches" role="group" aria-label="预设颜色"></div>
+  <div class="color-rgb">
+   <label>R<input id="colorR" type="number" min="0" max="255" step="1" required inputmode="numeric"></label>
+   <label>G<input id="colorG" type="number" min="0" max="255" step="1" required inputmode="numeric"></label>
+   <label>B<input id="colorB" type="number" min="0" max="255" step="1" required inputmode="numeric"></label>
+  </div>
+  <div class="color-preview"><span id="colorPreview" aria-hidden="true"></span><output id="colorHex"></output></div>
+  <p id="colorError" role="status" aria-live="polite"></p>
+  <div class="confirm-actions"><button id="colorCancel" type="button">取消</button><button type="submit">应用</button></div>
+ </form>
 </dialog>
 <aside id="appNotice" class="app-notice" role="status" aria-live="polite" aria-atomic="true" hidden>
  <div class="notice-head"><strong id="noticeTitle"></strong><button id="noticeClose" type="button" aria-label="关闭提示">×</button></div>
@@ -123,10 +138,11 @@
 <!-- Let Files providers expose Markdown even when its MIME/UTI is unknown. Validate after selection. -->
 <input id="file" type="file" hidden>
 
-<script src="mindmap-core.js"></script>
+<script src="mindmap-color.js?v=5df31281c657"></script>
+<script src="mindmap-core.js?v=614b6aa75cce"></script>
 <script src="mindmap-feedback.js?v=8ddc4461c1c8"></script>
 <script src="mindmap-file-store.js"></script>
 <script src="mindmap-touch.js?v=c1bc1ff72e31"></script>
-<script src="mindmap.js?v=0a6c986cd8ce"></script>
+<script src="mindmap.js?v=893bc24c09f0"></script>
 </body>
 </html>
