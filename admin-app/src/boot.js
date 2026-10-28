@@ -15,6 +15,13 @@ async function start() {
     // The widget consumes callback fragments asynchronously in its iframe.
     // Do not let the CMS hash router replace them before login completes.
     if (callback) {
+      const target = document.getElementById('studio-loading');
+      if (target) {
+        const login = document.createElement('button');
+        login.textContent = '登录';
+        login.onclick = () => window.netlifyIdentity.open('login');
+        target.replaceChildren(login);
+      }
       await waitForIdentityLogin(window.netlifyIdentity);
       window.netlifyIdentity.close();
     }

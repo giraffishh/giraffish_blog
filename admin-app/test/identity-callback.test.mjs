@@ -29,11 +29,16 @@ test('CMS startup waits for callback login, not an old session init event', asyn
   assert.equal(ready,true);
   assert.equal(handlers.size,0);
 });
-test('callback errors are surfaced without exposing credential-bearing error details', async () => {
+test('a recoverable widget error does not prevent a subsequent successful login', async () => {
   const handlers = new Map();
   const identity = {on:(name,fn)=>handlers.set(name,fn),off:name=>handlers.delete(name)};
-  const pending = waitForIdentityLogin(identity);
-  handlers.get('error')(new Error('provider error with private details'));
-  await assert.rejects(pending,/登录验证未完成/);
+  let ready = false;
+  const pending = waitForIdentityLogin(identity).then(()=>{ready=true;});
+  handlers.get('error')?.(new Error('incorrect password'));
+  await Promise.resolve();
+  assert.equal(ready,false);
+  handlers.get('login')({id:'test-user'});
+  await pending;
+  assert.equal(ready,true);
   assert.equal(handlers.size,0);
 });

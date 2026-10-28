@@ -12,18 +12,12 @@ export function callbackDestination({ pathname, hash }) {
 }
 
 export function waitForIdentityLogin(identity) {
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      identity.off('login', success);
-      identity.off('error', failure);
+  return new Promise(resolve => {
+    const success = user => {
+      if (user) { identity.off('login', success); resolve(); }
     };
-    const success = user => { if (user) { cleanup(); resolve(); } };
-    const failure = error => {
-      if (!error) return;
-      cleanup();
-      reject(new Error('登录验证未完成，请重新登录'));
-    };
+    // The widget displays errors and allows retries. A wrong password or a
+    // transient request failure must not permanently stop CMS startup.
     identity.on('login', success);
-    identity.on('error', failure);
   });
 }
