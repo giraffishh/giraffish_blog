@@ -3,13 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "hexo generate",
+    "build": "npm run build:admin && hexo generate",
+    "build:admin": "npm --prefix admin-app ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix admin-app test && npm --prefix admin-app run build",
+    "test:admin": "npm --prefix admin-app test",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
     "server": "hexo server"
   },
   "hexo": {
     "version": "8.1.2"
+  },
+  "overrides": {
+    "hexo-renderer-markdown-it": { "markdown-it": "15.0.3" },
+    "katex": "0.19.1"
   },
   "dependencies": {
     "@traptitech/markdown-it-katex": "^3.6.0",
