@@ -4,11 +4,11 @@ import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
-import DOMPurify from 'dompurify';
-import { imageMarkdown, safeImageUrl, readBackup, templates, documentSections } from './document.js';
+import { imageMarkdown, safeImageUrl, readBackup, templates } from './document.js';
 
 const assetBase = '/admin/assets';
-const vditorCDN = `${assetBase}/vditor`;
+import { livePreview, liveFocus, renderedBlocks, renderMode } from './live-preview.js';
+import { LazyDocument } from './rendered-document.js';
 const activeStudios = new Set();
 export function markBodySaved(body) {
   if (typeof body !== 'string') return;
@@ -60,8 +60,8 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [basicSetup, markdownLanguage(), keymap.of([indentWithTab]), EditorView.lineWrapping,
-          EditorView.contentAttributes.of({ 'aria-label': 'Markdown 源码', spellcheck: 'false' }),
+        extensions: [basicSetup, livePreview, liveFocus, markdownLanguage(), keymap.of([indentWithTab]), EditorView.lineWrapping,
+          EditorView.contentAttributes.of({ 'aria-label': '正文编辑器', spellcheck: 'false' }),
           EditorView.updateListener.of(update => {
             if (update.docChanged && !this.syncing) this.commit(update.state.doc.toString());
           }),
@@ -70,7 +70,8 @@ export class WritingStudio {
       }),
     });
     this.offerRecovery();
-    this.setMode(preference('mode', value.length > 100000 ? 'split' : 'ir'));
+    this.lazyPreview = new LazyDocument(this.previewPane);
+    this.setMode(preference('mode', 'render'));
     this.queueRender(0);
     window.addEventListener('pagehide', () => this.saveBackup(), { signal: this.abort.signal });
     this.root.addEventListener('keydown', event => {
@@ -85,40 +86,16 @@ export class WritingStudio {
     const modes = el('div', 'studio-modes');
     modes.setAttribute('aria-label', '编辑模式');
     this.modeButtons = {};
-    for (const [mode, label] of [['ir', '即时渲染'], ['source', '源码'], ['split', '分屏'], ['preview', '阅读']]) {
+    for (const [mode, label] of [['render', '渲染'], ['source', '源码'], ['split', '分屏']]) {
       const item = button(label, () => this.setMode(mode));
       item.setAttribute('aria-pressed', 'false');
       this.modeButtons[mode] = item;
       modes.append(item);
     }
-    nav.append(modes, button('大纲 / 图片', () => {
+    nav.append(modes, button('侧栏', () => {
       this.root.classList.toggle('studio-sidebar-open');
       this.source.requestMeasure();
     }), button('查找替换', () => { this.setMode('source'); openSearchPanel(this.source); }), button('导出正文', () => this.download()), this.focusButton);
-    this.toolbar = el('div', 'studio-tools');
-    this.toolbar.append(
-      button('B', () => this.wrap('**', '**', '粗体文字'), 'studio-bold'),
-      button('H₂', () => this.insert('\n## 小标题\n')),
-      button('链接', () => this.linkDialog(false)),
-      button('外链图片', () => this.linkDialog(true), 'studio-accent'),
-      button('代码', () => this.insert(`\n${templates['代码示例']}\n`)),
-      button('公式', () => this.insert(`\n${templates['公式']}\n`)),
-      button('表格', () => this.insert(`\n${templates['表格']}\n`)),
-      button('写作模板', () => { this.root.classList.add('studio-sidebar-open'); this.showSidebar('templates'); }),
-    );
-    this.sectionBar = el('div', 'studio-section-bar');
-    this.sectionBar.hidden = true;
-    const sectionLabel = el('label', '', '章节');
-    this.sectionSelect = el('select');
-    this.sectionSelect.setAttribute('aria-label', '当前编辑章节');
-    this.sectionSelect.addEventListener('change', () => {
-      this.flush();
-      this.sectionIndex = Number(this.sectionSelect.value);
-      this.configureIRScope();
-      this.ensureIR();
-    });
-    sectionLabel.append(this.sectionSelect);
-    this.sectionBar.append(sectionLabel);
     this.recovery = el('div', 'studio-recovery');
     this.recovery.hidden = true;
     this.body = el('div', 'studio-body');
@@ -131,15 +108,14 @@ export class WritingStudio {
     this.sidebar.append(sidebarNav, this.sideContent);
     this.workspace = el('div', 'studio-workspace');
     this.sourcePane = el('div', 'studio-source');
-    this.irPane = el('div', 'studio-ir');
-    this.previewPane = el('article', 'studio-preview');
+    this.previewPane = el('article', 'studio-preview studio-typography');
     this.previewPane.setAttribute('aria-label', '文章预览');
     this.previewPane.addEventListener('click', event => {
       const link = event.target.closest('a');
       if (link?.getAttribute('href')?.startsWith('#')) {
         event.preventDefault();
         const id = link.getAttribute('href').slice(1);
-        this.previewPane.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView({ block: 'nearest' });
+        this.lazyPreview.jumpAnchor(id);
       }
     });
     this.divider = el('div', 'studio-divider');
@@ -164,14 +140,14 @@ export class WritingStudio {
       event.preventDefault();
       this.setRatio(event.key === 'Home' ? 20 : event.key === 'End' ? 80 : this.ratio + (event.key === 'ArrowLeft' ? -5 : 5));
     });
-    this.workspace.append(this.sourcePane, this.divider, this.previewPane, this.irPane);
+    this.workspace.append(this.sourcePane, this.divider, this.previewPane);
     this.body.append(this.sidebar, this.workspace);
     this.footer = el('div', 'studio-footer');
     this.count = el('span');
     this.status = el('span');
     this.status.setAttribute('role', 'status');
     this.footer.append(this.count, this.status);
-    this.root.append(nav, this.toolbar, this.sectionBar, this.recovery, this.body, this.footer);
+    this.root.append(nav, this.recovery, this.body, this.footer);
     this.activeSide = 'outline';
   }
 
@@ -190,112 +166,20 @@ export class WritingStudio {
   }
 
   setMode(mode) {
-    if (!['ir', 'source', 'split', 'preview'].includes(mode)) mode = 'ir';
+    if (mode === 'ir' || mode === 'preview') mode = 'render';
+    if (!['render','source','split'].includes(mode)) mode = 'render';
     this.flush();
     this.mode = mode;
     this.root.dataset.mode = mode;
     for (const [key, btn] of Object.entries(this.modeButtons)) btn.setAttribute('aria-pressed', String(key === mode));
     storePreference('mode', mode);
-    this.toolbar.hidden = mode === 'preview';
-    this.sectionBar.hidden = true;
-    if (mode === 'ir') { this.configureIRScope(); this.ensureIR(); }
-    else this.updateSource();
+    this.source.dispatch({ effects: renderMode.of(mode === 'render') });
     this.source.requestMeasure();
     this.queueRender(0);
   }
 
-  configureIRScope() {
-    this.irScope = null;
-    if (this.value.length <= 80000) return;
-    const sections = documentSections(this.value);
-    this.sectionIndex = Math.min(this.sectionIndex || 0, sections.length - 1);
-    this.irScope = { ...sections[this.sectionIndex] };
-    this.sectionSelect.replaceChildren();
-    sections.forEach((section, i) => {
-      const option = el('option', '', `${i + 1}. ${section.title}`);
-      option.value = String(i); this.sectionSelect.append(option);
-    });
-    this.sectionSelect.value = String(this.sectionIndex);
-    this.sectionBar.hidden = false;
-  }
-
-  irText() { return this.irScope ? this.value.slice(this.irScope.from, this.irScope.to) : this.value; }
-
-  commitIR(text) {
-    this.irValue = text;
-    if (!this.irScope) { this.commit(text); return; }
-    const { from, to } = this.irScope;
-    const next = this.value.slice(0, from) + text + this.value.slice(to);
-    this.irScope.to = from + text.length;
-    this.commit(next);
-  }
-
-  ensureIR() {
-    const editorText = this.irText();
-    if (editorText.length > 80000) {
-      this.notice('这个章节较长，已使用分屏模式。可添加小标题后按章节即时编辑。');
-      this.setMode('split'); return;
-    }
-    if (this.vditor) {
-      // Initialization loads Lute asynchronously. Do not swap a section while
-      // the initial document is still being mounted into the editor.
-      if (!this.irReady) return;
-      if (this.irValue !== editorText) {
-        this.irReady = false;
-        this.vditor.setValue(editorText, true);
-        this.irBaseline = this.vditor.getValue();
-        this.irValue = editorText;
-        this.irReady = true;
-        this.irEdited = false;
-      }
-      return;
-    }
-    if (!window.Vditor) { this.notice('即时渲染组件未加载，已切换至源码。'); this.setMode('source'); return; }
-    this.irValue = editorText;
-    this.sectionSelect.disabled = true;
-    this.vditor = new window.Vditor(this.irPane, {
-      cdn: vditorCDN, value: editorText, mode: 'ir', lang: 'zh_CN', height: '100%',
-      cache: { enable: false }, toolbar: [], toolbarConfig: { hide: true },
-      placeholder: '输入正文…',
-      outline: { enable: false },
-      preview: {
-        delay: 350, maxWidth: 10000,
-        markdown: { sanitize: true, autoSpace: false, fixTermTypo: false, codeBlockPreview: false },
-        math: { engine: 'KaTeX', inlineDigit: true },
-        hljs: { enable: true },
-        transform: html => DOMPurify.sanitize(html),
-      },
-      link: { isOpen: false },
-      upload: { handler: () => { this.notice('请先将图片上传到图床，再使用“外链图片”插入地址。'); return '请使用外链图片地址'; } },
-      after: () => {
-        if (this.destroyed) return;
-        this.irBaseline = this.vditor.getValue();
-        this.irValue = editorText;
-        this.irReady = true;
-        this.sectionSelect.disabled = false;
-        this.irPane.querySelector('.vditor-ir [contenteditable="true"]')?.setAttribute('aria-label', '即时渲染编辑器');
-        if (this.mode === 'ir' && this.irText() !== editorText) this.ensureIR();
-      },
-      input: text => {
-        if (!this.irReady || this.mode !== 'ir' || text === this.irBaseline) return;
-        this.irEdited = true;
-        this.irBaseline = text;
-        this.commitIR(text);
-      },
-    });
-  }
-
   flush() {
-    // Vditor debounces its input callback. Read the DOM synchronously before a
-    // save/mode/section change, comparing with its normalized baseline so merely
-    // opening a document never rewrites the original Markdown.
-    if (this.mode === 'ir' && this.irReady) {
-      const text = this.vditor.getValue();
-      if (text !== this.irBaseline) {
-        this.irBaseline = text;
-        this.commitIR(text);
-      }
-    }
+    // CodeMirror publishes edits synchronously; do not rewrite untouched CRLF source.
   }
 
   updateSource() {
@@ -309,7 +193,7 @@ export class WritingStudio {
     if (value === this.value) return;
     this.value = value || '';
     this.updateSource();
-    if (this.mode === 'ir') this.ensureIR();
+
     this.queueRender(0);
   }
 
@@ -345,7 +229,7 @@ export class WritingStudio {
         this.commit(backup.body);
         this.setValue(backup.body);
         this.updateSource();
-        if (this.mode === 'ir') this.ensureIR();
+
         this.recovery.hidden = true;
       }), button('忽略此副本', () => {
         this.recovery.hidden = true;
@@ -356,8 +240,9 @@ export class WritingStudio {
   queueRender(delay = 400) {
     clearTimeout(this.renderTimer);
     this.count.textContent = `${this.value.replace(/\s/g, '').length.toLocaleString()} 字符 · ${this.value.split('\n').length.toLocaleString()} 行`;
+    const id = ++this.requestId;
     this.renderTimer = setTimeout(() => {
-      this.worker.postMessage({ id: ++this.requestId, text: this.value, preview: ['split','preview'].includes(this.mode) });
+      this.worker.postMessage({ id, text: this.source.state.doc.toString(), preview: ['split','render'].includes(this.mode) });
     }, delay);
   }
 
@@ -366,19 +251,9 @@ export class WritingStudio {
     if (data.error) { this.notice(`预览失败：${data.error}`); return; }
     this.documentInfo = data;
     this.showSidebar(this.activeSide);
-    if (data.html === undefined || !['split','preview'].includes(this.mode)) return;
-    const ratio = this.previewPane.scrollTop / Math.max(1, this.previewPane.scrollHeight - this.previewPane.clientHeight);
-    this.previewPane.innerHTML = DOMPurify.sanitize(data.html, { ADD_ATTR: ['target'], FORBID_TAGS: ['iframe', 'form', 'input', 'style'] });
-    for (const image of this.previewPane.querySelectorAll('img')) {
-      image.loading = 'lazy';
-      image.referrerPolicy = 'no-referrer';
-      const src = image.getAttribute('src');
-      if (src?.startsWith('/')) image.src = new URL(src, 'https://blog.giraffish.top').href;
-    }
-    for (const link of this.previewPane.querySelectorAll('a[href]')) {
-      link.target = '_blank'; link.rel = 'noopener noreferrer';
-    }
-    this.previewPane.scrollTop = ratio * (this.previewPane.scrollHeight - this.previewPane.clientHeight);
+    if (!data.blocks) return;
+    this.source.dispatch({ effects: renderedBlocks.of(data.blocks) });
+    if (this.mode === 'split') this.lazyPreview.update(data.blocks);
   }
 
   syncScroll() {
@@ -396,7 +271,7 @@ export class WritingStudio {
     } else if (tab === 'images') {
       const images = this.documentInfo?.images || [];
       this.sideContent.append(el('p', 'studio-muted', `${images.length} 张图片`));
-      if (!images.length) this.sideContent.append(button('插入第一张外链图片', () => this.linkDialog(true)));
+      this.sideContent.append(button('插入图片', () => this.linkDialog(true)));
       for (const image of images) {
         const card = el('div', 'studio-image-card');
         card.append(el('strong', '', image.alt || '未填写图片说明'), el('code', '', image.url));
@@ -427,28 +302,20 @@ export class WritingStudio {
   }
 
   goToLine(number) {
-    this.setMode('source');
     const line = this.source.state.doc.line(Math.min(number, this.source.state.doc.lines));
-    this.source.dispatch({ selection: { anchor: line.from }, scrollIntoView: true });
-    this.source.focus();
+    if (this.mode === 'render') {
+      this.source.dispatch({ effects: EditorView.scrollIntoView(line.from, { y:'start' }) });
+    } else {
+      this.source.dispatch({ selection: { anchor: line.from }, scrollIntoView: true });
+      this.source.focus();
+      if (this.mode === 'split') this.lazyPreview.jump(line.from);
+    }
   }
 
   insert(text) {
-    if (this.mode === 'ir' && this.irReady) {
-      this.vditor.insertMD(text);
-      this.irEdited = true;
-      this.flush();
-      return;
-    }
-    if (this.mode === 'preview') this.setMode('source');
-    const { from, to } = this.source.state.selection.main;
-    this.source.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length } });
+    const from = this.source.state.selection.main.head;
+    this.source.dispatch({ changes: { from, insert: text }, selection: { anchor: from + text.length } });
     this.source.focus();
-  }
-
-  wrap(before, after, placeholder) {
-    const selected = this.mode === 'ir' ? this.vditor?.getSelection() : this.source.state.sliceDoc(this.source.state.selection.main.from, this.source.state.selection.main.to);
-    this.insert(`${before}${selected || placeholder}${after}`);
   }
 
   linkDialog(image) {
@@ -494,6 +361,6 @@ export class WritingStudio {
     activeStudios.delete(this);
     this.abort.abort();
     clearTimeout(this.backupTimer); clearTimeout(this.renderTimer);
-    this.worker.terminate(); this.source.destroy(); this.vditor?.destroy();
+    this.worker.terminate(); this.lazyPreview.destroy(); this.source.destroy();
   }
 }

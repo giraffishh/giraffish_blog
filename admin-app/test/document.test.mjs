@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
 import YAML from 'yaml';
-import { markdown, inspectDocument, imageMarkdown, safeImageUrl, readBackup, documentSections } from '../src/document.js';
+import { markdown, inspectDocument, imageMarkdown, safeImageUrl, readBackup, renderBlocks } from '../src/document.js';
 
 test('external images support parentheses, references and HTML, excluding fenced examples', () => {
   const text = '# 真实标题\n\n![inline](https://example.com/a_(b).png)\n\n![ref][asset]\n\n[asset]: https://example.com/ref.webp\n\n<img src="https://example.com/html.png">\n\n```md\n# not a heading\n![example](https://example.com/ignore.png)\n```';
@@ -42,18 +42,6 @@ test('recovery ignores equivalent saved content and handles unavailable storage'
   assert.equal(readBackup({getItem:()=>'{broken'}, 'key', ''), null);
 });
 
-test('long-article sections form an exact, lossless partition', () => {
-  const body = '前言\n\n# 一级标题\n\n原文\n\n```md\n## 示例，不是章节\n```\n\n## 推导\n\n$$x=1$$\n\n### 细节\n正文\n';
-  const sections = documentSections(body);
-  assert.equal(sections.map(s => body.slice(s.from,s.to)).join(''), body);
-  assert.deepEqual(sections.map(s => s.title), ['开篇','一级标题','推导','细节']);
-  const edited = sections[2];
-  const replacement = '## 推导\n\n已修改。\n\n';
-  const next = body.slice(0,edited.from) + replacement + body.slice(edited.to);
-  assert.ok(next.startsWith(body.slice(0,edited.from)));
-  assert.ok(next.endsWith(body.slice(edited.to)));
-});
-
 test('all existing articles render without altering their original source', async () => {
   const dir = new URL('../../source/_posts/', import.meta.url);
   const files = (await readdir(dir)).filter(file => file.endsWith('.md'));
@@ -70,6 +58,12 @@ test('all existing articles render without altering their original source', asyn
     const html = markdown.render(body);
     assert.equal(typeof html, 'string');
     inspectDocument(body);
+    const blocks=renderBlocks(body);
+    if (body.trim()) assert.ok(blocks.length>0, file);
+    for(let i=0;i<blocks.length;i++) {
+      assert.ok(blocks[i].from<blocks[i].to && blocks[i].to<=body.length, file);
+      if(i)assert.ok(blocks[i-1].to<=blocks[i].from, file);
+    }
     assert.equal(await readFile(new URL(file, dir), 'utf8'), source);
   }
   console.log(`Corpus: ${files.length} articles; largest ${longest} characters; ${Math.round(performance.now()-start)} ms`);
