@@ -51,7 +51,7 @@ async function initialize() {
   document.body.classList.add('studio-demo');
   const notice = document.createElement('div');
   notice.className = 'studio-demo-notice';
-  notice.textContent = '体验模式 · 不连接博客仓库 · 刷新后测试文章会重置';
+  notice.textContent = '体验模式 · 不会保存到博客';
   document.body.append(notice);
   // Exercise the real collections and widgets; only the persistence backend
   // changes. This catches configuration issues hidden by a simplified demo.
@@ -63,7 +63,7 @@ async function initialize() {
   config.local_backend = false;
   config.publish_mode = 'simple';
   const fields = config.collections.find(collection => collection.name === 'posts').fields;
-  fields.find(field => field.name === 'title').default = '从一个想法开始';
+  fields.find(field => field.name === 'title').default = '示例文章';
   fields.find(field => field.name === 'body').default = `${templates['论文笔记']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n`;
   CMS.init({ config });
  } else CMS.init();

@@ -19,7 +19,7 @@ export function markBodySaved(body) {
     studio.edited = false;
     try { localStorage.removeItem(studio.key); } catch { /* Optional cleanup. */ }
     studio.recovery.hidden = true;
-    studio.notice('正文已保存到当前文章');
+    studio.notice('已保存');
   }
 }
 const el = (tag, cls, text) => {
@@ -80,11 +80,7 @@ export class WritingStudio {
 
   build() {
     this.root.className = 'writing-studio';
-    const header = el('div', 'studio-heading');
-    const brand = el('div');
-    brand.append(el('span', 'studio-eyebrow', 'GIRAFFISH / WRITING STUDIO'), el('strong', '', '让思考，顺畅落笔。'));
-    this.focusButton = button('专注写作 ↗', () => this.toggleFocus(), 'studio-primary');
-    header.append(brand, this.focusButton);
+    this.focusButton = button('全屏', () => this.toggleFocus());
     const nav = el('div', 'studio-nav');
     const modes = el('div', 'studio-modes');
     modes.setAttribute('aria-label', '编辑模式');
@@ -98,7 +94,7 @@ export class WritingStudio {
     nav.append(modes, button('大纲 / 图片', () => {
       this.root.classList.toggle('studio-sidebar-open');
       this.source.requestMeasure();
-    }), button('查找替换', () => { this.setMode('source'); openSearchPanel(this.source); }), button('导出正文', () => this.download()));
+    }), button('查找替换', () => { this.setMode('source'); openSearchPanel(this.source); }), button('导出正文', () => this.download()), this.focusButton);
     this.toolbar = el('div', 'studio-tools');
     this.toolbar.append(
       button('B', () => this.wrap('**', '**', '粗体文字'), 'studio-bold'),
@@ -112,7 +108,7 @@ export class WritingStudio {
     );
     this.sectionBar = el('div', 'studio-section-bar');
     this.sectionBar.hidden = true;
-    const sectionLabel = el('label', '', '长文分节编辑 ');
+    const sectionLabel = el('label', '', '章节');
     this.sectionSelect = el('select');
     this.sectionSelect.setAttribute('aria-label', '当前编辑章节');
     this.sectionSelect.addEventListener('change', () => {
@@ -122,7 +118,7 @@ export class WritingStudio {
       this.ensureIR();
     });
     sectionLabel.append(this.sectionSelect);
-    this.sectionBar.append(sectionLabel, el('span', '', '源码与分屏始终显示全文。'));
+    this.sectionBar.append(sectionLabel);
     this.recovery = el('div', 'studio-recovery');
     this.recovery.hidden = true;
     this.body = el('div', 'studio-body');
@@ -172,10 +168,10 @@ export class WritingStudio {
     this.body.append(this.sidebar, this.workspace);
     this.footer = el('div', 'studio-footer');
     this.count = el('span');
-    this.status = el('span', '', '本地恢复副本仅保存在此浏览器，发布请使用文章保存按钮。');
+    this.status = el('span');
     this.status.setAttribute('role', 'status');
     this.footer.append(this.count, this.status);
-    this.root.append(header, nav, this.toolbar, this.sectionBar, this.recovery, this.body, this.footer);
+    this.root.append(nav, this.toolbar, this.sectionBar, this.recovery, this.body, this.footer);
     this.activeSide = 'outline';
   }
 
@@ -189,7 +185,7 @@ export class WritingStudio {
 
   toggleFocus() {
     const focused = this.root.classList.toggle('studio-focus');
-    this.focusButton.textContent = focused ? '返回文章设置 ↙' : '专注写作 ↗';
+    this.focusButton.textContent = focused ? '退出全屏' : '全屏';
     this.source.requestMeasure();
   }
 
@@ -260,7 +256,7 @@ export class WritingStudio {
     this.vditor = new window.Vditor(this.irPane, {
       cdn: vditorCDN, value: editorText, mode: 'ir', lang: 'zh_CN', height: '100%',
       cache: { enable: false }, toolbar: [], toolbarConfig: { hide: true },
-      placeholder: '从一个想法开始，输入 Markdown…',
+      placeholder: '输入正文…',
       outline: { enable: false },
       preview: {
         delay: 350, maxWidth: 10000,
@@ -335,7 +331,7 @@ export class WritingStudio {
     }
     try {
       localStorage.setItem(this.key, JSON.stringify({ version: 1, body: this.value, base: this.original, time: Date.now() }));
-      this.notice(`本地恢复副本已更新 · ${new Date().toLocaleTimeString('zh-CN')} · 尚需保存到仓库`);
+      this.notice('已备份到本机');
     } catch { this.notice('本地空间不足或不可用，请及时保存到仓库或导出正文。'); }
   }
 
@@ -344,7 +340,7 @@ export class WritingStudio {
     try { backup = readBackup(localStorage, this.key, this.value); } catch { return; }
     if (!backup) return;
     this.recovery.hidden = false;
-    this.recovery.append(el('span', '', `发现 ${new Date(backup.time).toLocaleString('zh-CN')} 的本地副本。恢复前可先导出当前正文。`),
+    this.recovery.append(el('span', '', `本地备份 · ${new Date(backup.time).toLocaleString('zh-CN')}`),
       button('恢复副本', () => {
         this.commit(backup.body);
         this.setValue(backup.body);
@@ -396,11 +392,10 @@ export class WritingStudio {
     this.activeSide = tab;
     this.sideContent.replaceChildren();
     if (tab === 'templates') {
-      this.sideContent.append(el('p', 'studio-muted', '在光标处插入，不覆盖已有内容。'));
       for (const [name, content] of Object.entries(templates)) this.sideContent.append(button(name, () => this.insert(`\n${content}\n`), 'studio-template'));
     } else if (tab === 'images') {
       const images = this.documentInfo?.images || [];
-      this.sideContent.append(el('p', 'studio-muted', `当前文章引用了 ${images.length} 个图片地址。外链直接保留，无需导入媒体库。`));
+      this.sideContent.append(el('p', 'studio-muted', `${images.length} 张图片`));
       if (!images.length) this.sideContent.append(button('插入第一张外链图片', () => this.linkDialog(true)));
       for (const image of images) {
         const card = el('div', 'studio-image-card');
@@ -422,7 +417,7 @@ export class WritingStudio {
       }
     } else {
       const headings = this.documentInfo?.headings || [];
-      if (!headings.length) this.sideContent.append(el('p', 'studio-muted', '用 # 或 ## 添加标题，大纲会自动出现。'));
+      if (!headings.length) this.sideContent.append(el('p', 'studio-muted', '暂无标题'));
       for (const heading of headings) {
         const item = button(heading.text, () => this.goToLine(heading.line), 'studio-outline-item');
         item.style.paddingLeft = `${10 + Math.min(heading.level - 1, 4) * 10}px`;
@@ -466,12 +461,11 @@ export class WritingStudio {
     urlLabel.append(url);
     const altLabel = el('label', '', image ? '图片说明 / Alt 文本' : '链接文字');
     const alt = el('input'); alt.type = 'text'; altLabel.append(alt);
-    const hint = el('p', 'studio-muted', image ? '支持图床外链和 /images/ 站内路径，保留原地址。粘贴完整 Markdown 图片语法请直接粘贴到源码。' : '输入完整地址，支持 http(s)。');
     const error = el('p', 'studio-error'); error.setAttribute('role', 'alert');
     const actions = el('div', 'studio-dialog-actions');
     const submit = el('button', 'studio-primary', '插入'); submit.type = 'submit';
     actions.append(button('取消', () => dialog.close()), submit);
-    form.append(title, urlLabel, altLabel, hint, error, actions);
+    form.append(title, urlLabel, altLabel, error, actions);
     form.addEventListener('submit', event => {
       event.preventDefault();
       try {
