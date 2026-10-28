@@ -37,7 +37,7 @@ collections:
         date_format: YYYY-MM-DD
         time_format: HH:mm:ss
         picker_utc: false
-        hint: 保存文章时自动更新，使用北京时间。
+        hint: 保存时自动更新
       - label: 标签
         name: tags
         widget: list
@@ -85,7 +85,6 @@ collections:
         widget: hidden
         required: false
     label_singular: 文章
-    description: 论文批读、课程笔记与技术实践。正文支持即时渲染、源码和可调分屏。
     summary: "{{title}} · {{updated}}"
     sortable_fields:
       - updated
