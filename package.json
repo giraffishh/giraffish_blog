@@ -3,18 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "node build-tools/prepare-renderer.cjs && npm run build:admin && node build-tools/build-site.cjs",
-    "build:admin": "npm --prefix admin-app ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix admin-app test && npm --prefix admin-app run build",
-    "test:admin": "npm --prefix admin-app test",
+    "build": "node build.cjs",
+    "build:admin": "npm --prefix source/admin ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix source/admin run build",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
-    "server": "hexo server"
+    "server": "hexo server",
+    "dev:admin": "npm --prefix source/admin run dev"
   },
   "hexo": {
     "version": "8.1.2"
   },
   "overrides": {
-    "hexo-renderer-markdown-it": { "markdown-it": "15.0.3" },
+    "hexo-renderer-markdown-it": {
+      "markdown-it": "15.0.3"
+    },
     "katex": "0.19.1"
   },
   "dependencies": {

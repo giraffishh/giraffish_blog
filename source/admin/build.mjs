@@ -3,9 +3,9 @@ import { cp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const out = path.resolve(here, '../source/admin/assets');
-const relativeOutput = path.relative(path.dirname(here), out);
-if (relativeOutput !== path.join('source', 'admin', 'assets')) throw new Error('Unexpected generated asset directory');
+const out = path.resolve(here, 'assets');
+const relativeOutput = path.relative(here, out);
+if (relativeOutput !== 'assets') throw new Error('Unexpected generated asset directory');
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 await Promise.all([

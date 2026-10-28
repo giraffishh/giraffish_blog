@@ -100,7 +100,12 @@ pagination_dir: page
 include:
 exclude:
 ignore:
-
+ - "**/admin/src/**"
+ - "**/admin/node_modules/**"
+ - "**/admin/test/**"
+ - "**/admin/*.mjs"
+ - "**/admin/package*.json"
+ - "**/admin/.npmrc"
 # Extensions
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
