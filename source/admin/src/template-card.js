@@ -1,4 +1,4 @@
-import {markdown} from './document.js';
+import previews from 'studio:template-previews';
 import {populateRendered} from './rendered-document.js';
 
 export function createTemplateCard(name, content, onInsert) {
@@ -24,7 +24,7 @@ export function createTemplateCard(name, content, onInsert) {
     }
     preview.append(gallery);
   } else {
-    populateRendered(preview, markdown.render(content));
+    populateRendered(preview, previews[name]);
     // The whole card inserts a template; preview links and summaries are not controls.
     for (const node of preview.querySelectorAll('a, summary, [role=checkbox]')) {
       node.removeAttribute('href');

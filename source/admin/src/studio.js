@@ -4,8 +4,7 @@ import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
-import { imageMarkdown, readBackup, templates } from './document.js';
-const assetBase = '/admin/assets';
+import { imageMarkdown, readBackup, templates } from './document-utils.js';
 import { livePreview, liveFocus, renderedBlocks, renderMode } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
@@ -15,6 +14,9 @@ import { SidebarResize } from './sidebar-resize.js';
 import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
 import { MetadataDock } from './metadata-dock.js';
 import { LayoutMotion, reducedMotion } from './layout-motion.js';
+import { compactQuery, ResponsiveEditorLayout } from './responsive-layout.js';
+import { compactAction } from './action-icon.js';
+import { DocumentRenderer } from './analysis-client.js';
 const activeStudios = new Set();
 export function markBodySaved(body) {
   if (typeof body !== 'string') return;
@@ -69,14 +71,12 @@ export class WritingStudio {
     this.mode = 'source';
     this.requestId = 0;
     this.abort = new AbortController();
+    this.compact = window.matchMedia(compactQuery).matches;
+    this.desktopSidebarOpen = preference('sidebar-open', 'true') === 'true';
     activeStudios.add(this);
     this.build();
     this.motion = new LayoutMotion(this.root);
-    this.worker = new Worker(`${assetBase}/render-worker.js`);
-    this.worker.onmessage = ({
-      data
-    }) => this.renderResult(data);
-    this.worker.onerror = () => this.notice('预览加载失败，源码仍可编辑。请刷新后重试。');
+    this.renderer = new DocumentRenderer(data => this.renderResult(data));
     this.source = new EditorView({
       parent: this.sourcePane,
       state: EditorState.create({
@@ -120,9 +120,13 @@ export class WritingStudio {
         this.scrollSync.schedule();
         this.metadataDock?.schedule();
       },
-      onCommit: width => storePreference('sidebar-width', String(width))
+      onCommit: width => {
+        storePreference('sidebar-width', String(width));
+        this.scrollSync.schedule();
+      }
     });
     this.metadataDock = new MetadataDock(this);
+    this.responsiveLayout = new ResponsiveEditorLayout(this);
     this.setMode(preference('mode', 'render'));
     this.readyFrame = requestAnimationFrame(() => {
       if (!this.destroyed) this.root.classList.add('studio-ready');
@@ -133,18 +137,27 @@ export class WritingStudio {
   }
   build() {
     this.root.className = 'writing-studio studio-focus';
-    this.root.classList.toggle('studio-sidebar-open', preference('sidebar-open', 'true') === 'true');
+    delete this.root.dataset.mode;
+    this.root.classList.toggle('studio-sidebar-open', !this.compact && this.desktopSidebarOpen);
     const nav = el('div', 'studio-nav');
     const modes = el('div', 'studio-modes');
     modes.setAttribute('aria-label', '编辑模式');
     this.modeButtons = {};
     for (const [mode, label] of [['render', '渲染'], ['source', '源码'], ['split', '分屏']]) {
-      const item = button(label, () => this.setMode(mode));
+      const item = button(label, () => { if (this.compact) this.toggleSidebar(false); this.setMode(mode); });
       item.setAttribute('aria-pressed', 'false');
       this.modeButtons[mode] = item;
       modes.append(item);
     }
-    nav.append(modes, button('查找替换', () => openSearchPanel(this.source)), button('导出正文', () => this.download()));
+    this.metadataToggle = button('元数据', () => {
+      const visible = this.root.classList.contains('studio-sidebar-open') && this.activeSide === 'metadata';
+      this.toggleSidebar(!visible);
+      if (!visible) this.showSidebar('metadata');
+    });
+    nav.append(modes, compactAction(this.metadataToggle, 'metadata'), compactAction(button('查找替换', () => {
+      if (this.compact) this.toggleSidebar(false);
+      openSearchPanel(this.source);
+    }), 'search'), compactAction(button('导出正文', () => this.download()), 'download'));
     this.recovery = el('div', 'studio-recovery');
     this.recovery.hidden = true;
     this.body = el('div', 'studio-body');
@@ -152,7 +165,7 @@ export class WritingStudio {
     const sidebarNav = el('div', 'studio-side-nav');
     sidebarNav.setAttribute('aria-label', '侧栏内容');
     this.sidebarButtons = {};
-    for (const [tab, title] of [['outline', '大纲'], ['metadata', '信息'], ['images', '图片'], ['templates', '模板']]) {
+    for (const [tab, title] of [['outline', '大纲'], ['metadata', '元数据'], ['images', '图片'], ['templates', '模板']]) {
       const item = button(title, () => this.showSidebar(tab));
       item.setAttribute('aria-pressed', String(tab === 'outline'));
       this.sidebarButtons[tab] = item;
@@ -189,11 +202,14 @@ export class WritingStudio {
     this.setRatio(this.splitRatio);
     this.divider.addEventListener('pointerdown', event => {
       if (event.button !== 0 || this.drag) return;
+      const box = this.workspace.getBoundingClientRect();
       this.drag = {
         id: event.pointerId,
-        x: event.clientX,
+        coordinate: this.compact ? event.clientY : event.clientX,
         mode: this.mode,
         ratio: this.ratio,
+        start: this.compact ? box.top : box.left,
+        length: this.compact ? box.height : box.width,
         moved: false
       };
       this.divider.setPointerCapture(event.pointerId);
@@ -202,16 +218,23 @@ export class WritingStudio {
     });
     this.divider.addEventListener('pointermove', event => {
       if (this.drag?.id !== event.pointerId) return;
-      if (!this.drag.moved && Math.abs(event.clientX - this.drag.x) < 3) return;
+      const coordinate = this.compact ? event.clientY : event.clientX;
+      if (!this.drag.moved && Math.abs(coordinate - this.drag.coordinate) < 3) return;
       this.drag.moved = true;
       this.root.classList.add('studio-resizing');
       if (this.mode !== 'split') this.setMode('split');
-      const box = this.workspace.getBoundingClientRect();
-      this.setRatio((event.clientX - box.left) / box.width * 100);
+      this.drag.next = (coordinate - this.drag.start) / this.drag.length * 100;
+      if (!this.dragFrame) this.dragFrame = requestAnimationFrame(() => {
+        this.dragFrame = 0;
+        if (this.drag) this.setRatio(this.drag.next);
+      });
     });
     const finishDrag = (event, cancelled = false) => {
       if (this.drag?.id !== event.pointerId) return;
       const drag = this.drag;
+      cancelAnimationFrame(this.dragFrame);
+      this.dragFrame = 0;
+      if (!cancelled && drag.next != null) this.setRatio(drag.next);
       this.drag = null;
       this.root.classList.remove('studio-resizing');
       if (this.divider.hasPointerCapture(event.pointerId)) this.divider.releasePointerCapture(event.pointerId);
@@ -219,18 +242,23 @@ export class WritingStudio {
         this.setMode(drag.mode);
         this.setRatio(drag.ratio);
       } else if (drag.moved) this.settleRatio(this.ratio);
+      this.scrollSync?.schedule();
     };
     this.divider.addEventListener('pointerup', event => finishDrag(event));
     this.divider.addEventListener('pointercancel', event => finishDrag(event, true));
     this.divider.addEventListener('lostpointercapture', event => finishDrag(event, true));
     this.divider.addEventListener('keydown', event => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const previous = this.compact ? 'ArrowUp' : 'ArrowLeft';
+      const next = this.compact ? 'ArrowDown' : 'ArrowRight';
+      if (![previous, next, 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       const current = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
-      this.settleRatio(event.key === 'Home' ? 0 : event.key === 'End' ? 100 : current + (event.key === 'ArrowLeft' ? -5 : 5));
+      this.settleRatio(event.key === 'Home' ? 0 : event.key === 'End' ? 100 : current + (event.key === previous ? -5 : 5));
     });
     this.workspace.append(this.sourcePane, this.divider, this.previewPane);
-    this.body.append(this.sidebar, this.sidebarDivider, this.workspace);
+    this.sidebarBackdrop = button('', () => this.toggleSidebar(false), 'studio-sidebar-backdrop');
+    this.sidebarBackdrop.setAttribute('aria-label', '关闭侧栏');
+    this.body.append(this.sidebar, this.sidebarDivider, this.workspace, this.sidebarBackdrop);
     this.footer = el('div', 'studio-footer');
     this.sidebarToggle = button('', () => this.toggleSidebar(), 'studio-sidebar-toggle');
     const sidebarIcon = el('span', 'studio-sidebar-icon');
@@ -250,15 +278,19 @@ export class WritingStudio {
     const ratio = clampRatio(value);
     if (ratio === this.ratio) return;
     this.ratio = ratio;
-    this.workspace.style.setProperty('--studio-split', this.ratio + '%');
+    this.sourcePane.style.setProperty('--studio-split', this.ratio + '%');
     this.updateDivider();
     this.source?.requestMeasure();
   }
   updateDivider() {
     const value = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
+    const before = this.compact ? '下' : '右';
+    const after = this.compact ? '上' : '左';
+    this.divider.setAttribute('aria-orientation', this.compact ? 'horizontal' : 'vertical');
+    this.divider.setAttribute('aria-label', this.compact ? '拖动调整源码和预览高度' : '拖动调整源码和预览宽度');
     this.divider.setAttribute('aria-valuenow', String(Math.round(value)));
-    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? '渲染，向右拖动展开源码' : this.mode === 'source' ? '源码，向左拖动展开预览' : '源码 ' + Math.round(value) + '%，预览 ' + Math.round(100 - value) + '%');
-    this.divider.title = this.mode === 'split' ? '拖动调整宽度，拖到边缘切换单栏' : this.mode === 'source' ? '向左拖动展开预览' : '向右拖动展开源码';
+    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? `渲染，向${before}拖动展开源码` : this.mode === 'source' ? `源码，向${after}拖动展开预览` : '源码 ' + Math.round(value) + '%，预览 ' + Math.round(100 - value) + '%');
+    this.divider.title = this.mode === 'split' ? `拖动调整${this.compact ? '高度' : '宽度'}，拖到边缘切换单栏` : this.mode === 'source' ? `向${after}拖动展开预览` : `向${before}拖动展开源码`;
   }
   settleRatio(value) {
     const ratio = clampRatio(value);
@@ -271,9 +303,15 @@ export class WritingStudio {
   }
   updateSidebarToggle() {
     const open = this.root.classList.contains('studio-sidebar-open');
+    this.workspace.inert = this.compact && open;
+    this.sidebar.inert = !open;
+    this.sidebarDivider.inert = !open || this.compact;
     this.sidebarToggle.setAttribute('aria-expanded', String(open));
     this.sidebarToggle.setAttribute('aria-label', open ? '隐藏侧栏' : '显示侧栏');
     this.sidebarToggle.title = open ? '隐藏侧栏' : '显示侧栏';
+    const metadataVisible = open && this.activeSide === 'metadata';
+    this.metadataToggle.setAttribute('aria-expanded', String(metadataVisible));
+    this.metadataToggle.title = metadataVisible ? '关闭元数据侧栏' : '打开元数据侧栏';
   }
   toggleSidebar(force) {
     const open = force ?? !this.root.classList.contains('studio-sidebar-open');
@@ -291,7 +329,10 @@ export class WritingStudio {
     this.root.classList.toggle('studio-sidebar-open', open);
     this.sidebar.inert = !open;
     this.sidebarDivider.inert = !open;
-    storePreference('sidebar-open', String(open));
+    if (!this.compact) {
+      this.desktopSidebarOpen = open;
+      storePreference('sidebar-open', String(open));
+    }
     this.updateSidebarToggle();
     this.source?.requestMeasure();
     this.updateOutline(this.currentLine || 1, true);
@@ -404,12 +445,13 @@ export class WritingStudio {
       this.count.textContent = `${this.value.replace(/\s/g, '').length.toLocaleString()} 字符 · ${this.source.state.doc.lines.toLocaleString()} 行`;
     }
     const id = ++this.requestId;
+    if (this.analyzedValue === this.value && this.documentInfo && (this.mode === 'source' || this.documentInfo.blocks)) {
+      this.applyDocument(this.documentInfo);
+      return;
+    }
     this.renderTimer = setTimeout(() => {
-      this.worker.postMessage({
-        id,
-        text: this.source.state.doc.toString(),
-        preview: ['split', 'render'].includes(this.mode)
-      });
+      this.requestedValue = this.value;
+      this.renderer.request(id, this.value, this.mode !== 'source');
     }, delay);
   }
   renderResult(data) {
@@ -419,12 +461,20 @@ export class WritingStudio {
       return;
     }
     this.documentInfo = data;
+    this.analyzedValue = this.requestedValue;
+    this.applyDocument(data);
+  }
+  applyDocument(data) {
     this.showSidebar(this.activeSide);
     if (data.blocks) {
-      this.source.dispatch({
-        effects: renderedBlocks.of(data.blocks)
-      });
-      if (this.mode === 'split') this.lazyPreview.update(data.blocks);
+      if (this.appliedBlocks !== data.blocks) {
+        this.appliedBlocks = data.blocks;
+        this.source.dispatch({effects: renderedBlocks.of(data.blocks)});
+      }
+      if (this.mode === 'split' && this.previewBlocks !== data.blocks) {
+        this.previewBlocks = data.blocks;
+        this.lazyPreview.update(data.blocks);
+      }
     }
     this.scrollSync?.refresh(data.blocks);
   }
@@ -466,6 +516,7 @@ export class WritingStudio {
     this.sideContent.hidden = tab === 'metadata';
     this.metadataSlot.hidden = tab !== 'metadata';
     for (const [key, item] of Object.entries(this.sidebarButtons)) item.setAttribute('aria-pressed', String(key === tab));
+    this.updateSidebarToggle();
     const items = tab === 'outline' ? this.documentInfo?.headings : tab === 'images' ? this.documentInfo?.images : null;
     const signature = `${tab}:${JSON.stringify(items || [])}`;
     if (signature === this.sidebarSignature) {
@@ -593,6 +644,7 @@ export class WritingStudio {
     }
     this.updateOutline(line.number, true);
     this.scrollSync?.navigate(line.from);
+    if (this.compact) this.toggleSidebar(false);
   }
   insert(text) {
     const from = this.source.state.selection.main.head;
@@ -688,11 +740,13 @@ export class WritingStudio {
     this.sidebarResize?.destroy();
     this.metadataDock?.destroy();
     this.motion?.destroy();
+    this.responsiveLayout?.destroy();
     cancelAnimationFrame(this.readyFrame);
     clearTimeout(this.sidebarMotionTimer);
     clearTimeout(this.backupTimer);
     clearTimeout(this.renderTimer);
-    this.worker.terminate();
+    cancelAnimationFrame(this.dragFrame);
+    this.renderer.destroy();
     this.lazyPreview.destroy();
     this.source.destroy();
   }

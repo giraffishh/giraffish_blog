@@ -1,4 +1,34 @@
 import DOMPurify from 'dompurify';
+// Render mode recycles off-screen CodeMirror widgets. Reuse small sanitized
+// fragments on return; never cache connected nodes, listeners or frame state.
+const markupCache = new Map();
+let cachedCharacters = 0;
+function sanitizedFragment(html, styled) {
+  const cached = markupCache.get(html);
+  if (cached) {
+    markupCache.delete(html);
+    markupCache.set(html, cached);
+    return cached.cloneNode(true);
+  }
+  const fragment = DOMPurify.sanitize(html, {
+    RETURN_DOM_FRAGMENT: true,
+    FORCE_BODY: true,
+    ADD_TAGS: styled ? ['iframe', 'link', 'style'] : ['iframe'],
+    ADD_ATTR: ['target', 'allow', 'allowfullscreen'],
+    FORBID_ATTR: ['srcdoc'],
+    FORBID_TAGS: styled ? ['form', 'input'] : ['form', 'input', 'style']
+  });
+  if (html.length <= 50_000) {
+    markupCache.set(html, fragment.cloneNode(true));
+    cachedCharacters += html.length;
+    while (markupCache.size > 64 || cachedCharacters > 250_000) {
+      const oldest = markupCache.keys().next().value;
+      cachedCharacters -= oldest.length;
+      markupCache.delete(oldest);
+    }
+  }
+  return fragment;
+}
 function resourceUrl(value, base = 'https://blog.giraffish.top/') {
   try {
     const url = value?.trim() && new URL(value, base);
@@ -7,14 +37,7 @@ function resourceUrl(value, base = 'https://blog.giraffish.top/') {
 }
 export function populateRendered(element, html, onLayout = () => {}) {
   const styled = /<(?:link|style)\b/i.test(html);
-  const content = DOMPurify.sanitize(html, {
-    RETURN_DOM_FRAGMENT: true,
-    FORCE_BODY: true,
-    ADD_TAGS: styled ? ['iframe', 'link', 'style'] : ['iframe'],
-    ADD_ATTR: ['target', 'allow', 'allowfullscreen'],
-    FORBID_ATTR: ['srcdoc'],
-    FORBID_TAGS: styled ? ['form', 'input'] : ['form', 'input', 'style']
-  });
+  const content = sanitizedFragment(html, styled);
   const styles = new Set();
   for (const link of content.querySelectorAll('link')) {
     const href = link.getAttribute('href');
@@ -83,20 +106,39 @@ export class LazyDocument {
   constructor(root, onLayout = () => {}) {
     this.root = root;
     this.onLayout = onLayout;
+    this.pending = new Set();
     this.resizeObserver = new ResizeObserver(onLayout);
     this.resizeObserver.observe(root);
     this.observer = new IntersectionObserver(entries => {
-      for (const entry of entries) if (entry.isIntersecting) this.mount(entry.target);
+      for (const entry of entries) {
+        if (entry.isIntersecting) this.pending.add(entry.target);
+        else this.pending.delete(entry.target);
+      }
+      this.scheduleMounts();
     }, {
       root,
       rootMargin: '800px 0px'
     });
     this.nodes = [];
   }
+  scheduleMounts() {
+    if (this.frame || this.destroyed || !this.pending.size) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
+      const start = performance.now();
+      for (const node of this.pending) {
+        this.pending.delete(node);
+        this.mount(node);
+        if (performance.now() - start >= 6) break;
+      }
+      this.scheduleMounts();
+    });
+  }
   mount(node) {
     if (this.destroyed || node.parentNode !== this.root || node.dataset.mounted) return;
     populateRendered(node, node.block.html, this.onLayout);
     node.dataset.mounted = 'true';
+    this.pending.delete(node);
     node.style.minHeight = '';
     this.resizeObserver.observe(node);
     this.observer.unobserve(node);
@@ -129,6 +171,7 @@ export class LazyDocument {
         });
       }
       node.block = block;
+      node.style.setProperty('--block-height', `${block.height}px`);
       const from = String(block.from);
       if (node.dataset.from !== from) node.dataset.from = from;
       if (!node.dataset.mounted) node.style.minHeight = `${block.height}px`;
@@ -137,6 +180,7 @@ export class LazyDocument {
     for (const node of previous) if (!retained.has(node)) {
       this.observer.unobserve(node);
       this.resizeObserver.unobserve(node);
+      this.pending.delete(node);
       node.remove();
     }
     // Keep unchanged DOM connected: image loading and expanded details survive edits.
@@ -178,6 +222,8 @@ export class LazyDocument {
     this.destroyed = true;
     this.observer.disconnect();
     this.resizeObserver.disconnect();
+    cancelAnimationFrame(this.frame);
+    this.pending.clear();
     this.nodes = [];
     this.root.replaceChildren();
   }

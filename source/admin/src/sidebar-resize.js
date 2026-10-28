@@ -5,6 +5,8 @@ export class SidebarResize {
     this.onResize = onResize;
     this.onCommit = onCommit;
     this.preferredWidth = Number.isFinite(initialWidth) ? initialWidth : 240;
+    this.sidebar = body.querySelector('.studio-sidebar');
+    this.maximum = this.measureMaxWidth();
     this.abort = new AbortController();
     const listen = (type, callback) => handle.addEventListener(type, callback, {signal:this.abort.signal});
     handle.tabIndex = 0;
@@ -21,16 +23,23 @@ export class SidebarResize {
       event.preventDefault();
     });
     listen('pointermove', event => {
-      if (this.drag?.id === event.pointerId) this.apply(this.drag.width + event.clientX - this.drag.x);
+      if (this.drag?.id !== event.pointerId) return;
+      this.drag.next = this.drag.width + event.clientX - this.drag.x;
+      if (!this.frame) this.frame = requestAnimationFrame(() => {
+        this.frame = 0;
+        if (this.drag) this.apply(this.drag.next);
+      });
     });
     const finish = (event, cancelled = false) => {
       if (this.drag?.id !== event.pointerId) return;
       const drag = this.drag;
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
       this.drag = null;
       this.body.classList.remove('studio-sidebar-resizing');
       if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
       if (cancelled) this.apply(drag.preferred);
-      else this.commit(this.width);
+      else this.commit(drag.next ?? this.width);
     };
     listen('pointerup', event => finish(event));
     listen('pointercancel', event => finish(event, true));
@@ -42,10 +51,16 @@ export class SidebarResize {
       this.commit(event.key === 'Home' ? 160 : event.key === 'End' ? this.maxWidth() : this.width + (event.key === 'ArrowLeft' ? -16 : 16));
     });
     this.apply(this.preferredWidth);
-    this.observer = new ResizeObserver(() => this.apply(this.preferredWidth));
+    this.observer = new ResizeObserver(() => {
+      this.maximum = this.measureMaxWidth();
+      this.apply(this.drag ? this.width : this.preferredWidth);
+    });
     this.observer.observe(body);
   }
   maxWidth() {
+    return this.maximum;
+  }
+  measureMaxWidth() {
     const width = this.body.getBoundingClientRect().width;
     return width > 0 ? Math.floor(Math.max(160, Math.min(560, width / 2, width - 240))) : 560;
   }
@@ -58,7 +73,7 @@ export class SidebarResize {
     this.handle.setAttribute('aria-valuetext', `${width} 像素`);
     if (width === this.width) return;
     this.width = width;
-    this.body.style.setProperty('--studio-sidebar-width', `${width}px`);
+    this.sidebar.style.setProperty('--studio-sidebar-width', `${width}px`);
     this.onResize();
   }
   commit(value) {
@@ -67,6 +82,7 @@ export class SidebarResize {
     this.onCommit(this.width);
   }
   destroy() {
+    cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     this.abort.abort();
     this.body.classList.remove('studio-sidebar-resizing');

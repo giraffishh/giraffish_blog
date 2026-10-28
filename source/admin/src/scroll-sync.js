@@ -47,7 +47,7 @@ export class ScrollSync {
     }
   }
   schedule() {
-    if (this.frame || this.destroyed) return;
+    if (this.frame || this.destroyed || this.studio.drag || this.studio.sidebarResize?.drag) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
       this.sync();
@@ -126,7 +126,7 @@ export class ScrollSync {
   }
   sync() {
     const studio = this.studio;
-    if (this.destroyed || studio.destroyed) return;
+    if (this.destroyed || studio.destroyed || studio.drag || studio.sidebarResize?.drag) return;
     if (this.navigation != null) {
       const index = indexBefore(this.blocks, this.navigation, block => block.from);
       const anchor = {

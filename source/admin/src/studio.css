@@ -9,6 +9,7 @@ body { background:#f4f6f2; }
 .writing-studio button:focus-visible, .writing-studio a:focus-visible { outline:2px solid #418b71; outline-offset:2px; }
 .writing-studio button.studio-primary { background:var(--studio-green); color:white; padding:8px 14px; }
 .studio-nav { padding:10px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--studio-line); }
+.studio-nav > button[aria-expanded=true] { background:#edf2ec; color:var(--studio-green); }
 .studio-modes { position:relative; display:flex; background:#edf1ea; border-radius:8px; padding:3px; margin-right:auto; }
 .studio-modes::before { content:''; position:absolute; inset:3px auto 3px 3px; width:calc((100% - 6px) / 3); border-radius:6px; background:white; box-shadow:0 1px 4px #18382b20; transform:translateX(0); }
 .writing-studio[data-mode=source] .studio-modes::before { transform:translateX(100%); }
@@ -149,7 +150,7 @@ body { background:#f4f6f2; }
 .studio-divider::after { content:''; position:absolute; top:50%; left:2px; width:3px; height:32px; border-radius:3px; background:#8ba697; transform:translateY(-50%); }
 .studio-divider:focus-visible { outline:2px solid #418b71; outline-offset:-2px; }
 .studio-resizing, .studio-resizing * { cursor:col-resize!important; user-select:none!important; }
-.studio-resizing .studio-preview { padding-inline:clamp(0px, calc((100% - var(--studio-split)) / 4), 36px); }
+.studio-resizing .studio-preview { padding-inline:12px; }
 .writing-studio .studio-template { white-space:normal; padding:10px!important; }
 .writing-studio .studio-template:hover { border-color:#8ba697!important; box-shadow:0 1px 4px #18382b10; }
 .studio-template-name { display:block; font-size:12px; color:#61736a; margin-bottom:8px; }
@@ -218,3 +219,12 @@ body { background:#f4f6f2; }
 @media (prefers-reduced-motion:reduce) {
   .writing-studio *, .writing-studio *::before, .studio-metadata-origin > :not(.studio-editor-field) { transition:none!important; }
 }
+
+/* Isolate off-screen preview layout; CodeMirror owns its own virtualization. */
+.studio-preview > .studio-rendered-block { content-visibility:auto; contain-intrinsic-size:auto var(--block-height,100px); }
+@property --studio-split { syntax:'<percentage>'; inherits:false; initial-value:50%; }
+
+@property --metadata-left { syntax:'<length>'; inherits:false; initial-value:0px; }
+@property --metadata-top { syntax:'<length>'; inherits:false; initial-value:0px; }
+@property --metadata-width { syntax:'<length>'; inherits:false; initial-value:0px; }
+@property --metadata-height { syntax:'<length>'; inherits:false; initial-value:0px; }

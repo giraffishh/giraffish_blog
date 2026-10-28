@@ -1,4 +1,4 @@
-import {safeImageUrl} from './document.js';
+import {safeImageUrl} from './document-utils.js';
 
 export function imagePreviewUrl(value) {
   const url = safeImageUrl(value);

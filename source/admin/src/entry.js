@@ -1,32 +1,52 @@
-import { WritingStudio, markBodySaved } from './studio.js';
-import { safeImageUrl, templates } from './document.js';
-import { parse } from 'yaml';
+import { loadEditor, warmEditor } from './editor-loader.js';
+import { safeImageUrl, templates } from './document-utils.js';
 import './studio.css';
 import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
+import { installArticleMedia } from './article-media.js';
+import { installResponsiveViewport } from './responsive-layout.js';
+import './responsive.css';
 const {
   CMS,
   createClass,
   h
 } = window;
 if (!CMS || !createClass || !h) throw new Error('CMS 组件未加载，请刷新后重试。');
+installArticleMedia(CMS);
+installResponsiveViewport();
 const MarkdownControl = createClass({
   componentDidMount() {
-    this.studio = new WritingStudio(this.container, {
-      value: this.props.value || '',
-      onChange: this.props.onChange,
-      name: this.props.field.get('name'),
-      entryKey: `${this.props.collection.get('name')}/${this.props.entry?.get('slug') || '__new__'}`
-    });
+    this.mountEditor();
+  },
+  async mountEditor() {
+    this.container.textContent = '正在加载编辑器…';
+    try {
+      const { WritingStudio } = await loadEditor();
+      if (this.unmounted) return;
+      this.container.replaceChildren();
+      this.studio = new WritingStudio(this.container, {
+        value: this.props.value || '',
+        onChange: this.props.onChange,
+        name: this.props.field.get('name'),
+        entryKey: `${this.props.collection.get('name')}/${this.props.entry?.get('slug') || '__new__'}`
+      });
+    } catch {
+      if (this.unmounted) return;
+      const retry = document.createElement('button');
+      retry.textContent = '编辑器加载失败，点击重试';
+      retry.onclick = () => this.mountEditor();
+      this.container.replaceChildren(retry);
+    }
   },
   componentDidUpdate() {
-    this.studio.setValue(this.props.value || '');
+    this.studio?.setValue(this.props.value || '');
   },
   componentWillUnmount() {
-    this.studio.destroy();
+    this.unmounted = true;
+    this.studio?.destroy();
   },
   isValid() {
     // CodeMirror publishes changes synchronously; validation needs no flush.
-    return true;
+    return this.studio ? true : {error:'编辑器尚未加载完成，请稍后再保存。'};
   },
   render() {
     return h('div', {
@@ -88,7 +108,7 @@ CMS.registerEventListener({
   name: 'postSave',
   handler: ({
     entry
-  }) => markBodySaved(entry.getIn(['data', 'body']))
+  }) => loadEditor().then(({markBodySaved}) => markBodySaved(entry.getIn(['data', 'body'])))
 });
 CMS.registerEventListener({
   name: 'preSave',
@@ -109,7 +129,7 @@ CMS.registerEventListener({
     return entry.get('data').set('updated', now);
   }
 });
-async function initialize() {
+export async function initialize(config) {
   const demo = new URLSearchParams(location.search).get('demo') === '1';
   if (demo) {
     document.body.classList.add('studio-demo');
@@ -119,9 +139,8 @@ async function initialize() {
     document.body.append(notice);
     // Exercise the real collections and widgets; only the persistence backend
     // changes. This catches configuration issues hidden by a simplified demo.
-    const response = await fetch('/admin/config.yml');
-    if (!response.ok) throw new Error('无法加载后台配置');
-    const config = parse(await response.text());
+    const {TestBackend} = await import('decap-cms-backend-test');
+    CMS.registerBackend('test-repo', TestBackend);
     config.load_config_file = false;
     config.backend = {
       name: 'test-repo'
@@ -131,13 +150,8 @@ async function initialize() {
     const fields = config.collections.find(collection => collection.name === 'posts').fields;
     fields.find(field => field.name === 'title').default = '示例文章';
     fields.find(field => field.name === 'body').default = `${templates['折叠块']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n`;
-    CMS.init({
-      config
-    });
-  } else CMS.init();
+  }
+  CMS.init({config: {...config, load_config_file:false}});
+  warmEditor();
   document.getElementById('studio-loading')?.remove();
 }
-initialize().catch(error => {
-  const target = document.getElementById('studio-loading');
-  if (target) target.textContent = `后台启动失败：${error.message}。请刷新后重试。`;
-});

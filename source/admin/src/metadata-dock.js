@@ -73,9 +73,9 @@ export class MetadataDock {
     const sidebar = this.studio.sidebar.getBoundingClientRect();
     const tabs = this.studio.sidebar.querySelector('.studio-side-nav').getBoundingClientRect();
     const layout = {
-      left: sidebar.left,
+      left: this.studio.compact ? this.studio.body.getBoundingClientRect().left : sidebar.left,
       top: tabs.bottom,
-      width: this.studio.sidebarResize?.width || sidebar.width,
+      width: this.studio.compact ? sidebar.width : this.studio.sidebarResize?.width || sidebar.width,
       height: Math.max(0, sidebar.bottom - tabs.bottom)
     };
     for (const [name, value] of Object.entries(layout)) {
