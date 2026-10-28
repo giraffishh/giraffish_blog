@@ -5,3 +5,12 @@ updates:
   schedule:
     interval: daily
   open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/admin-app"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 5
+  groups:
+    editor-patches:
+      update-types:
+        - patch

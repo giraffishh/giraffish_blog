@@ -1,2 +1,19 @@
 [build]
-  command = "npm install --force && npm run build"
+  command = "npm run build"
+  publish = "public"
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/.netlify/identity/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/.netlify/git/*"
+  [headers.values]
+    Cache-Control = "no-store"
