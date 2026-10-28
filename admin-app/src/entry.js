@@ -1,5 +1,6 @@
 import { WritingStudio, markBodySaved } from './studio.js';
 import { safeImageUrl, templates } from './document.js';
+import { parse } from 'yaml';
 import './studio.css';
 
 const { CMS, createClass, h } = window;
@@ -44,22 +45,31 @@ CMS.registerEventListener({
     return entry.get('data').set('updated', now);
   },
 });
-const demo = new URLSearchParams(location.search).get('demo') === '1';
-if (demo) {
+async function initialize() {
+ const demo = new URLSearchParams(location.search).get('demo') === '1';
+ if (demo) {
   document.body.classList.add('studio-demo');
   const notice = document.createElement('div');
   notice.className = 'studio-demo-notice';
   notice.textContent = '体验模式 · 不连接博客仓库 · 刷新后测试文章会重置';
   document.body.append(notice);
-  CMS.init({ config: { load_config_file: false, backend: { name: 'test-repo' }, local_backend: false, publish_mode: 'simple',
-    media_folder: 'images', public_folder: '/images', locale: 'zh_Hans',
-    show_preview_links: false,
-    collections: [{ name: 'posts', label: '体验文章', folder: '_demo', create: true, editor: { preview: false },
-      fields: [
-        { name: 'title', label: '标题', widget: 'string', default: '从一个想法开始' },
-        { name: 'body', label: '正文', widget: 'studio-markdown', default: `${templates['论文笔记']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n` },
-      ],
-    }],
-  } });
-} else CMS.init();
-document.getElementById('studio-loading')?.remove();
+  // Exercise the real collections and widgets; only the persistence backend
+  // changes. This catches configuration issues hidden by a simplified demo.
+  const response = await fetch('/admin/config.yml');
+  if (!response.ok) throw new Error('无法加载后台配置');
+  const config = parse(await response.text());
+  config.load_config_file = false;
+  config.backend = { name: 'test-repo' };
+  config.local_backend = false;
+  config.publish_mode = 'simple';
+  const fields = config.collections.find(collection => collection.name === 'posts').fields;
+  fields.find(field => field.name === 'title').default = '从一个想法开始';
+  fields.find(field => field.name === 'body').default = `${templates['论文笔记']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n`;
+  CMS.init({ config });
+ } else CMS.init();
+ document.getElementById('studio-loading')?.remove();
+}
+initialize().catch(error => {
+  const target = document.getElementById('studio-loading');
+  if (target) target.textContent = `后台启动失败：${error.message}。请刷新后重试。`;
+});

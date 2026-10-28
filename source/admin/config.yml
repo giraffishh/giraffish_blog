@@ -308,7 +308,3 @@ slug:
   encoding: unicode
   clean_accents: false
   sanitize_replacement: "-"
-media_library:
-  name: default
-  config:
-    max_file_size: 10485760

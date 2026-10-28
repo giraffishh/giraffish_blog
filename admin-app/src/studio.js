@@ -278,7 +278,7 @@ export class WritingStudio {
         this.irReady = true;
         this.sectionSelect.disabled = false;
         this.irPane.querySelector('.vditor-ir [contenteditable="true"]')?.setAttribute('aria-label', '即时渲染编辑器');
-        if (this.irText() !== editorText) this.ensureIR();
+        if (this.mode === 'ir' && this.irText() !== editorText) this.ensureIR();
       },
       input: text => {
         if (!this.irReady || this.mode !== 'ir' || text === this.irBaseline) return;
