@@ -1,6 +1,21 @@
-import { renderBlocks, inspectDocument } from './document.js';
-self.onmessage = ({data:{id,text,preview}}) => {
+import { DocumentAnalysis } from './document.js';
+const document = new DocumentAnalysis();
+self.onmessage = ({
+  data: {
+    id,
+    text,
+    preview
+  }
+}) => {
   try {
-    self.postMessage({id,blocks:preview?renderBlocks(text):undefined,...inspectDocument(text)});
-  } catch(error) { self.postMessage({id,error:error.message}); }
+    self.postMessage({
+      id,
+      ...document.analyze(text, preview)
+    });
+  } catch (error) {
+    self.postMessage({
+      id,
+      error: error.message
+    });
+  }
 };

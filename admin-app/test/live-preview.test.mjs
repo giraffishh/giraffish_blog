@@ -3,6 +3,51 @@ import assert from 'node:assert/strict';
 import { EditorState } from '@codemirror/state';
 import { livePreview, renderMode, renderedBlocks, editingBlock } from '../src/live-preview.js';
 import { markdown, renderBlocks, templates } from '../src/document.js';
+import {search,openSearchPanel,SearchQuery,setSearchQuery,findNext} from '@codemirror/search';
+
+test('render mode exposes the search hit while keeping other blocks rendered',()=>{
+  const doc='# First\n\nNeedle text\n\n## Last';
+  const blocks=renderBlocks(doc);
+  const view={
+    state:EditorState.create({doc,extensions:[search(),livePreview]}),
+    dispatch(spec){this.state=this.state.update(spec).state;},
+    announce(){},
+    plugin(){return null;},
+  };
+  view.dispatch({effects:[renderMode.of(true),renderedBlocks.of(blocks)]});
+  openSearchPanel(view);
+  view.dispatch({effects:setSearchQuery.of(new SearchQuery({search:'Needle'}))});
+  findNext(view);
+  assert.equal(view.state.sliceDoc(view.state.selection.main.from,view.state.selection.main.to),'Needle');
+  const value=view.state.field(livePreview);
+  assert.equal(value.enabled,true);
+  assert.equal(value.decorations.size,blocks.length-1);
+});
+
+test('selection-only and unrelated transactions reuse rendered decorations',()=>{
+  let state=EditorState.create({doc:'# Heading\n\nText',extensions:[livePreview]});
+  state=state.update({effects:[renderMode.of(true),renderedBlocks.of(renderBlocks(state.doc.toString()))]}).state;
+  const value=state.field(livePreview);
+  state=state.update({selection:{anchor:3}}).state;
+  assert.equal(state.field(livePreview),value);
+  state=state.update({}).state;
+  assert.equal(state.field(livePreview),value);
+  state=state.update({effects:editingBlock.of(true)}).state;
+  assert.notEqual(state.field(livePreview).decorations,value.decorations);
+});
+
+test('unchanged rendered widgets survive edits preceding their source positions',()=>{
+  let state=EditorState.create({doc:'# Heading\n\nText',extensions:[livePreview]});
+  state=state.update({effects:[renderMode.of(true),renderedBlocks.of(renderBlocks(state.doc.toString()))]}).state;
+  const before=state.field(livePreview).decorations.iter();
+  before.next();
+  const widget=before.value.spec.widget;
+  state=state.update({changes:{from:2,insert:'Changed '}}).state;
+  state=state.update({effects:renderedBlocks.of(renderBlocks(state.doc.toString()))}).state;
+  const after=state.field(livePreview).decorations.iter();
+  after.next();
+  assert.ok(widget.eq(after.value.spec.widget));
+});
 
 test('rendered mode displays the whole document without rewriting its source',()=>{
   const doc='# 标题\n\n正文 **粗体**。\n\n$$\nx^2\n$$\n\n## 文末\n\n最后一段。\n';
