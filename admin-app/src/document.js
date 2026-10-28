@@ -112,4 +112,3 @@ export function readBackup(storage, key, current) {
   } catch { /* Storage may be unavailable or a previous record may be corrupt. */ }
   return null;
 }
-
