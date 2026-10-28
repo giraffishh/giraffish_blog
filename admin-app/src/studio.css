@@ -54,6 +54,7 @@ body { background:#f4f6f2; }
 .studio-typography h4 { font-size:1.125em; }
 .studio-typography h5 { font-size:1em; }
 .studio-typography h6 { font-size:.875em; color:#62736a; }
+.studio-typography :is(p,ul,ol,li,blockquote,details) { font-size:inherit; line-height:inherit; }
 .studio-typography a { color:#39725c; }.studio-typography p { margin:0 0 1em; }.studio-typography img { max-width:100%; height:auto; border-radius:4px; }
 .studio-typography :is(ul,ol) { margin:0 0 1em; padding-inline-start:1.6em; }
 .studio-typography li { margin:.3em 0; }.studio-typography li > :is(ul,ol) { margin:.4em 0; }
