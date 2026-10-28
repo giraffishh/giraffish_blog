@@ -309,7 +309,23 @@ export class WritingStudio {
     this.activeSide = tab;
     this.sideContent.replaceChildren();
     if (tab === 'templates') {
-      for (const [name, content] of Object.entries(templates)) this.sideContent.append(createTemplateCard(name, content, () => this.insert(`\n${content}\n`)));
+      let notes;
+      for (const [name, content] of Object.entries(templates)) {
+        const card = createTemplateCard(name, content, () => this.insert(`\n${content}\n`));
+        if (['提示便签', '成功便签', '警告便签'].includes(name)) {
+          if (!notes) {
+            const group = el('div', 'studio-template-notes');
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', '便签');
+            notes = el('div', 'studio-template-note-options');
+            group.append(el('span', 'studio-template-name', '便签'), notes);
+            this.sideContent.append(group);
+          }
+          card.classList.add('studio-template-compact');
+          card.querySelector('.note p').textContent = name.replace('便签', '');
+          notes.append(card);
+        } else this.sideContent.append(card);
+      }
     } else if (tab === 'images') {
       const images = this.documentInfo?.images || [];
       this.sideContent.append(el('p', 'studio-muted', `${images.length} 张图片`));
