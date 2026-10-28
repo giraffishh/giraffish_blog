@@ -42,8 +42,8 @@
       if (!m) continue;
       const depth = m[1].length - 1;
       const label = m[2].replace(/\s+#+\s*$/, '').replace(/<br\s*\/?\s*>/gi, ' / ').trim();
-      if (!label) throw Error(`第 ${i + 1} 行的节点标题为空`);
-      if (depth && !stack[depth - 1]) throw Error(`第 ${i + 1} 行层级跳跃`);
+      if (!label) throw Error(`第 ${i + 1} 行格式错误：标题内容不能为空。`);
+      if (depth && !stack[depth - 1]) throw Error(`第 ${i + 1} 行格式错误：前面缺少上一级标题，请检查标题前的 # 数量。`);
       const parent = depth ? stack[depth - 1] : null;
       const node = {
         label, depth, parent,
@@ -56,7 +56,7 @@
       pendingFloat = null; pendingColor = null;
       stack[depth] = node; stack.length = depth + 1; nodes.push(node);
     }
-    if (!root) throw Error('没有找到 # 根标题');
+    if (!root) throw Error('文件格式错误：请至少添加一个“# 标题”作为中心主题。');
     // Promote the previous format's floating second-level topics, preserving source lines.
     const legacy = new Set(nodes.filter(n => n.parent && n.depth === 1 && n.floating));
     const hasLegacyFloating = legacy.size > 0;

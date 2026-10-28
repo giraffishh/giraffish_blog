@@ -12,7 +12,7 @@
    $('noticeActions').hidden=options.actions===false;
    $('noticeRetry').textContent=category==='copy'?'重试另存为':'重试保存';
    $('noticeCopy').hidden=category==='copy';
-   notice.dataset.kind=options.kind||'error';notice.hidden=false;
+   notice.dataset.kind=options.kind||'error';notice.dataset.placement=options.placement||'corner';notice.hidden=false;
   }
   function clear(onlyCategory){
    if(onlyCategory&&onlyCategory!==category)return;

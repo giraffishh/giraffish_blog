@@ -652,3 +652,17 @@ kbd {
 #colorError:empty{display:none}
 
 #reset{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+#fileDropOverlay{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;background:#f5f9fce8;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#fileDropOverlay::before{content:"";position:absolute;inset:24px;border:2px dashed #8ba7bb;border-radius:20px;z-index:-1}
+#fileDropOverlay[hidden]{display:none}
+.file-drop-card{display:flex;align-items:center;flex-direction:column;gap:14px;padding:32px 40px;max-width:calc(100vw - 64px);text-align:center;border:1px solid #e3eaf0;border-radius:18px;background:#fff;box-shadow:0 12px 40px #28445b12;color:#354555}
+.file-drop-icon{display:grid;place-items:center;width:72px;height:72px;border-radius:20px;background:#edf4f9;color:#527f9f}
+.file-drop-icon svg{width:40px;height:40px;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+#fileDropTitle{font-size:18px;font-weight:600;line-height:1.5}
+.file-drop-formats{font-size:13px;letter-spacing:.3px;color:#7b8b99}
+#fileDropOverlay[data-blocked="true"]{background:#fbf8f4ed}
+#fileDropOverlay[data-blocked="true"]::before{border-color:#c4b39f}
+#fileDropOverlay[data-blocked="true"] .file-drop-icon{background:#f6f1ea;color:#96764f}
+
+.app-notice[data-placement="center"]{top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:400px;padding:20px;box-shadow:0 14px 48px #25394b24}

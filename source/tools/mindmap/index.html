@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mindmap 思维导图 · Giraffish 工具</title>
 <meta name="description" content="在浏览器中编辑 Markdown 思维导图，支持拖拽、撤销、草稿恢复和 SVG 导出。文件在本地处理。">
-<link rel="stylesheet" href="mindmap.css?v=5daaf518cb1c">
+<link rel="stylesheet" href="mindmap.css?v=73f25ce08d7c">
 </head>
 <body>
 <header id="header">
@@ -134,15 +134,23 @@
  <strong id="confirmTitle"></strong><p id="confirmMessage"></p>
  <div class="confirm-actions"><button id="confirmCancel" type="button">取消</button><button id="confirmAccept" type="button">继续</button></div>
 </dialog>
+<div id="fileDropOverlay" aria-live="polite" role="status" hidden>
+ <div class="file-drop-card">
+  <span class="file-drop-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M28 6H12a3 3 0 0 0-3 3v30a3 3 0 0 0 3 3h24a3 3 0 0 0 3-3V17L28 6Z"/><path d="M28 6v11h11M24 23v12m-5-5 5 5 5-5"/></svg></span>
+  <strong id="fileDropTitle">导入思维导图</strong>
+  <span class="file-drop-formats">.md · .markdown · .txt</span>
+ </div>
+</div>
 <noscript>请启用 JavaScript 使用思维导图。<a href="/tools/">返回工具列表</a></noscript>
 <!-- Let Files providers expose Markdown even when its MIME/UTI is unknown. Validate after selection. -->
 <input id="file" type="file" hidden>
 
+<script src="mindmap-file-drop.js?v=8e6c9df5e975"></script>
 <script src="mindmap-color.js?v=5df31281c657"></script>
-<script src="mindmap-core.js?v=614b6aa75cce"></script>
-<script src="mindmap-feedback.js?v=8ddc4461c1c8"></script>
+<script src="mindmap-core.js?v=6a37638d3b7d"></script>
+<script src="mindmap-feedback.js?v=4903a1b1ce88"></script>
 <script src="mindmap-file-store.js"></script>
 <script src="mindmap-touch.js?v=c1bc1ff72e31"></script>
-<script src="mindmap.js?v=893bc24c09f0"></script>
+<script src="mindmap.js?v=71bacbf1f7b5"></script>
 </body>
 </html>

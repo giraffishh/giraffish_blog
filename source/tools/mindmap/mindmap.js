@@ -30,7 +30,7 @@ function updateStorageStatus(){
  const status=$('storageStatus'),linked=mode==='handle'&&!!handle&&!pendingHandle&&!saveError;
  status.dataset.warning=String(!draftSaved||!associationSaved);
  status.disabled=!(touchMode&&pendingHandle)||saving;
- status.textContent=linked?'本地保存':'草稿';
+ status.textContent=linked?'关联本地文件':'草稿';
  status.title=pendingReason==='missing'?'点击保存选择新位置并重新关联':pendingHandle||saveError?'点击保存尝试授权，或重新打开文件':linked?associationSaved?'修改自动写回本地文件':'当前文件已关联，但浏览器无法记住关联；刷新后需重新打开':draftSaved?'草稿保存在此浏览器':'浏览器无法保存草稿 · 离开前请保存';
  if(touchMode){status.textContent='只读';status.title=pendingHandle?'点击授权读取本地文件':'移动端仅查看';}
  updateSaveControls();
@@ -47,7 +47,17 @@ function updateSaveControls(){
  $('saveAs').disabled=!!editing||saving;
 }
 function isMissingFile(error){return error?.name==='NotFoundError';}
-function fileErrorMessage(error){
+function fileErrorMessage(error,opening=false){
+ if(opening){
+  const messages={
+   NotFoundError:'文件不存在或已移动，请重新选择文件。',
+   NotReadableError:'无法读取文件，请确认文件已下载到本地，且没有被其他程序占用。',
+   NotAllowedError:'没有读取这个文件的权限，请重新选择并允许访问。',
+   SecurityError:'浏览器未允许读取文件，请重新点击“打开”选择文件。'
+  };
+  return messages[error?.name]||(/[\u3400-\u9fff]/.test(error?.message||'')?error.message:'无法打开文件，请确认文件可以读取后重试。');
+ }
+
  const messages={
   NotFoundError:'原文件或保存位置已失效，请重新选择保存位置。',
   NotAllowedError:'未获得文件权限，内容已保留为草稿。可再次保存授权，或另存为副本。',
@@ -68,9 +78,9 @@ function suspendFile(error,chosen=handle||pendingHandle){
 }
 function showFileError(error,title='保存失败',automatic=false){
  if(error?.name==='AbortError'&&!automatic)return;
- const message=fileErrorMessage(error);
+ const message=fileErrorMessage(error,title==='打开失败');
  $('status').textContent=message;
- feedback.show({title:automatic?'自动保存失败':title,message,category:title==='打开失败'?'operation':title==='另存为失败'?'copy':'save',actions:title!=='打开失败'});
+ feedback.show({title:automatic?'自动保存失败':title,message,category:title==='打开失败'?'operation':title==='另存为失败'?'copy':'save',actions:title!=='打开失败',placement:title==='打开失败'?'center':'corner'});
 }
 function clearSaveNotice(){feedback.clear('save');if(draftSaved)feedback.clear('draft');}
 async function saveFromNotice(copy=false){
@@ -571,6 +581,33 @@ async function readMarkdownFile(file){
  if(!/\.(md|markdown|txt)$/i.test(file.name))throw Error('请选择 .md、.markdown 或 .txt 文件。');
  const text=await file.text();
  return {text,prepared:parseMarkdown(text)};
+}
+function fileDropBlockedReason(){
+ if(saving)return '正在处理文件，请稍后再拖入';
+ if(editing)return '请先完成节点编辑';
+ if(drag)return '请先完成当前拖拽';
+ if(feedback.confirmOpen||$('branchColorDialog').open||$('shortcutHelp').open)return '请先关闭当前弹窗';
+ return '';
+}
+async function openDroppedMarkdown(file,handlePromise){
+ const blocked=fileDropBlockedReason();
+ if(blocked){showFileError(Error(blocked),'打开失败');return;}
+ setSaving(true);
+ try{
+  // Validate before asking to replace a draft; a bad drop must leave the current map intact.
+  const {text,prepared}=await readMarkdownFile(file);
+  if(!(await canReplaceSource()))return;
+  const chosen=await handlePromise;
+  let writable=false;
+  if(chosen&&!touchMode){try{writable=await chosen.queryPermission({mode:'readwrite'})==='granted';}catch{}}
+  await loadSource(text,file.name,writable?'handle':'manual',writable?chosen:null,prepared);
+  if(chosen&&!writable){
+   await rememberAssociation(chosen);pendingHandle=chosen;pendingReason='permission';associatedText=text;
+   rememberDraft();updateStorageStatus();
+  }
+  $('status').textContent='已打开 '+file.name;
+ }catch(error){showFileError(error,'打开失败');}
+ finally{setSaving(false);schedulePoll();}
 }
 $('open').onclick=async()=>{
  if(editing||saving||drag||!(await canReplaceSource()))return;
@@ -1165,4 +1202,5 @@ async function initializeMap(){
  }finally{setSaving(false);schedulePoll();}
 }
 initializeMap();
+MindmapFileDrop.create(document,window,{blockedReason:fileDropBlockedReason,open:openDroppedMarkdown,error:message=>showFileError(Error(message),'打开失败')});
 window.mindmap={parseMarkdown,getState:()=>({nodes:nodes.length,visible:visible.length,rendered:mountedNodes.size,sourceName,mode,scale}),getPerformance:()=>({...perf,metrics:{...metrics.stats},cachedMetrics:metrics.size,cachedNodes:nodeCache.size,cachedEdges:edgeCache.size})};
