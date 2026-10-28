@@ -168,7 +168,7 @@ export class WritingStudio {
     this.previewPane = el('article', 'studio-preview studio-typography');
     this.previewPane.setAttribute('aria-label', '文章预览');
     this.previewPane.addEventListener('click', event => {
-      const link = event.target.closest('a');
+      const link = event.composedPath()[0].closest?.('a');
       if (link?.getAttribute('href')?.startsWith('#')) {
         event.preventDefault();
         const id = link.getAttribute('href').slice(1);

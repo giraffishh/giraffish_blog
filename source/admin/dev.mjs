@@ -7,7 +7,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-    if (!pathname.startsWith('/admin/')) { res.writeHead(404); res.end(); return; }
+    if (!['/admin/', '/css/'].some(prefix => pathname.startsWith(prefix))) { res.writeHead(404); res.end(); return; }
     let file = path.resolve(root, `.${pathname}`);
     if (!file.startsWith(`${root}${path.sep}`)) throw new Error('Invalid path');
     if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');

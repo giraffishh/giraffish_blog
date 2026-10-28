@@ -1,21 +1,83 @@
 import DOMPurify from 'dompurify';
-export function populateRendered(element, html) {
-  element.innerHTML = DOMPurify.sanitize(html, {
-    ADD_ATTR: ['target'],
-    FORBID_TAGS: ['iframe', 'form', 'input', 'style']
+function resourceUrl(value, base = 'https://blog.giraffish.top/') {
+  try {
+    const url = value?.trim() && new URL(value, base);
+    return url && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+export function populateRendered(element, html, onLayout = () => {}) {
+  const styled = /<(?:link|style)\b/i.test(html);
+  const content = DOMPurify.sanitize(html, {
+    RETURN_DOM_FRAGMENT: true,
+    FORCE_BODY: true,
+    ADD_TAGS: styled ? ['iframe', 'link', 'style'] : ['iframe'],
+    ADD_ATTR: ['target', 'allow', 'allowfullscreen'],
+    FORBID_ATTR: ['srcdoc'],
+    FORBID_TAGS: styled ? ['form', 'input'] : ['form', 'input', 'style']
   });
-  for (const image of element.querySelectorAll('img')) {
+  const styles = new Set();
+  for (const link of content.querySelectorAll('link')) {
+    const href = link.getAttribute('href');
+    const localCss = ['127.0.0.1', 'localhost'].includes(window.location.hostname) && /^\/css\//.test(href || '');
+    const url = resourceUrl(href, localCss ? window.location.origin : undefined);
+    const key = JSON.stringify([url, link.media]);
+    if (link.rel.toLowerCase() !== 'stylesheet' || !url || styles.has(key)) {
+      link.remove();
+      continue;
+    }
+    styles.add(key);
+    link.href = url;
+    link.referrerPolicy = 'no-referrer';
+    link.addEventListener('load', onLayout);
+    link.addEventListener('error', onLayout);
+  }
+  for (const style of content.querySelectorAll('style')) {
+    const key = JSON.stringify([style.textContent, style.media]);
+    if (styles.has(key)) style.remove();
+    else styles.add(key);
+  }
+  // Configure frames while detached, before their documents can start loading.
+  // Preview scripts run in an opaque origin, isolated from CMS login/storage.
+  for (const frame of content.querySelectorAll('iframe')) {
+    const url = resourceUrl(frame.getAttribute('src'));
+    if (!url) {
+      frame.remove();
+      continue;
+    }
+    frame.setAttribute('sandbox', 'allow-scripts allow-presentation');
+    frame.referrerPolicy = 'no-referrer';
+    frame.loading = 'lazy';
+    frame.src = url;
+    if (!frame.title) frame.title = '内嵌页面';
+    if (!frame.hasAttribute('width') && !frame.style.width) frame.style.width = '100%';
+    if (!frame.hasAttribute('height') && !frame.style.height && !frame.style.aspectRatio) frame.style.height = '480px';
+    frame.style.maxWidth = '100%';
+    frame.style.display = 'block';
+  }
+  for (const media of content.querySelectorAll('img, iframe')) media.addEventListener('load', onLayout);
+  for (const image of content.querySelectorAll('img')) {
     image.loading = 'lazy';
     image.referrerPolicy = 'no-referrer';
     const src = image.getAttribute('src');
     if (src?.startsWith('/')) image.src = new URL(src, 'https://blog.giraffish.top').href;
   }
-  for (const link of element.querySelectorAll('a[href]')) {
+  for (const link of content.querySelectorAll('a[href]')) {
     if (!link.getAttribute('href').startsWith('#')) {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
+      const url = resourceUrl(link.getAttribute('href'));
+      if (url) link.href = url;
     }
   }
+  if (styles.size) {
+    const host = document.createElement('div');
+    host.className = 'studio-html-preview';
+    const shadow = host.attachShadow({mode:'open'});
+    const defaults = document.createElement('style');
+    defaults.textContent = ':host{display:block;font:inherit;color:inherit}*,*::before,*::after{box-sizing:border-box}a{color:inherit;text-decoration:none}img,svg{max-width:100%}';
+    shadow.append(defaults, content);
+    element.replaceChildren(host);
+  } else element.replaceChildren(content);
 }
 export class LazyDocument {
   constructor(root, onLayout = () => {}) {
@@ -33,7 +95,7 @@ export class LazyDocument {
   }
   mount(node) {
     if (this.destroyed || node.parentNode !== this.root || node.dataset.mounted) return;
-    populateRendered(node, node.block.html);
+    populateRendered(node, node.block.html, this.onLayout);
     node.dataset.mounted = 'true';
     node.style.minHeight = '';
     this.resizeObserver.observe(node);
@@ -107,7 +169,8 @@ export class LazyDocument {
     const node = this.nodes.find(n => n.block.html.includes(`id="${id}"`));
     if (node) {
       this.mount(node);
-      const target = node.querySelector(`#${CSS.escape(id)}`);
+      const scope = node.querySelector('.studio-html-preview')?.shadowRoot || node;
+      const target = scope.querySelector(`#${CSS.escape(id)}`);
       if (target) this.root.scrollTop += target.getBoundingClientRect().top - this.root.getBoundingClientRect().top - 20;
     }
   }

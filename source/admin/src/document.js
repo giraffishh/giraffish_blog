@@ -76,6 +76,10 @@ export function renderBlocks(text, parsed = parseDocument(text)) {
     tokens,
     env
   } = parsed;
+  // Stylesheet declarations can be separated from their HTML by blank lines.
+  // Repeat them only for raw HTML blocks; the view scopes them in a shadow root.
+  const htmlStyles = [...new Set(tokens.filter(token => token.type === 'html_block')
+    .flatMap(token => token.content.match(/<link\b[^>]*>|<style\b[^>]*>[\s\S]*?<\/style\s*>/gi) || []))].join('\n');
   const offsets = [0];
   for (let i = 0; i < text.length; i++) if (text[i] === '\n') offsets.push(i + 1);
   const result = [];
@@ -111,7 +115,8 @@ export function renderBlocks(text, parsed = parseDocument(text)) {
     if (text[to - 1] === '\n') to--;
     if (text[to - 1] === '\r') to--;
     if (to <= from) continue;
-    const html = markdown.renderer.render(tokens.slice(start, i), markdown.options, env);
+    const rendered = markdown.renderer.render(tokens.slice(start, i), markdown.options, env);
+    const html = first.type === 'html_block' && htmlStyles ? `${htmlStyles}\n${rendered}` : rendered;
     const heading = first.type === 'heading_open';
     const image = html.includes('<img');
     const lines = endLine - first.map[0];

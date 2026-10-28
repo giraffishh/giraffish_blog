@@ -19,11 +19,10 @@ class MarkdownBlock extends WidgetType {
   toDOM(view) {
     const node = document.createElement('div');
     node.className = 'studio-rendered-block studio-rendered-editable studio-typography';
-    populateRendered(node, this.block.html);
-    for (const image of node.querySelectorAll('img')) image.addEventListener('load', () => view.requestMeasure());
+    populateRendered(node, this.block.html, () => { if (view.dom.isConnected) view.requestMeasure(); });
     node.addEventListener('toggle', () => view.requestMeasure(), true);
     node.addEventListener('click', event => {
-      const href = event.target.closest('a')?.getAttribute('href');
+      const href = event.composedPath()[0].closest?.('a')?.getAttribute('href');
       if (!href?.startsWith('#')) return;
       event.preventDefault();
       const id = href.slice(1);
@@ -35,7 +34,7 @@ class MarkdownBlock extends WidgetType {
       });
     });
     node.addEventListener('mousedown', event => {
-      if (event.button !== 0 || event.target.closest('a,summary,button,input')) return;
+      if (event.button !== 0 || event.composedPath()[0].closest?.('a,summary,button,input,iframe')) return;
       event.preventDefault();
       const position = view.posAtDOM(node);
       view.dispatch({
