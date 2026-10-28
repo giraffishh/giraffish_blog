@@ -97,3 +97,9 @@ body { background:#f4f6f2; }
 .studio-template-photo::after { content:''; position:absolute; width:80%; height:45px; background:#9ebeb0; transform:rotate(35deg); bottom:-28px; left:3px; }
 .studio-template-photo + .studio-template-photo { background:#f1eee6; }
 .studio-template-photo + .studio-template-photo::after { background:#b6c3a1; transform:rotate(-30deg); left:18px; }
+.studio-template-notes { border:1px solid var(--studio-line); border-radius:6px; background:white; padding:10px; margin-bottom:10px; }
+.studio-template-note-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.writing-studio .studio-template-compact { min-width:0; padding:0!important; margin:0; border:0!important; }
+.studio-template-compact .studio-template-name { display:none; }
+.studio-template-compact .note { padding:7px 2px; border-left-width:3px; text-align:center; font-size:12px; white-space:nowrap; }
+.studio-template-compact:hover .note { filter:brightness(.96); }
