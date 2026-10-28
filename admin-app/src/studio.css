@@ -21,7 +21,7 @@ body { background:#f4f6f2; }
 .studio-template { display:block; border:1px solid var(--studio-line)!important; width:100%; text-align:left; background:white!important; margin-bottom:10px; padding:12px!important; }
 .studio-muted { color:var(--studio-muted); font-size:12px; line-height:1.7; }
 .studio-workspace { display:flex; flex:1; min-width:0; overflow:hidden; position:relative; }
-.studio-source { min-width:0; width:100%; overflow:hidden; }
+.studio-source { flex:1; min-width:0; width:0; overflow:hidden; }
 .studio-source .cm-editor { height:100%; font:14px/1.8 'Cascadia Code',Consolas,'Microsoft YaHei',monospace; background:#fffefb; }
 .studio-source .cm-scroller { overflow:auto; }.studio-source .cm-content { padding:22px 12px; }
 .studio-source .cm-gutters { background:#f8f9f4; color:#9aa69b; border:0; padding-left:4px; }
@@ -34,10 +34,10 @@ body { background:#f4f6f2; }
 .studio-typography code { font-family:'Cascadia Code',Consolas,monospace; font-size:.87em; background:#eef2eb; border-radius:3px; padding:.15em .25em; }.studio-typography pre code { padding:0; background:none; }
 .studio-typography table { display:block; max-width:100%; overflow:auto; border-collapse:collapse; font-size:.9em; }.studio-typography th, .studio-typography td { border:1px solid #dce5df; padding:9px 12px; }.studio-typography th { background:#eff3ed; }
 .studio-typography blockquote { margin:1em 0; padding:6px 20px; border-left:3px solid #82a890; background:#f2f6ef; color:#577061; }.studio-typography .katex-display { overflow:auto hidden; padding:8px 0; }.studio-typography details { border:1px solid #dce5df; border-radius:6px; padding:12px; }
-.studio-divider { display:none; width:9px; flex-shrink:0; background:#eef2e9; cursor:col-resize; touch-action:none; border-inline:1px solid #dce5df; }.studio-divider:hover, .studio-divider:focus { background:#a8c7ae; }
-.writing-studio[data-mode=split] .studio-source { flex:0 0 calc(var(--studio-split) - 5px); }.writing-studio[data-mode=split] .studio-typography { flex:1; }.writing-studio[data-mode=split] .studio-divider { display:block; }
+.studio-divider { display:block; position:relative; width:9px; flex-shrink:0; background:#eef2e9; cursor:col-resize; touch-action:none; border-inline:1px solid #dce5df; }.studio-divider:hover, .studio-divider:focus { background:#a8c7ae; }
+.writing-studio[data-mode=split] .studio-source { flex:0 0 max(0px, calc(var(--studio-split) - 4.5px)); }.writing-studio[data-mode=split] .studio-typography { flex:1; }.writing-studio[data-mode=split] .studio-divider { display:block; }
 .studio-footer { padding:9px 16px; display:flex; justify-content:space-between; gap:12px; font-size:11px; color:var(--studio-muted); border-top:1px solid var(--studio-line); flex-wrap:wrap; }
-.studio-focus { position:fixed; inset:76px 16px 12px; z-index:99; display:flex; flex-direction:column; box-shadow:0 10px 90px #18362d40; }.studio-focus .studio-body { flex:1; height:auto; min-height:0; }
+.studio-focus { position:fixed; inset:76px 16px 12px; width:auto; z-index:99; display:flex; flex-direction:column; box-shadow:0 10px 90px #18362d40; }.studio-focus .studio-body { flex:1; height:auto; min-height:0; }
 .studio-image-card { padding:12px 0; border-bottom:1px solid var(--studio-line); }.studio-image-card strong { display:block; font-size:12px; }.studio-image-card code { display:block; font-size:10px; overflow-wrap:anywhere; margin:8px 0; user-select:all; }.studio-image-card a { color:var(--studio-green); font-size:12px; margin-left:8px; }
 .studio-recovery { padding:12px 16px; background:#fff2d8; font-size:12px; }.studio-recovery button { border:1px solid #d6bd83; margin-left:8px; }.writing-studio [hidden] { display:none!important; }
 .studio-dialog { color:var(--studio-ink); border:1px solid var(--studio-line); border-radius:14px; padding:24px; width:min(480px,90vw); box-shadow:0 20px 80px #16332930; }.studio-dialog::backdrop { background:#15332366; }.studio-dialog h2 { font-size:20px; margin-top:0; }.studio-dialog label { display:block; margin:16px 0; font-size:13px; }
@@ -77,3 +77,23 @@ body { background:#f4f6f2; }
 
 .writing-studio[data-mode=render] .cm-line:empty, .writing-studio[data-mode=render] .cm-line:has(> br:only-child) { min-height:6px; line-height:6px; font-size:6px; }
 .studio-rendered-editable:empty { padding:0; }
+
+.writing-studio[data-mode=render] .studio-divider { order:-1; }
+.studio-divider::after { content:''; position:absolute; top:50%; left:2px; width:3px; height:32px; border-radius:3px; background:#8ba697; transform:translateY(-50%); }
+.studio-divider:focus-visible { outline:2px solid #418b71; outline-offset:-2px; }
+.studio-resizing, .studio-resizing * { cursor:col-resize!important; user-select:none!important; }
+.studio-resizing .studio-preview { padding-inline:clamp(0px, calc((100% - var(--studio-split)) / 4), 36px); }
+.writing-studio .studio-template { white-space:normal; padding:10px!important; }
+.writing-studio .studio-template:hover { border-color:#8ba697!important; box-shadow:0 1px 4px #18382b10; }
+.studio-template-name { display:block; font-size:12px; color:#61736a; margin-bottom:8px; }
+.studio-template-preview { display:block; pointer-events:none; font-size:13px; line-height:1.6; }
+.studio-template-preview > :first-child, .studio-template-preview > :last-child { margin:0; }
+.studio-template-preview .note { padding:8px 10px; margin:0; }
+.studio-template-preview p { margin:0; }
+.studio-template-preview .fluid-fold > summary { padding:8px 10px; }
+.studio-template-gallery { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.studio-template-photo { height:42px; border-radius:3px; position:relative; overflow:hidden; background:#e7f1f4; }
+.studio-template-photo::before { content:''; position:absolute; width:10px; height:10px; border-radius:50%; background:#e6c37b; top:7px; right:12px; }
+.studio-template-photo::after { content:''; position:absolute; width:80%; height:45px; background:#9ebeb0; transform:rotate(35deg); bottom:-28px; left:3px; }
+.studio-template-photo + .studio-template-photo { background:#f1eee6; }
+.studio-template-photo + .studio-template-photo::after { background:#b6c3a1; transform:rotate(-30deg); left:18px; }

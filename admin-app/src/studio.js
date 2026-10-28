@@ -9,6 +9,8 @@ import { imageMarkdown, safeImageUrl, readBackup, templates } from './document.j
 const assetBase = '/admin/assets';
 import { livePreview, liveFocus, renderedBlocks, renderMode } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
+import {createTemplateCard} from './template-card.js';
+import {clampRatio, modeAtRatio} from './split-layout.js';
 const activeStudios = new Set();
 export function markBodySaved(body) {
   if (typeof body !== 'string') return;
@@ -123,22 +125,44 @@ export class WritingStudio {
     this.divider.setAttribute('role', 'separator');
     this.divider.setAttribute('aria-label', '拖动调整源码和预览宽度');
     this.divider.setAttribute('aria-orientation', 'vertical');
-    this.divider.setAttribute('aria-valuemin', '20');
-    this.divider.setAttribute('aria-valuemax', '80');
-    this.setRatio(Number(preference('ratio', 50)));
+    this.divider.setAttribute('aria-valuemin', '0');
+    this.divider.setAttribute('aria-valuemax', '100');
+    this.splitRatio = clampRatio(Number(preference('ratio', 50)));
+    if (modeAtRatio(this.splitRatio) !== 'split') this.splitRatio = 50;
+    this.setRatio(this.splitRatio);
     this.divider.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || this.drag) return;
+      this.drag = { id:event.pointerId, x:event.clientX, mode:this.mode, ratio:this.ratio, moved:false };
       this.divider.setPointerCapture(event.pointerId);
+      this.divider.focus();
       event.preventDefault();
     });
     this.divider.addEventListener('pointermove', event => {
-      if (!this.divider.hasPointerCapture(event.pointerId)) return;
+      if (this.drag?.id !== event.pointerId) return;
+      if (!this.drag.moved && Math.abs(event.clientX - this.drag.x) < 3) return;
+      this.drag.moved = true;
+      this.root.classList.add('studio-resizing');
+      if (this.mode !== 'split') this.setMode('split');
       const box = this.workspace.getBoundingClientRect();
       this.setRatio((event.clientX - box.left) / box.width * 100);
     });
+    const finishDrag = (event, cancelled = false) => {
+      if (this.drag?.id !== event.pointerId) return;
+      const drag = this.drag;
+      this.drag = null;
+      this.root.classList.remove('studio-resizing');
+      if (this.divider.hasPointerCapture(event.pointerId)) this.divider.releasePointerCapture(event.pointerId);
+      if (cancelled) { this.setMode(drag.mode); this.setRatio(drag.ratio); }
+      else if (drag.moved) this.settleRatio(this.ratio);
+    };
+    this.divider.addEventListener('pointerup', event => finishDrag(event));
+    this.divider.addEventListener('pointercancel', event => finishDrag(event, true));
+    this.divider.addEventListener('lostpointercapture', event => finishDrag(event, true));
     this.divider.addEventListener('keydown', event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      this.setRatio(event.key === 'Home' ? 20 : event.key === 'End' ? 80 : this.ratio + (event.key === 'ArrowLeft' ? -5 : 5));
+      const current = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
+      this.settleRatio(event.key === 'Home' ? 0 : event.key === 'End' ? 100 : current + (event.key === 'ArrowLeft' ? -5 : 5));
     });
     this.workspace.append(this.sourcePane, this.divider, this.previewPane);
     this.body.append(this.sidebar, this.workspace);
@@ -152,11 +176,27 @@ export class WritingStudio {
   }
 
   setRatio(value) {
-    this.ratio = Math.max(20, Math.min(80, Number.isFinite(value) ? value : 50));
-    this.workspace.style.setProperty('--studio-split', `${this.ratio}%`);
-    this.divider.setAttribute('aria-valuenow', String(Math.round(this.ratio)));
-    storePreference('ratio', String(this.ratio));
+    this.ratio = clampRatio(value);
+    this.workspace.style.setProperty('--studio-split', this.ratio + '%');
+    this.updateDivider();
     this.source?.requestMeasure();
+  }
+
+  updateDivider() {
+    const value = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
+    this.divider.setAttribute('aria-valuenow', String(Math.round(value)));
+    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? '渲染，向右拖动展开源码' : this.mode === 'source' ? '源码，向左拖动展开预览' : '源码 ' + Math.round(value) + '%，预览 ' + Math.round(100 - value) + '%');
+    this.divider.title = this.mode === 'split' ? '拖动调整宽度，拖到边缘切换单栏' : this.mode === 'source' ? '向左拖动展开预览' : '向右拖动展开源码';
+  }
+
+  settleRatio(value) {
+    const ratio = clampRatio(value);
+    const mode = modeAtRatio(ratio);
+    if (mode === 'split') {
+      this.splitRatio = ratio;
+      storePreference('ratio', String(ratio));
+    }
+    this.setMode(mode);
   }
 
   toggleFocus() {
@@ -171,6 +211,8 @@ export class WritingStudio {
     this.flush();
     this.mode = mode;
     this.root.dataset.mode = mode;
+    if (mode === 'split') this.setRatio(this.splitRatio);
+    this.updateDivider();
     for (const [key, btn] of Object.entries(this.modeButtons)) btn.setAttribute('aria-pressed', String(key === mode));
     storePreference('mode', mode);
     this.source.dispatch({ effects: renderMode.of(mode === 'render') });
@@ -267,7 +309,7 @@ export class WritingStudio {
     this.activeSide = tab;
     this.sideContent.replaceChildren();
     if (tab === 'templates') {
-      for (const [name, content] of Object.entries(templates)) this.sideContent.append(button(name, () => this.insert(`\n${content}\n`), 'studio-template'));
+      for (const [name, content] of Object.entries(templates)) this.sideContent.append(createTemplateCard(name, content, () => this.insert(`\n${content}\n`)));
     } else if (tab === 'images') {
       const images = this.documentInfo?.images || [];
       this.sideContent.append(el('p', 'studio-muted', `${images.length} 张图片`));
