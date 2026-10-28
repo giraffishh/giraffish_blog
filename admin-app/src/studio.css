@@ -47,11 +47,21 @@ body { background:#f4f6f2; }
 .writing-studio .studio-source .cm-panel.cm-search button[name=close]:hover { background:#e8eee8; color:#285d4e; }
 .writing-studio .cm-searchMatch { background:#f3e8b6; border-radius:2px; }.writing-studio .cm-searchMatch-selected { background:#c9e4d2; }
 .studio-preview { min-width:0; width:100%; padding:26px 36px; overflow:auto; font:16px/1.85 -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; overflow-wrap:anywhere; background:#fffefb; }
-.studio-typography h1, .studio-typography h2, .studio-typography h3 { color:#244c40; line-height:1.4; margin:1.4em 0 .6em; }.studio-typography h1 { font-size:2em; }.studio-typography h2 { font-size:1.5em; border-bottom:1px solid #e1e8df; padding-bottom:.3em; }
-.studio-typography a { color:#39725c; }.studio-typography p { margin:.8em 0; }.studio-typography img { max-width:100%; height:auto; border-radius:4px; }
-.studio-typography pre { background:#f0f3ed; border:1px solid #e1e8df; padding:18px; border-radius:8px; overflow:auto; white-space:pre; }
+.studio-typography :is(h1,h2,h3,h4,h5,h6) { color:#244c40; font-weight:650; line-height:1.4; margin:1.25em 0 .6em; }
+.studio-typography h1 { font-size:2em; margin-top:.6em; }
+.studio-typography h2 { font-size:1.625em; border-bottom:1px solid #e1e8df; padding-bottom:.3em; }
+.studio-typography h3 { font-size:1.375em; }
+.studio-typography h4 { font-size:1.125em; }
+.studio-typography h5 { font-size:1em; }
+.studio-typography h6 { font-size:.875em; color:#62736a; }
+.studio-typography :is(p,ul,ol,li,blockquote,details) { font-size:inherit; line-height:inherit; }
+.studio-typography a { color:#39725c; }.studio-typography p { margin:0 0 1em; }.studio-typography img { max-width:100%; height:auto; border-radius:4px; }
+.studio-typography :is(ul,ol) { margin:0 0 1em; padding-inline-start:1.6em; }
+.studio-typography li { margin:.3em 0; }.studio-typography li > :is(ul,ol) { margin:.4em 0; }
+.studio-typography hr { border:0; border-top:1px solid var(--studio-line); margin:1.5em 0; }
+.studio-typography pre { margin:0 0 1em; background:#f0f3ed; border:1px solid #e1e8df; padding:18px; border-radius:8px; overflow:auto; white-space:pre; }
 .studio-typography code { font-family:'Cascadia Code',Consolas,monospace; font-size:.87em; background:#eef2eb; border-radius:3px; padding:.15em .25em; }.studio-typography pre code { padding:0; background:none; }
-.studio-typography table { display:block; max-width:100%; overflow:auto; border-collapse:collapse; font-size:.9em; }.studio-typography th, .studio-typography td { border:1px solid #dce5df; padding:9px 12px; }.studio-typography th { background:#eff3ed; }
+.studio-typography table { display:block; margin:0 0 1em; max-width:100%; overflow:auto; border-collapse:collapse; font-size:.9em; }.studio-typography th, .studio-typography td { border:1px solid #dce5df; padding:9px 12px; }.studio-typography th { background:#eff3ed; }
 .studio-typography blockquote { margin:1em 0; padding:6px 20px; border-left:3px solid #82a890; background:#f2f6ef; color:#577061; }.studio-typography .katex-display { overflow:auto hidden; padding:8px 0; }.studio-typography details { border:1px solid #dce5df; border-radius:6px; padding:12px; }
 .studio-divider { display:block; position:relative; width:9px; flex-shrink:0; background:#eef2e9; cursor:col-resize; touch-action:none; border-inline:1px solid #dce5df; }.studio-divider:hover, .studio-divider:focus { background:#a8c7ae; }
 .writing-studio[data-mode=split] .studio-source { flex:0 0 max(0px, calc(var(--studio-split) - 4.5px)); }.writing-studio[data-mode=split] .studio-typography { flex:1; }.writing-studio[data-mode=split] .studio-divider { display:block; }
@@ -72,10 +82,11 @@ body { background:#f4f6f2; }
 .writing-studio:not([data-mode=split]) .studio-preview { display:none; }
 .writing-studio[data-mode=split] .studio-preview { flex:1; }
 .studio-preview { color:var(--studio-ink); }
-.studio-rendered-block { font:16px/1.85 -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; overflow-wrap:anywhere; white-space:normal; }
-.studio-rendered-editable { cursor:text; padding:4px 20px; }
-.studio-rendered-block > :first-child { margin-top:0; }
-.studio-rendered-block > :last-child { margin-bottom:0; }
+/* Contain child margins so lazy blocks and CodeMirror widgets measure their full spacing. */
+.studio-rendered-block { display:flow-root; font:16px/1.85 -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; overflow-wrap:anywhere; white-space:normal; }
+.studio-rendered-editable { cursor:text; padding:0 20px; }
+.studio-typography :is(blockquote,li,.note,.fluid-fold > div) > :first-child { margin-top:0; }
+.studio-typography :is(blockquote,li,.note,.fluid-fold > div) > :last-child { margin-bottom:0; }
 .writing-studio[data-mode=render] .cm-gutters { display:none; }
 .writing-studio[data-mode=render] .cm-content { padding:24px 24px 80px; }
 .writing-studio[data-mode=render] .cm-activeLine { background:transparent; }
