@@ -64,7 +64,7 @@ async function initialize() {
   config.publish_mode = 'simple';
   const fields = config.collections.find(collection => collection.name === 'posts').fields;
   fields.find(field => field.name === 'title').default = '示例文章';
-  fields.find(field => field.name === 'body').default = `${templates['论文笔记']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n`;
+  fields.find(field => field.name === 'body').default = `${templates['折叠块']}\n## 公式示例\n\n$E=mc^2$\n\n$$\n\\mathcal{L} = \\mathbb{E}_{x} \\left[\\lVert x - \\hat{x} \\rVert^2\\right]\n$$\n\n![外链图片](https://blog.giraffish.top/img/default.png)\n`;
   CMS.init({ config });
  } else CMS.init();
  document.getElementById('studio-loading')?.remove();

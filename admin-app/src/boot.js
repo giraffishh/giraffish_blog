@@ -26,7 +26,7 @@ async function start() {
       window.netlifyIdentity.close();
     }
   }
-  await Promise.all([load('/admin/assets/decap/decap-cms.js'), load('/admin/assets/vditor/dist/index.min.js')]);
+  await load('/admin/assets/decap/decap-cms.js');
   await load('/admin/assets/entry.js');
 }
 start().catch(error => {

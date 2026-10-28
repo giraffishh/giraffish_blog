@@ -1,8 +1,11 @@
 import MarkdownIt from 'markdown-it';
 import math from '@traptitech/markdown-it-katex';
+import { fluidTags } from './fluid.js';
+export { fluidTemplates as templates } from './fluid.js';
 
 export const markdown = new MarkdownIt({ html: true, linkify: true, breaks: true, typographer: true, quotes: '“”‘’' })
-  .use(math, { throwOnError: false, trust: false, strict: false, maxExpand: 1000, maxSize: 20 });
+  .use(math, { throwOnError: false, trust: false, strict: false, maxExpand: 1000, maxSize: 20 })
+  .use(fluidTags);
 
 export function inspectDocument(text) {
   const tokens = markdown.parse(text, {});
@@ -10,6 +13,11 @@ export function inspectDocument(text) {
   const images = [];
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
+    if (token.type === 'fluid_block') {
+      const nested=inspectDocument(token.content);
+      headings.push(...nested.headings.map(h=>({...h,line:h.line+token.meta.contentLine})));
+      images.push(...nested.images.map(image=>({...image,line:image.line+token.meta.contentLine})));
+    }
     if (token.type === 'heading_open') {
       headings.push({ level: Number(token.tag[1]), text: tokens[i + 1].content, line: token.map[0] + 1 });
     }
@@ -29,12 +37,57 @@ export function inspectDocument(text) {
   return { headings, images: [...new Map(images.map(image => [image.url, image])).values()] };
 }
 
-export function documentSections(text) {
-  const offsets = [0];
-  for (let i = 0; i < text.length; i++) if (text[i] === '\n') offsets.push(i + 1);
-  const starts = inspectDocument(text).headings.map(h => ({ title: h.text, from: offsets[h.line - 1] }));
-  if (!starts.length || starts[0].from !== 0) starts.unshift({ title: '开篇', from: 0 });
-  return starts.map((section, i) => ({ ...section, to: starts[i + 1]?.from ?? text.length }));
+export function renderBlocks(text) {
+  const env={};
+  const tokens=markdown.parse(text,env);
+  const offsets=[0];
+  for(let i=0;i<text.length;i++) if(text[i]==='\n')offsets.push(i+1);
+  const result=[];
+  for(let i=0;i<tokens.length;) {
+    const first=tokens[i];
+    if(!first.map || first.level!==0 || first.nesting<0) {i++;continue;}
+    const start=i;
+    const from=offsets[first.map[0]];
+    let endLine=first.map[1];
+    const stack=[];
+    do {
+      const token=tokens[i];
+      if(token.map)endLine=Math.max(endLine,token.map[1]);
+      if(token.type==='heading_open') {
+        const heading=tokens[i+1]?.content || '';
+        token.attrSet('id',heading.toLowerCase().trim().replace(/[^\p{L}\p{N}_-]+/gu,'-'));
+      }
+      if(token.type==='html_block') {
+        for(const match of token.content.matchAll(/<(\/?)(details|div|section|article|figure|table)\b[^>]*>/gi)) {
+          const tag=match[2].toLowerCase();
+          if(!match[1])stack.push(tag);
+          else {const at=stack.lastIndexOf(tag);if(at>=0)stack.splice(at);}
+        }
+      }
+      i++;
+    } while(i<tokens.length && (stack.length || tokens[i-1].nesting===1 || tokens[i-1].level>0));
+    let to=offsets[endLine]??text.length;
+    if(text[to-1]==='\n')to--;
+    if(text[to-1]==='\r')to--;
+    if(to<=from)continue;
+    const html=markdown.renderer.render(tokens.slice(start,i),markdown.options,env);
+    const heading=first.type==='heading_open';
+    const image=html.includes('<img');
+    const lines=endLine-first.map[0];
+    const height=heading?64:image?240:Math.max(40,Math.min(1800,Math.max(lines,Math.ceil((to-from)/65))*25));
+    result.push({from,to,line:first.map[0]+1,html,height});
+  }
+  const complete=[];
+  let cursor=0;
+  for(const block of [...result,{from:text.length,to:text.length}]) {
+    if (block.from>cursor && text.slice(cursor,block.from).trim()) {
+      const html=markdown.render(text.slice(cursor,block.from),env);
+      complete.push({from:cursor,to:block.from,line:text.slice(0,cursor).split('\n').length,html,height:html.trim()?40:0});
+    }
+    if(block.html!==undefined)complete.push(block);
+    cursor=block.to;
+  }
+  return complete;
 }
 
 export function safeImageUrl(value) {
@@ -59,12 +112,3 @@ export function readBackup(storage, key, current) {
   } catch { /* Storage may be unavailable or a previous record may be corrupt. */ }
   return null;
 }
-
-export const templates = {
-  '论文笔记': '## 论文信息\n\n**作者**：\n**会议 / 年份**：\n**链接**：[论文](https://arxiv.org/) · [代码](https://github.com/)\n\n## 一句话总结\n\n\n## 核心贡献\n\n1. \n\n## 方法\n\n\n## 实验与结果\n\n| 方法 | 指标 | 结果 |\n| --- | --- | --- |\n|  |  |  |\n\n## 局限与思考\n\n\n## 参考资料\n\n',
-  '课程笔记': '## 本节目标\n\n- [ ] \n\n## 核心概念\n\n\n## 推导与例题\n\n$$\n\n$$\n\n## 易错点\n\n> \n\n## 练习\n\n- [ ] \n\n',
-  '代码示例': '```python\n# 在这里输入代码\n```\n',
-  '公式': '$$\nE = mc^2\n$$\n',
-  '表格': '| 项目 | 说明 |\n| --- | --- |\n|  |  |\n',
-  '折叠笔记': '<details>\n<summary>展开查看</summary>\n\n在这里补充推导或旁注。\n\n</details>\n',
-};
