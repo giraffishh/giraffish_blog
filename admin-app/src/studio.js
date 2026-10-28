@@ -3,7 +3,7 @@ import { EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
-import { openSearchPanel } from '@codemirror/search';
+import { openSearchPanel, search } from '@codemirror/search';
 import { imageMarkdown, safeImageUrl, readBackup, templates } from './document.js';
 
 const assetBase = '/admin/assets';
@@ -63,6 +63,14 @@ export class WritingStudio {
       state: EditorState.create({
         doc: value,
         extensions: [basicSetup, livePreview, liveFocus, markdownLanguage(), keymap.of([indentWithTab]), EditorView.lineWrapping,
+          search({ top: true }),
+          EditorState.phrases.of({
+            'Find': '查找内容', 'Replace': '替换为', 'next': '下一处', 'previous': '上一处',
+            'all': '选中全部', 'match case': '区分大小写', 'regexp': '正则表达式', 'by word': '全词匹配',
+            'replace': '替换', 'replace all': '全部替换', 'close': '关闭查找',
+            'No matches found': '未找到匹配项', 'replaced $ matches': '已替换 $ 处',
+            'current match': '当前匹配', 'on line': '位于行',
+          }),
           EditorView.contentAttributes.of({ 'aria-label': '正文编辑器', spellcheck: 'false' }),
           EditorView.updateListener.of(update => {
             if (update.docChanged && !this.syncing) this.commit(update.state.doc.toString());
@@ -77,7 +85,7 @@ export class WritingStudio {
     this.queueRender(0);
     window.addEventListener('pagehide', () => this.saveBackup(), { signal: this.abort.signal });
     this.root.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && this.root.classList.contains('studio-focus')) this.toggleFocus();
+      if (event.key === 'Escape' && !event.defaultPrevented && this.root.classList.contains('studio-focus')) this.toggleFocus();
     }, { signal: this.abort.signal });
   }
 
