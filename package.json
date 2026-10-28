@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "npm run build:admin && hexo generate",
+    "build": "node build-tools/prepare-renderer.cjs && npm run build:admin && node build-tools/build-site.cjs",
     "build:admin": "npm --prefix admin-app ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix admin-app test && npm --prefix admin-app run build",
     "test:admin": "npm --prefix admin-app test",
     "clean": "hexo clean",

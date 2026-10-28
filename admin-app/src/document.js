@@ -1,7 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import math from '@traptitech/markdown-it-katex';
 
-export const markdown = new MarkdownIt({ html: true, linkify: true, breaks: false })
+export const markdown = new MarkdownIt({ html: true, linkify: true, breaks: true, typographer: true, quotes: '“”‘’' })
   .use(math, { throwOnError: false, trust: false, strict: false, maxExpand: 1000, maxSize: 20 });
 
 export function inspectDocument(text) {

@@ -38,6 +38,7 @@ npm --prefix admin-app run dev
 - `build:admin` 使用锁文件安装、运行测试，再生成资源。Netlify 执行 `npm run build`，不再使用 `npm install --force`。
 - Decap 的官方发行包使用 React 19，部分传递依赖仍声明旧 React peer；`admin-app/.npmrc` 仅用于安装这个官方 bundle。没有单独编译第二套 React。
 - 根目录 overrides 将 Hexo renderer 的 Markdown-it 更新到 15.0.3、KaTeX 更新到 0.19.1。后台预览使用同版组件。Vditor 自带的 KaTeX 也在构建时用 0.19.1 覆盖。
+- `build-tools/prepare-renderer.cjs` 为旧 Hexo renderer 的 Token 导入加上严格版本检查的兼容补丁，改用 Markdown-it 公开 API；升级 renderer 时必须重新核验。`build-tools/build-site.cjs` 清理后生成站点，检查 Hexo 错误日志与首页、归档、现有文章、后台资源，防止 Hexo 返回 0 却生成不完整站点。
 - Dependabot 每周检查 `/admin-app`，补丁更新分组；主版本升级应重新跑语料和浏览器测试。
 
 ## 验证与已知限制
