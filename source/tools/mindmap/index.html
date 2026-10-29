@@ -158,8 +158,9 @@
     </main>
 
     <div id="nodeMenu" role="menu" aria-label="节点操作" hidden>
+      <button type="button" role="menuitem" data-action="copy">复制</button>
+      <button type="button" role="menuitem" data-action="paste">粘贴</button>
       <button type="button" role="menuitem" data-action="root">新建根节点</button>
-      <button type="button" role="menuitem" data-action="edit">编辑节点</button>
       <button type="button" role="menuitem" data-action="child">新增子节点</button>
       <button type="button" role="menuitem" data-action="sibling">新增同级节点</button>
       <button type="button" role="menuitem" data-action="detach">独立节点</button>
@@ -228,6 +229,14 @@
           >
           <tr
             ><td>删除节点及其子节点</td><td><kbd data-shortcut-key="delete">Delete</kbd></td></tr
+          >
+          <tr
+            ><td>复制</td
+            ><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd>C</kbd></td></tr
+          >
+          <tr
+            ><td>粘贴</td
+            ><td><kbd data-shortcut-key="command">Ctrl</kbd> + <kbd>V</kbd></td></tr
           >
           <tr
             ><td>导出 SVG</td
@@ -332,7 +341,7 @@
     <!-- Let Files providers expose Markdown even when its MIME/UTI is unknown. Validate after selection. -->
     <input id="file" type="file" hidden />
 
-    <script src="mindmap-core.js?v=c6a786aeea29"></script>
-    <script src="mindmap.js?v=4593c981448e"></script>
+    <script src="mindmap-core.js?v=8d2716fc649a"></script>
+    <script src="mindmap.js?v=285711693cf7"></script>
   </body>
 </html>

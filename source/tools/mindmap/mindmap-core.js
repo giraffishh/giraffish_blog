@@ -741,25 +741,14 @@
     return model.roots || model.nodes.filter((n) => !n.parent);
   }
 
-  // Keep each heading's notes with it, even when old floating-topic source order differs.
-  function rewriteForest(
-    text,
-    model,
-    roots,
-    children,
-    positions,
-    extra = new Map(),
-    preserveColors = false,
-    colorOverrides = new Map(),
-  ) {
-    if (!roots.length) throw Error('至少保留一个根节点');
+  function sourceChunks(text, model) {
     const offsets = [0];
     let match;
     const newline = /\r?\n/g,
       eol = text.includes('\r\n') ? '\r\n' : '\n';
     while ((match = newline.exec(text))) offsets.push(match.index + match[0].length);
     const sourceOrder = model.nodes.slice().sort((a, b) => a.startLine - b.startLine),
-      chunks = new Map(extra);
+      chunks = new Map();
     sourceOrder.forEach((n, i) => {
       const start = offsets[n.startLine - 1];
       const end =
@@ -772,6 +761,23 @@
         );
       chunks.set(n, { prefix, body: text.slice(offsets[n.line - 1], end) });
     });
+    return { offsets, sourceOrder, eol, chunks };
+  }
+
+  // Keep each heading's notes with it, even when old floating-topic source order differs.
+  function rewriteForest(
+    text,
+    model,
+    roots,
+    children,
+    positions,
+    extra = new Map(),
+    preserveColors = false,
+    colorOverrides = new Map(),
+  ) {
+    if (!roots.length) throw Error('至少保留一个根节点');
+    const { offsets, sourceOrder, eol, chunks: originalChunks } = sourceChunks(text, model);
+    const chunks = new Map([...extra, ...originalChunks]);
     const order = [],
       stack = roots
         .slice()
@@ -913,6 +919,80 @@
       if (!roots.length || n.index >= roots[roots.length - 1].end) roots.push(n);
     return roots;
   }
+  // Copy standalone Markdown so branches can also move between tabs and files.
+  function copySubtrees(text, model, ids, palette = []) {
+    const selected = selectionRoots(model, ids);
+    if (!selected.length) throw Error('请先选择要复制的节点');
+    const overrides = new Map();
+    for (const node of selected) {
+      const color =
+        typeof node.color === 'string' ? node.color : palette[node.color % palette.length];
+      if (color) overrides.set(node, color);
+    }
+    const change = rewriteForest(
+      text,
+      model,
+      selected,
+      structureMaps(model).children,
+      new Map(),
+      new Map(),
+      false,
+      overrides,
+    );
+    const firstLine = change.model.nodes.reduce(
+      (line, node) => Math.min(line, node.startLine),
+      Infinity,
+    );
+    return change.text
+      .split('\n')
+      .slice(firstLine - 1)
+      .join('\n')
+      .replace(/^\uFEFF/, '');
+  }
+
+  function pasteSubtrees(text, model, targetId, clipboard, position = null) {
+    const target = model.byId.get(targetId);
+    if (targetId != null && !target) throw Error('请先选择粘贴位置');
+    if (!target && (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)))
+      throw Error('粘贴位置无效');
+    if (typeof clipboard !== 'string' || !clipboard.trim()) throw Error('剪贴板为空，请先复制节点');
+    // Plain clipboard text becomes one node per nonempty line. Markdown branches
+    // keep their hierarchy, notes and color metadata.
+    if (!/^#{1,}[ \t]+\S/m.test(clipboard.replace(/^\uFEFF/, ''))) {
+      clipboard = clipboard
+        .split(/\r\n|\r|\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => '# ' + line)
+        .join('\n');
+    }
+    const imported = parseMarkdown(clipboard),
+      state = structureMaps(model);
+    const extra = sourceChunks(clipboard, imported).chunks;
+    const eol = text.includes('\r\n') ? '\r\n' : '\n';
+    for (const [node, chunk] of extra) {
+      extra.set(node, {
+        prefix: chunk.prefix.replace(/\r?\n/g, eol),
+        body: chunk.body.replace(/\r?\n/g, eol),
+      });
+      state.children.set(node, node.children.slice());
+    }
+    if (target) state.children.get(target).push(...imported.roots);
+    else {
+      state.roots.push(...imported.roots);
+      imported.roots.forEach((node, index) => {
+        state.positions.set(node, point({ x: position.x, y: position.y + index * 120 }));
+      });
+    }
+    const change = rewriteForest(text, model, state.roots, state.children, state.positions, extra);
+    return {
+      ...change,
+      pastedIndices: imported.roots.map((node) => change.indices.get(node)),
+      expandIndex: target ? change.remap(target.index) : null,
+      count: imported.nodes.length,
+    };
+  }
+
   function point(value) {
     return { x: Math.round(value.x * 100) / 100, y: Math.round(value.y * 100) / 100 };
   }
@@ -1213,6 +1293,8 @@
     createHistory,
     changeStructure,
     selectionRoots,
+    copySubtrees,
+    pasteSubtrees,
     swapSiblings,
     siblingGaps,
     isInsertionNoop,

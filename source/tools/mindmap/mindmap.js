@@ -1221,7 +1221,8 @@
   }
   function showNodeMenu(n, x, y) {
     if (touchMode || editing || saving) return;
-    if (n && !selectedIds.has(n.id)) setSelection([n.id]);
+    if (!n) setSelection([]);
+    else if (!selectedIds.has(n.id)) setSelection([n.id]);
     menuTarget = n;
     menuPoint = n
       ? { x: n.x + n.w + 120, y: n.y + 80 }
@@ -1236,12 +1237,13 @@
       );
     const allowed = {
       root: !n,
-      edit: single,
       child: single,
       sibling: siblings,
       detach: !!n,
       toggle: !!n,
       color: !!n,
+      copy: !!n,
+      paste: !n || single,
       delete: !!n,
     };
     for (const item of menu.querySelectorAll('button[data-action]')) {
@@ -1306,13 +1308,14 @@
       createRoot(position);
       return;
     }
+    if (action === 'paste') return pasteFromMenu(n, position);
     if (!n || nodeById.get(n.id) !== n || editing || saving) return;
+    if (action === 'copy') return copyNodes(ids);
     if (action === 'color') {
       openBranchColor(ids, n);
       return;
     }
-    if (action === 'edit') startEdit(n);
-    else if (action === 'toggle')
+    if (action === 'toggle')
       toggleNodes(
         ids.map((id) => nodeById.get(id)),
         n,
@@ -2830,6 +2833,151 @@
     updateViewport();
     schedulePoll();
   });
+  // ── 节点复制与粘贴 ──────────────────────────────────────────
+  let copiedMarkdown = '',
+    clipboardBusy = false,
+    pastePointer = null;
+  function rememberPastePointer(event) {
+    if (event.pointerType !== 'touch') pastePointer = { x: event.clientX, y: event.clientY };
+  }
+  viewport.addEventListener('pointermove', rememberPastePointer);
+  viewport.addEventListener('pointerdown', rememberPastePointer);
+  function clipboardPosition() {
+    return pastePointer
+      ? {
+          x: (pastePointer.x - viewRect.left - tx) / scale,
+          y: (pastePointer.y - viewRect.top - ty) / scale,
+        }
+      : { x: (viewWidth / 2 - tx) / scale, y: (viewHeight / 2 - ty) / scale };
+  }
+  function clipboardError(message) {
+    feedback.show({
+      title: '复制粘贴未完成',
+      message,
+      category: 'clipboard',
+      actions: false,
+      placement: 'center',
+    });
+  }
+  function clipboardAllowed(target) {
+    return (
+      !touchMode &&
+      !editing &&
+      !saving &&
+      !drag &&
+      !clipboardBusy &&
+      !feedback.confirmOpen &&
+      !$('shortcutHelp').open &&
+      !$('branchColorDialog').open &&
+      !target?.closest('input,textarea,select,[contenteditable="true"]')
+    );
+  }
+  function clipboardTarget() {
+    if (selectedIds.size > 1) throw Error('请选择一个节点作为粘贴位置');
+    return selectedIds.size ? nodeById.get([...selectedIds][0]) : null;
+  }
+  function pasteNodes(markdown, target, position = clipboardPosition()) {
+    return commitStructure((text, model, view) => {
+      let change = Core.pasteSubtrees(text, model, target?.id ?? null, markdown, position);
+      // Keep the first pasted root at the cursor; place additional roots without overlap.
+      if (!target && change.pastedIndices.length > 1)
+        change = Core.settleRootPositions(change, change.pastedIndices.slice(1), metrics);
+      return {
+        change,
+        afterView: mappedView(view, change, change.pastedIndices, change.expandIndex),
+        revealIndex: change.pastedIndices[0],
+        status: `已粘贴 ${change.count} 个节点`,
+      };
+    });
+  }
+  document.addEventListener('copy', (event) => {
+    if (
+      !clipboardAllowed(event.target) ||
+      !selectedIds.size ||
+      !event.clipboardData ||
+      window.getSelection()?.toString()
+    )
+      return;
+    try {
+      const markdown = Core.copySubtrees(raw, currentModel(), [...selectedIds], colors);
+      event.clipboardData.setData('text/plain', markdown);
+      event.preventDefault();
+      copiedMarkdown = markdown;
+      $('status').textContent = '已复制';
+    } catch (error) {
+      clipboardError(error.message);
+    }
+  });
+  document.addEventListener('paste', (event) => {
+    if (!clipboardAllowed(event.target) || !event.clipboardData) return;
+    event.preventDefault();
+    try {
+      const target = clipboardTarget();
+      void pasteNodes(event.clipboardData.getData('text/plain'), target);
+    } catch (error) {
+      clipboardError(error.message);
+    }
+  });
+  async function copyNodes(ids) {
+    if (!clipboardAllowed()) return;
+    try {
+      const markdown = Core.copySubtrees(raw, currentModel(), ids, colors);
+      copiedMarkdown = markdown;
+      clipboardBusy = true;
+      try {
+        await navigator.clipboard.writeText(markdown);
+        $('status').textContent = '已复制';
+      } catch {
+        feedback.show({
+          title: '已复制到当前页面',
+          message: '可通过右键菜单粘贴。跨页面复制请使用 Ctrl/Cmd+C。',
+          category: 'clipboard',
+          kind: 'info',
+          actions: false,
+        });
+      }
+    } catch (error) {
+      clipboardError(error.message);
+    } finally {
+      clipboardBusy = false;
+    }
+  }
+  async function pasteFromMenu(target, position = clipboardPosition()) {
+    if (!clipboardAllowed()) return;
+    const expected = raw,
+      expectedRevision = revision;
+    clipboardBusy = true;
+    try {
+      let markdown;
+      try {
+        markdown = await navigator.clipboard.readText();
+      } catch {
+        if (!copiedMarkdown) throw Error('浏览器未允许读取剪贴板，请使用 Ctrl/Cmd+V 粘贴');
+        markdown = copiedMarkdown;
+        feedback.show({
+          title: '使用页面内副本',
+          message: '浏览器未允许读取系统剪贴板，将粘贴最近在本页复制的节点。',
+          category: 'clipboard',
+          kind: 'info',
+          actions: false,
+        });
+      }
+      clipboardBusy = false;
+      if (
+        raw !== expected ||
+        revision !== expectedRevision ||
+        (target && nodeById.get(target.id) !== target) ||
+        !clipboardAllowed()
+      )
+        throw Error('导图或操作状态已变化，请重新选择节点后粘贴');
+      await pasteNodes(markdown, target, position);
+    } catch (error) {
+      clipboardError(error.message);
+    } finally {
+      clipboardBusy = false;
+    }
+  }
+
   async function initializeMap() {
     setSaving(true);
     try {
