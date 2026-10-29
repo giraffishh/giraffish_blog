@@ -1,9 +1,11 @@
 import MarkdownIt from 'markdown-it';
 import math from '@traptitech/markdown-it-katex';
 import { fluidTags } from './fluid.js';
+import { highlightCode } from './code-highlight.js';
 
 export const markdown = new MarkdownIt({
   html: true,
+  highlight: highlightCode,
   linkify: true,
   breaks: true,
   typographer: true,

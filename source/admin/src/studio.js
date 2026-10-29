@@ -4,14 +4,15 @@ import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
-import { imageMarkdown, readBackup, templates } from './document-utils.js';
+import { readBackup, templates } from './document-utils.js';
 import { livePreview, liveFocus, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
-import { clampRatio, modeAtRatio, dividerRatio } from './split-layout.js';
+import { clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST } from './split-layout.js';
 import { ScrollSync, indexBefore } from './scroll-sync.js';
 import { SidebarResize } from './sidebar-resize.js';
 import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
+import { reloadDocumentImages } from './image-reload.js';
 import { MetadataDock } from './metadata-dock.js';
 import { LayoutMotion, reducedMotion } from './layout-motion.js';
 import { PaneLayout } from './pane-layout.js';
@@ -22,6 +23,7 @@ import { attachToolbar } from './toolbar-bridge.js';
 import { ToolbarMenus } from './toolbar-menus.js';
 import { startPdfExport } from './pdf-launcher.js';
 import { downloadText } from './export-utils.js';
+import { sourceCodeLanguage, sourceCodeHighlight } from './source-code.js';
 let toolbarId = 0;
 const activeStudios = new Set();
 export function markBodySaved(body) {
@@ -75,7 +77,7 @@ export class WritingStudio {
     this.onChange = onChange;
     this.key = `studio:backup:v1:${entryKey}:${name}`;
     this.mode = 'source';
-    this.sourceFirst = preference('source-first', 'false') === 'true';
+    this.sourceFirst = preference('source-first', String(DEFAULT_SOURCE_FIRST)) === 'true';
     this.requestId = 0;
     this.abort = new AbortController();
     this.compact = window.matchMedia(compactQuery).matches;
@@ -88,7 +90,7 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [basicSetup, livePreview, liveFocus, markdownLanguage(), keymap.of([indentWithTab]), EditorView.lineWrapping, search({
+        extensions: [basicSetup, livePreview, liveFocus, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping, search({
           top: true
         }), EditorState.phrases.of({
           'Find': '查找内容',
@@ -137,9 +139,6 @@ export class WritingStudio {
     this.responsiveLayout = new ResponsiveEditorLayout(this);
     this.toolbarMenus = new ToolbarMenus(this);
     this.setMode(preference('mode', 'render'));
-    this.readyFrame = requestAnimationFrame(() => {
-      if (!this.destroyed) this.root.classList.add('studio-ready');
-    });
     window.addEventListener('pagehide', () => this.saveBackup(), {
       signal: this.abort.signal
     });
@@ -148,6 +147,7 @@ export class WritingStudio {
   build() {
     this.root.className = 'writing-studio studio-focus';
     delete this.root.dataset.mode;
+    delete this.root.dataset.paneMode;
     this.root.dataset.sourceFirst = String(this.sourceFirst);
     this.root.classList.toggle('studio-sidebar-open', !this.compact && this.desktopSidebarOpen);
     const nav = el('div', 'studio-nav studio-unified-nav');
@@ -515,9 +515,11 @@ export class WritingStudio {
   renderResult(data) {
     if (this.destroyed || data.id !== this.requestId) return;
     if (data.error) {
+      this.workspace.dataset.initialError = 'true';
       this.notice(`预览失败：${data.error}`);
       return;
     }
+    delete this.workspace.dataset.initialError;
     this.documentInfo = data;
     this.analyzedValue = this.requestedValue;
     this.applyDocument(data);
@@ -615,7 +617,9 @@ export class WritingStudio {
     } else if (tab === 'images') {
       const images = this.documentInfo?.images || [];
       this.sideContent.append(el('p', 'studio-muted', `${images.length} 张图片`));
-      this.sideContent.append(button('插入图片', () => this.imageDialog()));
+      this.reloadImagesButton = button('重新加载所有图片', () => this.reloadImages());
+      this.reloadImagesButton.disabled = Boolean(this.reloadingImages) || !images.length;
+      this.sideContent.append(this.reloadImagesButton);
       const thumbnails = new Map();
       for (const image of images) {
         const card = el('div', 'studio-image-card');
@@ -720,63 +724,19 @@ export class WritingStudio {
     });
     this.source.focus();
   }
-  imageDialog() {
-    this.closeImageDialog?.();
-    const dialog = el('dialog', 'studio-dialog');
-    const form = el('form');
-    form.method = 'dialog';
-    const title = el('h2', '', '插入外链图片');
-    const urlLabel = el('label', '', '图片地址');
-    const url = el('input');
-    url.type = 'text';
-    url.required = true;
-    url.placeholder = 'https://…';
-    urlLabel.append(url);
-    const altLabel = el('label', '', '图片说明 / Alt 文本');
-    const alt = el('input');
-    alt.type = 'text';
-    altLabel.append(alt);
-    const error = el('p', 'studio-error');
-    error.setAttribute('role', 'alert');
-    const imagePreview = el('div', 'studio-image-field-preview');
-    imagePreview.hidden = true;
-    let previewTimer;
-    url.addEventListener('input', () => {
-      clearTimeout(previewTimer);
-      imagePreview.replaceChildren();
-      imagePreview.hidden = !imagePreviewUrl(url.value);
-      if (!imagePreview.hidden) previewTimer = setTimeout(() => {
-        imagePreview.replaceChildren(createImageThumbnail(url.value, alt.value || '图片预览'));
-      }, 250);
-    });
-    const actions = el('div', 'studio-dialog-actions');
-    const submit = el('button', 'studio-primary', '插入');
-    submit.type = 'submit';
-    actions.append(button('取消', () => dialog.close()), submit);
-    form.append(title, urlLabel, imagePreview, altLabel, error, actions);
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      try {
-        const text = imageMarkdown(url.value, alt.value);
-        dialog.close();
-        this.insert(text);
-      } catch (err) {
-        error.textContent = err.message;
-      }
-    });
-    dialog.append(form);
-    this.root.append(dialog);
-    const cleanup = () => {
-      clearTimeout(previewTimer);
-      dialog.remove();
-      if (this.closeImageDialog === cleanup) this.closeImageDialog = null;
-    };
-    this.closeImageDialog = cleanup;
-    dialog.addEventListener('close', cleanup, {
-      once: true
-    });
-    dialog.showModal();
-    url.focus();
+  async reloadImages() {
+    if (this.reloadingImages) return;
+    this.reloadingImages = true;
+    this.reloadImagesButton.disabled = true;
+    try {
+      const count = await reloadDocumentImages(this.body, this.documentInfo?.images || [], this.abort.signal, (done, total) => {
+        if (!this.destroyed) this.notice('重新加载图片 ' + done + ' / ' + total);
+      });
+      if (!this.destroyed) this.notice('已重新请求 ' + count + ' 张图片');
+    } finally {
+      this.reloadingImages = false;
+      if (!this.destroyed && this.reloadImagesButton) this.reloadImagesButton.disabled = !this.documentInfo?.images?.length;
+    }
   }
   exportSnapshot() {
     return {
@@ -829,7 +789,6 @@ export class WritingStudio {
   }
   destroy() {
     this.saveBackup();
-    this.closeImageDialog?.();
     this.closeExportDialog?.();
     this.closePdfExport?.();
     this.destroyed = true;
@@ -843,7 +802,6 @@ export class WritingStudio {
     this.paneLayout?.destroy();
     this.motion?.destroy();
     this.responsiveLayout?.destroy();
-    cancelAnimationFrame(this.readyFrame);
     clearTimeout(this.sidebarMotionTimer);
     clearTimeout(this.backupTimer);
     clearTimeout(this.renderTimer);

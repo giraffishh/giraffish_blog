@@ -170,6 +170,7 @@ export class PaneLayout {
       }
       this.moving = false;
       studio.root.classList.remove('studio-layout-moving');
+      studio.root.classList.add('studio-ready');
       studio.scrollSync.schedule();
       const swap = this.queuedSwap;
       this.queuedSwap = null;

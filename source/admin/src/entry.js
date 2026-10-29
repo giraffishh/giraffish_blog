@@ -1,6 +1,6 @@
 import React from 'react';
 import { CMS } from './cms.js';
-import { configureToolbar } from './toolbar-bridge.js';
+import { configureToolbar, setEditorLoadFailure } from './toolbar-bridge.js';
 import { loadEditor, warmEditor } from './editor-loader.js';
 import { safeImageUrl, templates } from './document-utils.js';
 import './studio.css';
@@ -9,6 +9,10 @@ import { installArticleMedia } from './article-media.js';
 import { installResponsiveViewport } from './responsive-layout.js';
 import './responsive.css';
 import './toolbar.css';
+import {codeStyles} from './code-theme.js';
+const codeStyle = document.createElement('style');
+codeStyle.textContent = codeStyles;
+document.head.append(codeStyle);
 const h = React.createElement;
 installArticleMedia(CMS);
 installResponsiveViewport();
@@ -17,7 +21,7 @@ class MarkdownControl extends React.Component {
     this.mountEditor();
   }
   async mountEditor() {
-    this.container.textContent = '正在加载编辑器…';
+    setEditorLoadFailure();
     try {
       const { WritingStudio } = await loadEditor();
       if (this.unmounted) return;
@@ -30,10 +34,7 @@ class MarkdownControl extends React.Component {
       });
     } catch {
       if (this.unmounted) return;
-      const retry = document.createElement('button');
-      retry.textContent = '编辑器加载失败，点击重试';
-      retry.onclick = () => this.mountEditor();
-      this.container.replaceChildren(retry);
+      setEditorLoadFailure({retry:() => this.mountEditor()});
     }
   }
   componentDidUpdate() {
@@ -45,6 +46,7 @@ class MarkdownControl extends React.Component {
   componentWillUnmount() {
     this.unmounted = true;
     this.studio?.destroy();
+    setEditorLoadFailure();
   }
   isValid = () => {
     // CodeMirror publishes changes synchronously; validation needs no flush.

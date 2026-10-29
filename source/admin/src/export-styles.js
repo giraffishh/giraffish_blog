@@ -1,4 +1,6 @@
-export const paperStyles = `
+import {codeStyles} from './code-theme.js';
+
+export const paperStyles = codeStyles + `
 *{box-sizing:border-box} :host{display:block;color:#202b29;font:11pt/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
 body{margin:0;background:white;color:#202b29;font:11pt/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
 .pdf-paper{width:210mm;margin:0;padding:16mm;background:white;overflow-wrap:anywhere}

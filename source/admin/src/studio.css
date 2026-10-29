@@ -2,7 +2,7 @@
 body { background:#f4f6f2; }
 /* Decap's stable component-name suffix, not its generated hash. */
 [class*="ControlPaneContainer"]:has(> [class*="ControlContainer"] .writing-studio) { max-width:1440px; width:calc(100% - 64px); }
-.writing-studio { --studio-body-size:16px; --studio-body-leading:1.75; --studio-font:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; --studio-code-font:'Cascadia Code',Consolas,'Microsoft YaHei',monospace; color:var(--studio-ink); font:14px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; border:1px solid var(--studio-line); border-radius:8px; background:var(--studio-paper); overflow:hidden; width:100%; min-width:0;  }
+.writing-studio { --studio-body-size:15px; --studio-body-leading:1.75; --studio-font:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; --studio-code-font:'Cascadia Code',Consolas,'Microsoft YaHei',monospace; color:var(--studio-ink); font:14px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif; border:1px solid var(--studio-line); border-radius:8px; background:var(--studio-paper); overflow:hidden; width:100%; min-width:0;  }
 .writing-studio *, .writing-studio *::before, .writing-studio *::after { box-sizing:border-box; }
 .writing-studio button { border:1px solid transparent; background:transparent; color:inherit; border-radius:6px; padding:6px 10px; cursor:pointer; font:inherit; white-space:nowrap; }
 .writing-studio button:hover { background:#eaf0e8; }
@@ -215,3 +215,9 @@ body { background:#f4f6f2; }
 @property --metadata-top { syntax:'<length>'; inherits:false; initial-value:0px; }
 @property --metadata-width { syntax:'<length>'; inherits:false; initial-value:0px; }
 @property --metadata-height { syntax:'<length>'; inherits:false; initial-value:0px; }
+
+/* Do not expose a temporary source-only pane before the first parse completes. */
+.writing-studio:not([data-pane-mode]) .studio-workspace > * { visibility:hidden; }
+.writing-studio:not([data-pane-mode]) .studio-workspace::after { content:"正在加载正文…"; position:absolute; inset:0; display:grid; place-items:center; color:var(--studio-muted); font:14px/1.5 var(--studio-font); }
+
+.writing-studio:not([data-pane-mode]) .studio-workspace[data-initial-error]::after { content:"预览加载失败，可切换源码继续编辑"; }

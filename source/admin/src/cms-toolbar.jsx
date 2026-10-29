@@ -2,7 +2,7 @@ import React from 'react';
 import {createPortal} from 'react-dom';
 import {translate} from 'react-polyglot';
 import {EditorToolbar as NativeToolbar} from 'decap-cms-core/dist/esm/components/Editor/EditorToolbar';
-import {currentToolbar, subscribeToolbar, previewLinksEnabled} from './toolbar-bridge.js';
+import {currentToolbar, subscribeToolbar, previewLinksEnabled, usesStudioEditor, editorLoadFailure} from './toolbar-bridge.js';
 
 const paths = {
   exit:'M19 12H5m6-6-6 6 6 6',
@@ -93,7 +93,19 @@ export class StudioToolbar extends NativeToolbar {
   }
   render() {
     const studio = currentToolbar();
-    if (!studio || studio.destroyed) return super.render();
+    if (!studio || studio.destroyed) {
+      if (!usesStudioEditor(this.props.collection)) return super.render();
+      const exit = React.cloneElement(super.render().props.children[0], {
+        className:'studio-exit', title:'退出编辑', 'aria-label':'退出编辑',
+        children:<>{icon('exit')}<span>退出</span></>
+      });
+      return <section className="studio-editor-loading" aria-label="工作台加载">
+        <div className="studio-unified-nav">{exit}</div>
+        <div className="studio-editor-loading-status" role="status" aria-busy={!editorLoadFailure}>
+          {editorLoadFailure ? <><p>编辑器加载失败</p><button type="button" onClick={editorLoadFailure.retry}>重新加载</button></> : '正在加载编辑器…'}
+        </div>
+      </section>;
+    }
     const compact = this.compactQuery?.matches ?? window.matchMedia('(max-width:1200px)').matches;
     const original = super.render().props.children;
     const exit = React.cloneElement(original[0], {

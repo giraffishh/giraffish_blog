@@ -5,6 +5,21 @@ export function imagePreviewUrl(value) {
   return url?.startsWith('/') ? `https://blog.giraffish.top${url}` : url;
 }
 
+export function reloadImageElement(image) {
+  const url = image.getAttribute('src');
+  if (!url) return;
+  const root = image.closest('.studio-image-preview');
+  if (root) {
+    root.dataset.state = 'loading';
+    const message = root.querySelector('.studio-image-placeholder');
+    if (message) { message.textContent = '加载中…'; message.hidden = false; }
+    const retry = root.querySelector('.studio-image-retry');
+    if (retry) retry.hidden = true;
+  }
+  image.removeAttribute('src');
+  image.setAttribute('src', url);
+}
+
 export function createImageThumbnail(value, alt = '图片预览') {
   const root = document.createElement('div');
   root.className = 'studio-image-preview';
@@ -45,13 +60,7 @@ export function createImageThumbnail(value, alt = '图片预览') {
     message.hidden = false;
     retry.hidden = false;
   });
-  retry.addEventListener('click', () => {
-    root.dataset.state = 'loading';
-    message.textContent = '加载中…';
-    retry.hidden = true;
-    image.removeAttribute('src');
-    image.src = url;
-  });
+  retry.addEventListener('click', () => reloadImageElement(image));
   image.src = url;
   link.append(image, message);
   root.append(link, retry);

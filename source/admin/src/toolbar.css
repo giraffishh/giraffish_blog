@@ -114,3 +114,12 @@
 @media (max-width:480px) { .studio-export-formats { grid-template-columns:1fr; } }
 
 .studio-print-frame { position:fixed; left:-10000px; top:0; width:794px; height:1123px; border:0; pointer-events:none; }
+
+/* The native form remains mounted for CMS state, but never paints its legacy
+   layout while the asynchronous editor module is being prepared. */
+.studio-editor-loading { position:fixed; z-index:110; inset:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px); display:flex; flex-direction:column; background:var(--studio-paper); color:var(--studio-ink); --studio-font:system-ui,-apple-system,'Segoe UI','Microsoft YaHei',sans-serif; font:14px/1.5 var(--studio-font); }
+.studio-demo .studio-editor-loading { bottom:28px; }
+.studio-editor-loading-status { display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--studio-muted); }
+.studio-editor-loading-status p { margin:0; }
+.studio-editor-loading-status button { border:1px solid var(--studio-line); border-radius:6px; padding:8px 16px; background:transparent; color:var(--studio-green); font:inherit; cursor:pointer; }
+#nc-root:has(.studio-editor-loading) :is([class*="ControlPaneContainer"],[class*="PreviewPaneContainer"]) { visibility:hidden; }
