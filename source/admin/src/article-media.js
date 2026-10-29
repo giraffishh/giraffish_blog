@@ -35,6 +35,7 @@ export class ArticleMediaStore {
     this.sizeCache = new Map();
     this.files = [];
     this.fileSizes = new Map();
+    this.fileNames = new Map();
   }
   rebuild() {
     const articles = new Map(this.articles.map(article => [article.id, article]));
@@ -58,6 +59,11 @@ export class ArticleMediaStore {
       if (data.version !== 1 || !Array.isArray(data.articles) || data.articles.some(article => typeof article.id !== 'string' || typeof article.title !== 'string' || !Array.isArray(article.images))) throw new Error('图片索引格式不正确');
       this.articles = data.articles;
       this.files = Array.isArray(data.files) ? data.files : [];
+      this.fileNames = new Map();
+      for (const file of this.files) for (const name of new Set([file.name,file.name.split('/').pop()])) {
+        if (!this.fileNames.has(name)) this.fileNames.set(name,file.bytes);
+        else this.fileNames.set(name,undefined); // Ambiguous basenames need the exact URL.
+      }
       this.fileSizes = new Map(this.files.map(file => [new URL(file.path, 'https://blog.giraffish.top').href, file.bytes]));
       if (force) this.sizeCache.clear();
       this.generatedAt = data.generatedAt;
@@ -376,11 +382,12 @@ export class ArticleMediaPanel {
       this.resultSource = this.store.items;
       this.resultQuery = query;
       this.results = filterMedia(this.store.items, this.filters);
+      this.resultCount = this.results.reduce((sum,image) => sum + image.count,0);
     }
     const items = this.results;
     const pages = Math.max(1, Math.ceil(items.length / pageSize));
     this.page = Math.max(0, Math.min(this.page, pages - 1));
-    this.summary.textContent = `${items.length} 张图片 · ${items.reduce((sum, image) => sum + image.count, 0)} 次引用`;
+    this.summary.textContent = `${items.length} 张图片 · ${this.resultCount} 次引用`;
     this.thumbnailObserver?.disconnect();
     this.pendingThumbnails.clear();
     this.grid.replaceChildren(...items.slice(this.page * pageSize, (this.page + 1) * pageSize).map(image => this.card(image)));

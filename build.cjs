@@ -45,13 +45,13 @@ function run(command) {
 // Use Hexo's supported cleanup to avoid stale output hiding missing pages.
 run('clean');
 run('generate');
-for (const name of ['index.html', 'archives/index.html', 'admin/index.html', 'admin/assets/boot.js', 'admin/assets/entry.js', 'post/806475f8/index.html']) {
+for (const name of ['index.html', 'archives/index.html', 'admin/index.html', 'admin/print.html', 'admin/assets/print.js', 'admin/assets/boot.js', 'admin/assets/entry.js', 'post/806475f8/index.html']) {
   const file = path.join(root, 'public', name);
   if (!fs.existsSync(file) || fs.statSync(file).size === 0) throw new Error(`Required generated page/asset is missing: ${name}`);
 }
 console.log('Verified homepage, archives, an existing post and admin assets.');
 
 const adminFiles = fs.readdirSync(path.join(root,'public/admin'));
-const unexpected = adminFiles.filter(name => !['index.html','config.yml','assets'].includes(name));
+const unexpected = adminFiles.filter(name => !['index.html','print.html','config.yml','assets'].includes(name));
 if (unexpected.length) throw new Error('Development files leaked into the published admin: ' + unexpected.join(', '));
-console.log('Verified admin output contains only index.html, config.yml and assets/.');
+console.log('Verified admin output contains only index.html, print.html, config.yml and assets/.');

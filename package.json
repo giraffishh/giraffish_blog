@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node build.cjs",
-    "build:admin": "npm --prefix source/admin ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix source/admin run build",
+    "build:admin": "npm --prefix source/admin ci --include=dev --ignore-scripts --no-fund --no-audit && npm --prefix source/admin run check && npm --prefix source/admin run build",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
     "server": "hexo server",

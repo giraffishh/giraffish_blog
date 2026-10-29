@@ -35,7 +35,7 @@ function resourceUrl(value, base = 'https://blog.giraffish.top/') {
     return url && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
-export function populateRendered(element, html, onLayout = () => {}) {
+export function populateRendered(element, html, onLayout = () => {}, {print = false} = {}) {
   const styled = /<(?:link|style)\b/i.test(html);
   const content = sanitizedFragment(html, styled);
   const styles = new Set();
@@ -67,6 +67,14 @@ export function populateRendered(element, html, onLayout = () => {}) {
       frame.remove();
       continue;
     }
+    if (print) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.className = 'pdf-embed-link';
+      link.textContent = (frame.title || '内嵌页面') + '：' + url;
+      frame.replaceWith(link);
+      continue;
+    }
     frame.setAttribute('sandbox', 'allow-scripts allow-presentation');
     frame.referrerPolicy = 'no-referrer';
     frame.loading = 'lazy';
@@ -79,7 +87,7 @@ export function populateRendered(element, html, onLayout = () => {}) {
   }
   for (const media of content.querySelectorAll('img, iframe')) media.addEventListener('load', onLayout);
   for (const image of content.querySelectorAll('img')) {
-    image.loading = 'lazy';
+    image.loading = print ? 'eager' : 'lazy';
     image.referrerPolicy = 'no-referrer';
     const src = image.getAttribute('src');
     if (src?.startsWith('/')) image.src = new URL(src, 'https://blog.giraffish.top').href;

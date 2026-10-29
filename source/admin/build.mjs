@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { buildMediaIndex } from './build-media-index.mjs';
+import { studioAdapters } from './build-adapters.mjs';
 import { markdown } from './src/document.js';
 import { templates } from './src/templates.js';
 
@@ -25,32 +26,18 @@ await Promise.all([
 const previews = Object.fromEntries(Object.entries(templates).map(([name,source])=>[name,markdown.render(source)]));
 const result = await build({
   absWorkingDir:here,
-  entryPoints:['src/boot.js','src/cms.js','src/entry.js','src/render-worker.js'],
+  entryPoints:['src/boot.js','src/cms.js','src/entry.js','src/render-worker.js','src/print.js'],
   outdir:out, bundle:true, minify:true, format:'esm', splitting:true,
   entryNames:'chunks/[name]-[hash]', chunkNames:'chunks/[name]-[hash]', assetNames:'static/[name]-[hash]',
   publicPath:'/admin/assets', target:['es2022'], legalComments:'linked', metafile:true,
+  logOverride:{'css-syntax-error':'error'},
   define:{'process.env.NODE_ENV':'"production"', __IDENTITY_URL__:JSON.stringify(`/admin/assets/static/${identityName}`)},
   loader:{'.wasm':'file'},
-  plugins:[{
-    name:'studio-assets',
-    setup(build) {
-      build.onResolve({filter:/^studio:template-previews$/},()=>({path:'templates',namespace:'studio'}));
-      build.onLoad({filter:/.*/,namespace:'studio'},()=>({contents:`export default ${JSON.stringify(previews)}`,loader:'js'}));
-      // Preserve Decap's optional WebP conversion, with hashed WASM URLs.
-      build.onLoad({filter:/[\\/]@jsquash[\\/]webp[\\/]codec[\\/].*\.js$/},async ({path:file})=>{
-        let source=await readFile(file,'utf8'),imports='';
-        source=source.replace(/new URL\(["']([^"']+\.wasm)["'],\s*import\.meta\.url\)/g,(_,name)=>{
-          imports+=`import wasmAsset from './${name}';\n`;
-          return 'new URL(wasmAsset,import.meta.url)';
-        });
-        return {contents:imports+source,loader:'js'};
-      });
-    }
-  }]
+  plugins:[await studioAdapters(here,previews)]
 });
 // Tiny revalidated entry files point to immutable content-addressed bundles.
 for (const [file, meta] of Object.entries(result.metafile.outputs)) {
-  if (!meta.entryPoint || !['boot.js','cms.js','entry.js','render-worker.js'].includes(path.basename(meta.entryPoint)) || !file.endsWith('.js')) continue;
+  if (!meta.entryPoint || !['boot.js','cms.js','entry.js','render-worker.js','print.js'].includes(path.basename(meta.entryPoint)) || !file.endsWith('.js')) continue;
   const name = path.basename(meta.entryPoint);
   const relative = path.relative(out,path.resolve(here,file)).replaceAll(path.sep,'/');
   await writeFile(path.join(out,name), `export * from './${relative}';\n`);

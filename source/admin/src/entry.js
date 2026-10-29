@@ -1,3 +1,6 @@
+import React from 'react';
+import { CMS } from './cms.js';
+import { configureToolbar } from './toolbar-bridge.js';
 import { loadEditor, warmEditor } from './editor-loader.js';
 import { safeImageUrl, templates } from './document-utils.js';
 import './studio.css';
@@ -5,18 +8,14 @@ import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
 import { installArticleMedia } from './article-media.js';
 import { installResponsiveViewport } from './responsive-layout.js';
 import './responsive.css';
-const {
-  CMS,
-  createClass,
-  h
-} = window;
-if (!CMS || !createClass || !h) throw new Error('CMS 组件未加载，请刷新后重试。');
+import './toolbar.css';
+const h = React.createElement;
 installArticleMedia(CMS);
 installResponsiveViewport();
-const MarkdownControl = createClass({
+class MarkdownControl extends React.Component {
   componentDidMount() {
     this.mountEditor();
-  },
+  }
   async mountEditor() {
     this.container.textContent = '正在加载编辑器…';
     try {
@@ -36,18 +35,21 @@ const MarkdownControl = createClass({
       retry.onclick = () => this.mountEditor();
       this.container.replaceChildren(retry);
     }
-  },
+  }
   componentDidUpdate() {
-    this.studio?.setValue(this.props.value || '');
-  },
+    if (this.studio) {
+      this.studio.onChange = this.props.onChange;
+      this.studio.setValue(this.props.value || '');
+    }
+  }
   componentWillUnmount() {
     this.unmounted = true;
     this.studio?.destroy();
-  },
-  isValid() {
+  }
+  isValid = () => {
     // CodeMirror publishes changes synchronously; validation needs no flush.
     return this.studio ? true : {error:'编辑器尚未加载完成，请稍后再保存。'};
-  },
+  }
   render() {
     return h('div', {
       ref: node => {
@@ -55,17 +57,17 @@ const MarkdownControl = createClass({
       }
     });
   }
-});
-const ImageURLControl = createClass({
+}
+class ImageURLControl extends React.Component {
   componentDidMount() {
     this.updatePreview();
-  },
+  }
   componentDidUpdate(previous) {
     if (previous.value !== this.props.value) this.updatePreview(250);
-  },
+  }
   componentWillUnmount() {
     clearTimeout(this.previewTimer);
-  },
+  }
   updatePreview(delay = 0) {
     clearTimeout(this.previewTimer);
     const value = this.props.value || '';
@@ -77,12 +79,12 @@ const ImageURLControl = createClass({
     if (this.previewHost.hidden) return;
     const show = () => this.previewHost.replaceChildren(createImageThumbnail(value, this.props.field.get('label') || '图片预览'));
     if (delay) this.previewTimer = setTimeout(show, delay);else show();
-  },
-  isValid() {
+  }
+  isValid = () => {
     return !this.props.value || safeImageUrl(this.props.value) ? true : {
       error: '请输入有效的 http(s) 图片地址或 /images/ 站内路径。'
     };
-  },
+  }
   render() {
     const value = this.props.value || '';
     return h('div', {
@@ -101,7 +103,7 @@ const ImageURLControl = createClass({
       }
     }));
   }
-});
+}
 CMS.registerWidget('studio-markdown', MarkdownControl);
 CMS.registerWidget('image-url', ImageURLControl);
 CMS.registerEventListener({
@@ -130,6 +132,7 @@ CMS.registerEventListener({
   }
 });
 export async function initialize(config) {
+  configureToolbar(config);
   const demo = new URLSearchParams(location.search).get('demo') === '1';
   if (demo) {
     document.body.classList.add('studio-demo');

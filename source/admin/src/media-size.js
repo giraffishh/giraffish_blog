@@ -95,9 +95,8 @@ export class NativeMediaSizes {
     for (const title of this.grid.querySelectorAll('[class*="CardText"]')) {
       const card = title.parentElement;
       const name = title.textContent;
-      const candidates = (this.store.files || []).filter(file => file.name === name || file.name.split('/').pop() === name);
       const src = card.querySelector('img')?.src;
-      const known = this.store.fileSizes?.get(src) ?? (candidates.length === 1 ? candidates[0].bytes : undefined);
+      const known = this.store.fileSizes?.get(src) ?? this.store.fileNames?.get(name);
       const key = JSON.stringify([name, src, known]);
       if (this.records.get(card)?.key === key) continue;
       let label = card.querySelector('.studio-native-size');

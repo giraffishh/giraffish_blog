@@ -5,18 +5,24 @@ import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
 import { imageMarkdown, readBackup, templates } from './document-utils.js';
-import { livePreview, liveFocus, renderedBlocks, renderMode } from './live-preview.js';
+import { livePreview, liveFocus, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
-import { clampRatio, modeAtRatio } from './split-layout.js';
+import { clampRatio, modeAtRatio, dividerRatio } from './split-layout.js';
 import { ScrollSync, indexBefore } from './scroll-sync.js';
 import { SidebarResize } from './sidebar-resize.js';
 import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
 import { MetadataDock } from './metadata-dock.js';
 import { LayoutMotion, reducedMotion } from './layout-motion.js';
+import { PaneLayout } from './pane-layout.js';
 import { compactQuery, ResponsiveEditorLayout } from './responsive-layout.js';
 import { compactAction } from './action-icon.js';
 import { DocumentRenderer } from './analysis-client.js';
+import { attachToolbar } from './toolbar-bridge.js';
+import { ToolbarMenus } from './toolbar-menus.js';
+import { startPdfExport } from './pdf-launcher.js';
+import { downloadText } from './export-utils.js';
+let toolbarId = 0;
 const activeStudios = new Set();
 export function markBodySaved(body) {
   if (typeof body !== 'string') return;
@@ -69,6 +75,7 @@ export class WritingStudio {
     this.onChange = onChange;
     this.key = `studio:backup:v1:${entryKey}:${name}`;
     this.mode = 'source';
+    this.sourceFirst = preference('source-first', 'false') === 'true';
     this.requestId = 0;
     this.abort = new AbortController();
     this.compact = window.matchMedia(compactQuery).matches;
@@ -111,6 +118,7 @@ export class WritingStudio {
     this.offerRecovery();
     this.lazyPreview = new LazyDocument(this.previewPane, () => this.scrollSync?.schedule());
     this.scrollSync = new ScrollSync(this);
+    this.paneLayout = new PaneLayout(this);
     this.sidebarResize = new SidebarResize({
       body: this.body,
       handle: this.sidebarDivider,
@@ -127,6 +135,7 @@ export class WritingStudio {
     });
     this.metadataDock = new MetadataDock(this);
     this.responsiveLayout = new ResponsiveEditorLayout(this);
+    this.toolbarMenus = new ToolbarMenus(this);
     this.setMode(preference('mode', 'render'));
     this.readyFrame = requestAnimationFrame(() => {
       if (!this.destroyed) this.root.classList.add('studio-ready');
@@ -134,17 +143,33 @@ export class WritingStudio {
     window.addEventListener('pagehide', () => this.saveBackup(), {
       signal: this.abort.signal
     });
+    this.detachToolbar = attachToolbar(this);
   }
   build() {
     this.root.className = 'writing-studio studio-focus';
     delete this.root.dataset.mode;
+    this.root.dataset.sourceFirst = String(this.sourceFirst);
     this.root.classList.toggle('studio-sidebar-open', !this.compact && this.desktopSidebarOpen);
-    const nav = el('div', 'studio-nav');
+    const nav = el('div', 'studio-nav studio-unified-nav');
+    this.nav = nav;
+    this.exitSlot = el('div', 'studio-exit-slot');
+    this.actionsSlot = el('div', 'studio-actions-slot');
+    this.extraActionsSlot = el('div', 'studio-extra-actions');
+    this.cmsToolsSlot = el('div', 'studio-toolbar-native-tools');
+    this.toolbarTools = el('div', 'studio-toolbar-secondary');
+    this.toolbarTools.id = `studio-toolbar-tools-${++toolbarId}`;
+    this.toolbarTools.setAttribute('aria-label', '更多编辑操作');
+    this.toolbarMore = button('⋯', () => this.toggleToolbarTools(), 'studio-toolbar-more');
+    this.toolbarMore.setAttribute('aria-label', '更多编辑操作');
+    this.toolbarMore.setAttribute('aria-controls', this.toolbarTools.id);
+    this.toolbarMore.setAttribute('aria-expanded', 'false');
+    const tools = el('div', 'studio-editor-tools');
     const modes = el('div', 'studio-modes');
     modes.setAttribute('aria-label', '编辑模式');
     this.modeButtons = {};
-    for (const [mode, label] of [['render', '渲染'], ['source', '源码'], ['split', '分屏']]) {
+    for (const [mode, label] of [['source', '源码'], ['split', '分屏'], ['render', '渲染']]) {
       const item = button(label, () => { if (this.compact) this.toggleSidebar(false); this.setMode(mode); });
+      compactAction(item, mode);
       item.setAttribute('aria-pressed', 'false');
       this.modeButtons[mode] = item;
       modes.append(item);
@@ -154,10 +179,27 @@ export class WritingStudio {
       this.toggleSidebar(!visible);
       if (!visible) this.showSidebar('metadata');
     });
-    nav.append(modes, compactAction(this.metadataToggle, 'metadata'), compactAction(button('查找替换', () => {
+    this.swapButton = compactAction(button('交换左右', () => this.swapPanes()), 'swap');
+    this.swapButton.classList.add('studio-swap-toggle');
+    tools.append(compactAction(this.metadataToggle, 'metadata'), compactAction(button('查找替换', () => {
       if (this.compact) this.toggleSidebar(false);
       openSearchPanel(this.source);
-    }), 'search'), compactAction(button('导出正文', () => this.download()), 'download'));
+    }), 'search'), this.swapButton, compactAction(button('导出', () => this.exportDialog()), 'download'));
+    this.toolbarTools.append(this.extraActionsSlot, tools, this.cmsToolsSlot);
+    const leading = el('div', 'studio-toolbar-leading');
+    this.leadingActionsSlot = el('div', 'studio-extra-actions');
+    leading.append(this.exitSlot, this.actionsSlot, this.leadingActionsSlot);
+    nav.append(leading, modes, this.toolbarMore, this.toolbarTools);
+    tools.addEventListener('click', () => this.toggleToolbarTools(false));
+    document.addEventListener('pointerdown', event => {
+      if (!this.toolbarTools.contains(event.target) && !this.toolbarMore.contains(event.target)) this.toggleToolbarTools(false);
+    }, {signal:this.abort.signal});
+    nav.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !this.root.classList.contains('studio-tools-open')) return;
+      this.toggleToolbarTools(false);
+      this.toolbarMore.focus();
+      event.preventDefault();
+    });
     this.recovery = el('div', 'studio-recovery');
     this.recovery.hidden = true;
     this.body = el('div', 'studio-body');
@@ -178,7 +220,9 @@ export class WritingStudio {
     this.sidebarDivider = el('div', 'studio-sidebar-divider');
     this.workspace = el('div', 'studio-workspace');
     this.sourcePane = el('div', 'studio-source');
+    this.previewFrame = el('div', 'studio-preview-frame');
     this.previewPane = el('article', 'studio-preview studio-typography');
+    this.previewFrame.append(this.previewPane);
     this.previewPane.setAttribute('aria-label', '文章预览');
     this.previewPane.addEventListener('click', event => {
       const link = event.composedPath()[0].closest?.('a');
@@ -197,7 +241,7 @@ export class WritingStudio {
     this.divider.setAttribute('aria-orientation', 'vertical');
     this.divider.setAttribute('aria-valuemin', '0');
     this.divider.setAttribute('aria-valuemax', '100');
-    this.splitRatio = clampRatio(Number(preference('ratio', 50)));
+    this.splitRatio = clampRatio(Number(preference('divider-position', 100 - Number(preference('ratio', 50)))));
     if (modeAtRatio(this.splitRatio) !== 'split') this.splitRatio = 50;
     this.setRatio(this.splitRatio);
     this.divider.addEventListener('pointerdown', event => {
@@ -222,8 +266,8 @@ export class WritingStudio {
       if (!this.drag.moved && Math.abs(coordinate - this.drag.coordinate) < 3) return;
       this.drag.moved = true;
       this.root.classList.add('studio-resizing');
-      if (this.mode !== 'split') this.setMode('split');
       this.drag.next = (coordinate - this.drag.start) / this.drag.length * 100;
+      if (this.mode !== 'split') this.setMode('split');
       if (!this.dragFrame) this.dragFrame = requestAnimationFrame(() => {
         this.dragFrame = 0;
         if (this.drag) this.setRatio(this.drag.next);
@@ -252,10 +296,10 @@ export class WritingStudio {
       const next = this.compact ? 'ArrowDown' : 'ArrowRight';
       if (![previous, next, 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      const current = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
+      const current = dividerRatio(this.mode, this.ratio, this.sourceFirst);
       this.settleRatio(event.key === 'Home' ? 0 : event.key === 'End' ? 100 : current + (event.key === previous ? -5 : 5));
     });
-    this.workspace.append(this.sourcePane, this.divider, this.previewPane);
+    this.workspace.append(this.previewFrame, this.divider, this.sourcePane);
     this.sidebarBackdrop = button('', () => this.toggleSidebar(false), 'studio-sidebar-backdrop');
     this.sidebarBackdrop.setAttribute('aria-label', '关闭侧栏');
     this.body.append(this.sidebar, this.sidebarDivider, this.workspace, this.sidebarBackdrop);
@@ -278,26 +322,52 @@ export class WritingStudio {
     const ratio = clampRatio(value);
     if (ratio === this.ratio) return;
     this.ratio = ratio;
-    this.sourcePane.style.setProperty('--studio-split', this.ratio + '%');
+    if (this.mode === 'split') this.paneLayout?.resize();
     this.updateDivider();
     this.source?.requestMeasure();
   }
+  toggleToolbarTools(force) {
+    const open = force ?? !this.root.classList.contains('studio-tools-open');
+    this.root.classList.toggle('studio-tools-open', open);
+    this.toolbarMore.setAttribute('aria-expanded', String(open));
+    this.toolbarMenus?.tools(open);
+  }
   updateDivider() {
-    const value = this.mode === 'render' ? 0 : this.mode === 'source' ? 100 : this.ratio;
-    const before = this.compact ? '下' : '右';
-    const after = this.compact ? '上' : '左';
+    const value = dividerRatio(this.mode, this.ratio, this.sourceFirst);
+    const low = this.compact ? '上' : '左';
+    const high = this.compact ? '下' : '右';
+    const before = this.sourceFirst ? high : low;
+    const after = this.sourceFirst ? low : high;
+    const preview = this.sourceFirst ? 100 - value : value;
+    const swapLabel = this.compact ? '交换上下' : '交换左右';
+    this.swapButton.querySelector('.studio-action-label').textContent = swapLabel;
+    this.swapButton.setAttribute('aria-label', swapLabel);
+    this.swapButton.title = swapLabel + (this.mode === 'split' ? '' : '（分屏模式）');
+    this.swapButton.disabled = this.mode !== 'split';
     this.divider.setAttribute('aria-orientation', this.compact ? 'horizontal' : 'vertical');
     this.divider.setAttribute('aria-label', this.compact ? '拖动调整源码和预览高度' : '拖动调整源码和预览宽度');
     this.divider.setAttribute('aria-valuenow', String(Math.round(value)));
-    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? `渲染，向${before}拖动展开源码` : this.mode === 'source' ? `源码，向${after}拖动展开预览` : '源码 ' + Math.round(value) + '%，预览 ' + Math.round(100 - value) + '%');
+    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? `渲染，向${before}拖动展开源码` : this.mode === 'source' ? `源码，向${after}拖动展开预览` : '预览 ' + Math.round(preview) + '%，源码 ' + Math.round(100 - preview) + '%');
     this.divider.title = this.mode === 'split' ? `拖动调整${this.compact ? '高度' : '宽度'}，拖到边缘切换单栏` : this.mode === 'source' ? `向${after}拖动展开预览` : `向${before}拖动展开源码`;
+  }
+  swapPanes() {
+    if (this.mode !== 'split' || this.drag) return;
+    this.paneLayout.swap(() => {
+      this.sourceFirst = !this.sourceFirst;
+      this.root.dataset.sourceFirst = String(this.sourceFirst);
+      this.ratio = 100 - this.ratio;
+      this.splitRatio = this.ratio;
+      storePreference('source-first', String(this.sourceFirst));
+      storePreference('divider-position', String(this.ratio));
+      this.updateDivider();
+    });
   }
   settleRatio(value) {
     const ratio = clampRatio(value);
-    const mode = modeAtRatio(ratio);
+    const mode = modeAtRatio(ratio, this.sourceFirst);
     if (mode === 'split') {
       this.splitRatio = ratio;
-      storePreference('ratio', String(ratio));
+      storePreference('divider-position', String(ratio));
     }
     this.setMode(mode);
   }
@@ -345,28 +415,16 @@ export class WritingStudio {
       if (mode === 'split') this.setRatio(this.splitRatio);
       return;
     }
-    const changed = this.mode !== mode;
     this.mode = mode;
-    if (this.scrollSync) {
-      this.scrollSync.leader = 'source';
-      this.scrollSync.navigation = null;
-    }
     this.root.dataset.mode = mode;
-    this.previewPane.inert = mode !== 'split';
-    this.previewPane.setAttribute('aria-hidden', String(mode !== 'split'));
-    if (mode === 'split') this.setRatio(this.splitRatio);
+    if (mode === 'split') this.ratio = clampRatio(this.drag?.next ?? this.splitRatio);
     this.updateDivider();
     for (const [key, btn] of Object.entries(this.modeButtons)) btn.setAttribute('aria-pressed', String(key === mode));
     storePreference('mode', mode);
-    this.source.dispatch({
-      effects: renderMode.of(mode === 'render')
-    });
-    this.source.requestMeasure();
+    this.paneLayout.change();
+    this.scrollSync.leader = 'source';
+    this.scrollSync.navigation = null;
     this.queueRender(0);
-    if (changed) {
-      this.motion?.reveal(this.sourcePane);
-      if (mode === 'split') this.motion?.reveal(this.previewPane);
-    }
   }
   updateSource() {
     if (!this.source || this.source.state.doc.toString() === this.value) return;
@@ -471,12 +529,13 @@ export class WritingStudio {
         this.appliedBlocks = data.blocks;
         this.source.dispatch({effects: renderedBlocks.of(data.blocks)});
       }
-      if (this.mode === 'split' && this.previewBlocks !== data.blocks) {
+      if ((this.mode === 'split' || this.paneLayout?.moving) && this.previewBlocks !== data.blocks) {
         this.previewBlocks = data.blocks;
         this.lazyPreview.update(data.blocks);
       }
     }
     this.scrollSync?.refresh(data.blocks);
+    if (this.paneLayout?.pending && data.blocks) this.paneLayout.change();
   }
   updateOutline(line, force = false) {
     this.currentLine = line;
@@ -518,7 +577,9 @@ export class WritingStudio {
     for (const [key, item] of Object.entries(this.sidebarButtons)) item.setAttribute('aria-pressed', String(key === tab));
     this.updateSidebarToggle();
     const items = tab === 'outline' ? this.documentInfo?.headings : tab === 'images' ? this.documentInfo?.images : null;
-    const signature = `${tab}:${JSON.stringify(items || [])}`;
+    const signature = items === this.sidebarItems && tab === this.sidebarTab ? this.sidebarSignature : `${tab}:${JSON.stringify(items || [])}`;
+    this.sidebarItems = items;
+    this.sidebarTab = tab;
     if (signature === this.sidebarSignature) {
       if (tab === 'outline') this.updateOutline(this.currentLine || 1);
       if (tab === 'metadata') this.metadataDock?.sync();
@@ -717,15 +778,51 @@ export class WritingStudio {
     dialog.showModal();
     url.focus();
   }
+  exportSnapshot() {
+    return {
+      text:this.value,
+      title:this.metadataDock?.form?.querySelector('input[id^="title-field"]')?.value?.trim() || '文章正文'
+    };
+  }
+  exportDialog() {
+    this.closeExportDialog?.();
+    const dialog = el('dialog', 'studio-dialog studio-export-dialog');
+    const title = el('h2', '', '导出');
+    title.id = 'studio-export-title';
+    dialog.setAttribute('aria-labelledby', title.id);
+    const formats = el('div', 'studio-export-formats');
+    const markdown = button('Markdown (.md)', () => { dialog.close(); this.download(); });
+    const pdf = button('PDF (.pdf)', () => {
+      const snapshot = this.exportSnapshot();
+      this.closePdfExport?.();
+      this.closePdfExport = startPdfExport(snapshot, message => { if (!this.destroyed) this.notice(message); });
+      dialog.close();
+    });
+    const html = button('HTML (.html)', async () => {
+      const snapshot = this.exportSnapshot();
+      dialog.close();
+      this.notice('正在导出 HTML…');
+      try {
+        const {downloadHtml} = await import('./html-export.js');
+        await downloadHtml(snapshot, this.abort.signal);
+        if (!this.destroyed) this.notice('HTML 已导出');
+      } catch (error) {
+        if (!this.destroyed) this.notice('HTML 导出失败：' + error.message);
+      }
+    });
+    formats.append(compactAction(markdown, 'source'), compactAction(pdf, 'render'), compactAction(html, 'source'));
+    const actions = el('div', 'studio-dialog-actions');
+    actions.append(button('取消', () => dialog.close()));
+    dialog.append(title, formats, actions);
+    this.root.append(dialog);
+    const cleanup = () => { dialog.remove(); if (this.closeExportDialog === cleanup) this.closeExportDialog = null; };
+    this.closeExportDialog = cleanup;
+    dialog.addEventListener('close', cleanup, {once:true});
+    dialog.showModal();
+    markdown.focus();
+  }
   download() {
-    const url = URL.createObjectURL(new Blob([this.value], {
-      type: 'text/markdown;charset=utf-8'
-    }));
-    const link = el('a');
-    link.href = url;
-    link.download = '文章正文.md';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(this.value, 'text/markdown;charset=utf-8', '文章正文.md');
   }
   notice(text) {
     this.status.textContent = text;
@@ -733,12 +830,17 @@ export class WritingStudio {
   destroy() {
     this.saveBackup();
     this.closeImageDialog?.();
+    this.closeExportDialog?.();
+    this.closePdfExport?.();
     this.destroyed = true;
+    this.toolbarMenus?.destroy();
+    this.detachToolbar?.();
     activeStudios.delete(this);
     this.abort.abort();
     this.scrollSync?.destroy();
     this.sidebarResize?.destroy();
     this.metadataDock?.destroy();
+    this.paneLayout?.destroy();
     this.motion?.destroy();
     this.responsiveLayout?.destroy();
     cancelAnimationFrame(this.readyFrame);

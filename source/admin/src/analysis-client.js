@@ -20,32 +20,41 @@ function remember(text, result) {
   }
 }
 
-function pump() {
-  if (running || !queue.size) return;
-  if (!worker) {
-    worker = new Worker('/admin/assets/render-worker.js', {type:'module'});
-    worker.onmessage = ({data}) => {
-      const job = running;
-      running = null;
-      if (job.kind === 'document') remember(job.text, data);
-      if (!job.owner?.destroyed) job.done(data);
-      pump();
-    };
-    worker.onerror = () => {
-      worker.terminate();
-      worker = null;
-      const jobs = [running, ...queue.values()];
-      running = null;
-      queue.clear();
-      for (const job of jobs) if (job && !job.owner?.destroyed) job.done({error:'解析器加载失败，请重试'});
-    };
-  }
-  const [key, job] = queue.entries().next().value;
-  queue.delete(key);
-  running = job;
-  worker.postMessage({id:++sequence, kind:job.kind, text:job.text, preview:job.preview, articleId:job.articleId, data:job.data});
+function failWorker() {
+  worker?.terminate();
+  worker = null;
+  const jobs = [running, ...queue.values()];
+  running = null;
+  queue.clear();
+  for (const job of jobs) if (job && !job.owner?.destroyed) job.done({error:'解析器加载失败，请重试'});
 }
 
+function pump() {
+  if (running || !queue.size) return;
+  try {
+    if (!worker) {
+      worker = new Worker('/admin/assets/render-worker.js', {type:'module'});
+      worker.onmessage = ({data}) => {
+        const job = running;
+        if (!job || data.id !== job.sequence) return;
+        running = null;
+        if (job.kind === 'document') remember(job.text, data);
+        try { if (!job.owner?.destroyed) job.done(data); }
+        finally { pump(); }
+      };
+      worker.onerror = failWorker;
+      worker.onmessageerror = failWorker;
+    }
+    // A newly opened/edited document should not wait behind media indexing.
+    let next = queue.entries().next().value;
+    for (const entry of queue) if (entry[1].kind === 'document') { next = entry; break; }
+    const [key, job] = next;
+    queue.delete(key);
+    running = job;
+    job.sequence = ++sequence;
+    worker.postMessage({id:job.sequence, kind:job.kind, text:job.text, preview:job.preview, articleId:job.articleId, data:job.data});
+  } catch { failWorker(); }
+}
 export class DocumentRenderer {
   constructor(onResult) { this.onResult = onResult; }
   request(id, text, preview) {

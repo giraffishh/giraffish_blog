@@ -31,7 +31,9 @@ export class ResponsiveEditorLayout {
     this.header = document.querySelector('[class*="ToolbarContainer"]');
     this.query.addEventListener('change',event => {
       if (studio.drag && studio.divider.hasPointerCapture(studio.drag.id)) studio.divider.releasePointerCapture(studio.drag.id);
+      studio.paneLayout?.finish();
       studio.compact = event.matches;
+      studio.toggleToolbarTools(false);
       studio.updateDivider();
       studio.toggleSidebar(studio.compact ? false : studio.desktopSidebarOpen);
       studio.source.requestMeasure();
@@ -54,7 +56,7 @@ export class ResponsiveEditorLayout {
   schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => {this.frame=0;this.update();}); }
   update() {
     const top = window.visualViewport?.offsetTop || 0;
-    const height = Math.max(0,(this.header?.getBoundingClientRect().bottom || 66)-top);
+    const height = this.studio.root.classList.contains('studio-toolbar-integrated') ? 0 : Math.max(0,(this.header?.getBoundingClientRect().bottom || 66)-top);
     const value = `${Math.round(height)}px`;
     if (this.studio.root.style.getPropertyValue('--studio-header-height') !== value) this.studio.root.style.setProperty('--studio-header-height',value);
     this.studio.metadataDock?.schedule();

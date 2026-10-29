@@ -1,4 +1,8 @@
 const paths = {
+  swap: 'M3 7h17 M16 3l4 4-4 4 M21 17H4 M8 13l-4 4 4 4',
+  source: 'M8 6l-6 6 6 6 M16 6l6 6-6 6 M14 4l-4 16',
+  split: 'M3 4h18v16H3z M12 4v16',
+  render: 'M5 3h10l4 4v14H5z M14 3v5h5 M8 12h8 M8 16h6',
   metadata: 'M4 3h16v18H4z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
   search: 'M21 21l-6-6 M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0',
   download: 'M12 3v12 M7 10l5 5 5-5 M4 16v5h16v-5',

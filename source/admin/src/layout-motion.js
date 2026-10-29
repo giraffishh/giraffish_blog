@@ -4,14 +4,20 @@ export function reducedMotion() {
 
 export class LayoutMotion {
   constructor(root) { this.root=root; this.animations=new Map(); }
-  reveal(element) {
+  cancel(element) {
     this.animations.get(element)?.cancel();
     this.animations.delete(element);
+  }
+  animate(element, frames, options) {
+    this.cancel(element);
     if (!element?.animate || !this.root.classList.contains('studio-ready') || this.root.classList.contains('studio-resizing') || reducedMotion()) return;
-    const animation=element.animate([{opacity:.45},{opacity:1}],{duration:160,easing:'ease-out'});
+    const animation=element.animate(frames,options);
     this.animations.set(element,animation);
     const cleanup=()=>{if(this.animations.get(element)===animation)this.animations.delete(element);};
     animation.finished.then(cleanup,cleanup);
+  }
+  reveal(element) {
+    this.animate(element,[{opacity:.45},{opacity:1}],{duration:160,easing:'ease-out'});
   }
   destroy() {
     for (const animation of this.animations.values()) animation.cancel();

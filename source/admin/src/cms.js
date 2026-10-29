@@ -1,6 +1,4 @@
 import CMS from 'decap-cms-core';
-import React from 'react';
-import createClass from 'create-react-class';
 import { GitGatewayBackend } from 'decap-cms-backend-git-gateway';
 import StringWidget from 'decap-cms-widget-string';
 import NumberWidget from 'decap-cms-widget-number';
@@ -26,6 +24,4 @@ CMS.registerWidget([
   DatetimeWidget.Widget()
 ]);
 window.CMS = CMS;
-window.h = React.createElement;
-window.createClass = createClass;
 export { CMS };
