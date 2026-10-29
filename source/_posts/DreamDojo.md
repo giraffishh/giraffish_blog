@@ -1,7 +1,7 @@
 ---
 title: ACWM：[Arxiv 2602.06949] DreamDojo
 date: 2026-08-30 21:33:05
-updated: 2026-10-29 19:59:36
+updated: 2026-10-29 20:02:26
 tags:
   - WM
   - DreamDojo
@@ -19,7 +19,7 @@ abbrlink: 730c6bb4
 **机构**: NVIDIA；HKUST；UC Berkeley；University of Washington；Stanford University；KAIST；University of Toronto；UC San Diego；UT Austin
 **会议**: arXiv 2026
 **版本**: arXiv v1（2026-02-06）
-**链接**: [arXiv](https://arxiv.org/abs/2602.06949) · [项目主页](https://dreamdojo-world.github.io/) · [PDF](paper.pdf) · [MinerU 全文](full.md)
+**链接**: [arXiv](https://arxiv.org/abs/2602.06949) · [项目主页](https://dreamdojo-world.github.io/)
 
 
 ## 一句话总结
