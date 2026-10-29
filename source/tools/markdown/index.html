@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="在线编辑和实时渲染 Markdown，支持公式、源码分屏、本地文件读写及 HTML、PDF 导出。">
+  <title>Markdown 编辑器 · Giraffish 工具</title>
+  <link rel="icon" href="/img/favicon.png">
+  <link rel="stylesheet" href="/admin/assets/katex/katex.min.css">
+  <link rel="stylesheet" href="/admin/assets/markdown-tool.css">
+</head>
+<body>
+  <div id="studio-loading" role="status">正在加载 Markdown 编辑器…</div>
+  <main id="markdown-editor" aria-label="Markdown 编辑器"></main>
+  <noscript>请启用 JavaScript 使用 Markdown 编辑器。<a href="/tools/">返回工具集</a></noscript>
+  <script type="module">
+    import('/admin/assets/markdown-tool.js').catch(() => {
+      document.getElementById('studio-loading').textContent = '编辑器加载失败，请刷新页面重试。';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+body { margin:0; overflow:hidden; }
+.markdown-tool .markdown-back { display:inline-flex; align-items:center; justify-content:center; flex:none; width:var(--toolbar-control-height); height:var(--toolbar-control-height); padding:0; border:0; border-radius:6px; background:transparent; color:var(--studio-ink); text-decoration:none; transition:background-color 140ms ease,color 140ms ease; }
+.markdown-tool .markdown-back:hover { background:#eaf0e8; color:var(--studio-green); }
+.markdown-tool .markdown-back svg { display:block; width:18px; height:18px; }
+.markdown-tool .markdown-filename { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--studio-muted); font-size:12px; }
+.markdown-tool .studio-unified-nav .markdown-file-action { display:inline-flex; align-items:center; justify-content:center; height:var(--toolbar-control-height); min-height:var(--toolbar-control-height); padding:4px 8px; border:0; border-radius:6px; background:transparent; color:var(--studio-ink); font:var(--toolbar-font-size)/20px var(--studio-font); }
+.markdown-tool .studio-unified-nav .markdown-file-action:not(:disabled):hover { background:#eaf0e8; }
+.markdown-tool .studio-actions-slot { gap:6px; }
+.markdown-tool .markdown-save:disabled { opacity:.5; cursor:wait; }
+.markdown-tool .studio-footer { flex-wrap:wrap; }
+.markdown-tool .markdown-storage { order:1; }
+.markdown-tool .studio-footer-info { order:2; }
+.markdown-tool.markdown-dragging::after { content:'松开以打开 Markdown 文件'; position:absolute; inset:54px 12px 40px; display:grid; place-items:center; background:#f4faf2ed; border:2px dashed #418b71; border-radius:10px; color:var(--studio-green); font-size:20px; pointer-events:none; z-index:100; }
+@media (max-width:1200px) {
+  .markdown-tool .studio-extra-actions button { width:100%; text-align:left; }
+}
+@media (max-width:760px) {
+  .markdown-tool .studio-toolbar-leading > .studio-extra-actions { display:none; }
+  .markdown-tool .markdown-back { padding:0; }
+  .markdown-tool .markdown-storage { max-width:55%; font-size:10px; }
+  .markdown-tool .studio-footer-info { flex:1; gap:4px; font-size:10px; }
+}
+
+@media (min-width:761px) and (max-width:1200px) {
+  .markdown-tool .studio-unified-nav { grid-template-columns:minmax(0,1fr) auto auto; }
+  .markdown-tool .studio-toolbar-leading > .studio-extra-actions { border:0; padding:0; }
+}
+@media (min-width:761px) and (max-width:1000px) {
+  .markdown-tool .studio-toolbar-leading > .studio-extra-actions { display:none; }
+}

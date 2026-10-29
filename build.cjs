@@ -45,7 +45,7 @@ function run(command) {
 // Use Hexo's supported cleanup to avoid stale output hiding missing pages.
 run('clean');
 run('generate');
-for (const name of ['index.html', 'archives/index.html', 'admin/index.html', 'admin/print.html', 'admin/assets/print.js', 'admin/assets/boot.js', 'admin/assets/entry.js', 'post/806475f8/index.html']) {
+for (const name of ['index.html', 'archives/index.html', 'admin/index.html', 'admin/print.html', 'admin/assets/print.js', 'admin/assets/boot.js', 'admin/assets/entry.js', 'tools/markdown/index.html', 'admin/assets/markdown-tool.js', 'admin/assets/markdown-tool.css', 'post/806475f8/index.html']) {
   const file = path.join(root, 'public', name);
   if (!fs.existsSync(file) || fs.statSync(file).size === 0) throw new Error(`Required generated page/asset is missing: ${name}`);
 }

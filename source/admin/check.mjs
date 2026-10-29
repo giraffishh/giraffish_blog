@@ -1,3 +1,4 @@
+await import('./check-local-document.mjs');
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {lazyGateway} from './build-adapters.mjs';

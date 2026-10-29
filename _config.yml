@@ -33,6 +33,7 @@ skip_render:
  - admin/**
  - widgets/*
  - tools/mindmap/**
+ - tools/markdown/**
 
 # Writing
 new_post_name: :title.md # File name of new posts

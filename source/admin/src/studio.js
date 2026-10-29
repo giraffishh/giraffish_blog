@@ -69,12 +69,19 @@ export class WritingStudio {
     value = '',
     onChange,
     name = 'body',
-    entryKey = location.hash
+    entryKey = location.hash,
+    metadata = true,
+    backup = true,
+    cmsToolbar = true,
+    documentTitle
   }) {
     this.root = root;
     this.value = value;
     this.original = value;
     this.onChange = onChange;
+    this.metadataEnabled = metadata;
+    this.backupEnabled = backup;
+    this.documentTitle = documentTitle;
     this.key = `studio:backup:v1:${entryKey}:${name}`;
     this.mode = 'source';
     this.sourceFirst = preference('source-first', String(DEFAULT_SOURCE_FIRST)) === 'true';
@@ -135,14 +142,14 @@ export class WritingStudio {
         this.scrollSync.schedule();
       }
     });
-    this.metadataDock = new MetadataDock(this);
+    if (metadata) this.metadataDock = new MetadataDock(this);
     this.responsiveLayout = new ResponsiveEditorLayout(this);
     this.toolbarMenus = new ToolbarMenus(this);
     this.setMode(preference('mode', 'render'));
     window.addEventListener('pagehide', () => this.saveBackup(), {
       signal: this.abort.signal
     });
-    this.detachToolbar = attachToolbar(this);
+    if (cmsToolbar) this.detachToolbar = attachToolbar(this);
   }
   build() {
     this.root.className = 'writing-studio studio-focus';
@@ -181,7 +188,8 @@ export class WritingStudio {
     });
     this.swapButton = compactAction(button('交换左右', () => this.swapPanes()), 'swap');
     this.swapButton.classList.add('studio-swap-toggle');
-    tools.append(compactAction(this.metadataToggle, 'metadata'), compactAction(button('查找替换', () => {
+    if (this.metadataEnabled) tools.append(compactAction(this.metadataToggle, 'metadata'));
+    tools.append(compactAction(button('查找替换', () => {
       if (this.compact) this.toggleSidebar(false);
       openSearchPanel(this.source);
     }), 'search'), this.swapButton, compactAction(button('导出', () => this.exportDialog()), 'download'));
@@ -208,6 +216,7 @@ export class WritingStudio {
     sidebarNav.setAttribute('aria-label', '侧栏内容');
     this.sidebarButtons = {};
     for (const [tab, title] of [['outline', '大纲'], ['metadata', '元数据'], ['images', '图片'], ['templates', '模板']]) {
+      if (tab === 'metadata' && !this.metadataEnabled) continue;
       const item = button(title, () => this.showSidebar(tab));
       item.setAttribute('aria-pressed', String(tab === 'outline'));
       this.sidebarButtons[tab] = item;
@@ -454,6 +463,7 @@ export class WritingStudio {
     this.queueRender();
   }
   saveBackup() {
+    if (!this.backupEnabled) return;
     if (!this.edited) return;
     if (this.value === this.original) {
       if (this.edited) {
@@ -476,6 +486,7 @@ export class WritingStudio {
     }
   }
   offerRecovery() {
+    if (!this.backupEnabled) return;
     let backup;
     try {
       backup = readBackup(localStorage, this.key, this.value);
@@ -741,7 +752,7 @@ export class WritingStudio {
   exportSnapshot() {
     return {
       text:this.value,
-      title:this.metadataDock?.form?.querySelector('input[id^="title-field"]')?.value?.trim() || '文章正文'
+      title:this.documentTitle?.() || this.metadataDock?.form?.querySelector('input[id^="title-field"]')?.value?.trim() || '文章正文'
     };
   }
   exportDialog() {
@@ -782,7 +793,7 @@ export class WritingStudio {
     markdown.focus();
   }
   download() {
-    downloadText(this.value, 'text/markdown;charset=utf-8', '文章正文.md');
+    downloadText(this.value, 'text/markdown;charset=utf-8', this.exportSnapshot().title + '.md');
   }
   notice(text) {
     this.status.textContent = text;
