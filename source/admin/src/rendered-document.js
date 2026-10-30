@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import {enhanceCodeBlocks} from './code-block.js';
 // Render mode recycles off-screen CodeMirror widgets. Reuse small sanitized
 // fragments on return; never cache connected nodes, listeners or frame state.
 const markupCache = new Map();
@@ -35,7 +36,7 @@ function resourceUrl(value, base = 'https://blog.giraffish.top/') {
     return url && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
-export function populateRendered(element, html, onLayout = () => {}, {print = false} = {}) {
+export function populateRendered(element, html, onLayout = () => {}, {print = false, codeActions = false} = {}) {
   const styled = /<(?:link|style)\b/i.test(html);
   const content = sanitizedFragment(html, styled);
   const styles = new Set();
@@ -100,6 +101,7 @@ export function populateRendered(element, html, onLayout = () => {}, {print = fa
       if (url) link.href = url;
     }
   }
+  if (codeActions && !print && !styles.size) enhanceCodeBlocks(content);
   if (styles.size) {
     const host = document.createElement('div');
     host.className = 'studio-html-preview';
@@ -144,7 +146,7 @@ export class LazyDocument {
   }
   mount(node) {
     if (this.destroyed || node.parentNode !== this.root || node.dataset.mounted) return;
-    populateRendered(node, node.block.html, this.onLayout);
+    populateRendered(node, node.block.html, this.onLayout, {codeActions:true});
     node.dataset.mounted = 'true';
     this.pending.delete(node);
     node.style.minHeight = '';

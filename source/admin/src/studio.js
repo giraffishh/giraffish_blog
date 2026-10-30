@@ -4,25 +4,23 @@ import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
 import { indentWithTab } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
-import { readBackup, templates } from './document-utils.js';
+import {EditorBackup, preference, storePreference} from './studio-storage.js';
+import {element as el, button, compactAction} from './studio-ui.js';
+import {DocumentExport} from './document-export.js';
+import { templates } from './templates.js';
 import { livePreview, liveFocus, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
-import { clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST } from './split-layout.js';
+import {clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST, LayoutMotion, reducedMotion} from './layout-utils.js';
 import { ScrollSync, indexBefore } from './scroll-sync.js';
 import { SidebarResize } from './sidebar-resize.js';
-import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
-import { reloadDocumentImages } from './image-reload.js';
+import {createImageThumbnail, imagePreviewUrl, reloadDocumentImages} from './images.js';
 import { MetadataDock } from './metadata-dock.js';
-import { LayoutMotion, reducedMotion } from './layout-motion.js';
 import { PaneLayout } from './pane-layout.js';
 import { compactQuery, ResponsiveEditorLayout } from './responsive-layout.js';
-import { compactAction } from './action-icon.js';
 import { DocumentRenderer } from './analysis-client.js';
 import { attachToolbar } from './toolbar-bridge.js';
 import { ToolbarMenus } from './toolbar-menus.js';
-import { startPdfExport } from './pdf-launcher.js';
-import { downloadText } from './export-utils.js';
 import { sourceCodeLanguage, sourceCodeHighlight } from './source-code.js';
 let toolbarId = 0;
 const activeStudios = new Set();
@@ -30,39 +28,10 @@ export function markBodySaved(body) {
   if (typeof body !== 'string') return;
   for (const studio of activeStudios) {
     if (studio.value.trimEnd() !== body.trimEnd()) continue;
-    clearTimeout(studio.backupTimer);
-    studio.original = studio.value;
-    studio.edited = false;
-    try {
-      localStorage.removeItem(studio.key);
-    } catch {/* Optional cleanup. */}
+    studio.backup?.saved();
     studio.recovery.hidden = true;
     studio.notice('已保存');
   }
-}
-const el = (tag, cls, text) => {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text) node.textContent = text;
-  return node;
-};
-const button = (label, action, cls = '') => {
-  const node = el('button', cls, label);
-  node.type = 'button';
-  node.addEventListener('click', action);
-  return node;
-};
-function preference(key, fallback) {
-  try {
-    return localStorage.getItem(`studio:${key}`) || fallback;
-  } catch {
-    return fallback;
-  }
-}
-function storePreference(key, value) {
-  try {
-    localStorage.setItem(`studio:${key}`, value);
-  } catch {/* Optional preference. */}
 }
 export class WritingStudio {
   constructor(root, {
@@ -77,20 +46,23 @@ export class WritingStudio {
   }) {
     this.root = root;
     this.value = value;
-    this.original = value;
     this.onChange = onChange;
     this.metadataEnabled = metadata;
-    this.backupEnabled = backup;
     this.documentTitle = documentTitle;
-    this.key = `studio:backup:v1:${entryKey}:${name}`;
+    this.backup = backup ? new EditorBackup({
+      entryKey, name, value, getValue:() => this.value, notice:message => this.notice(message)
+    }) : null;
     this.mode = 'source';
     this.sourceFirst = preference('source-first', String(DEFAULT_SOURCE_FIRST)) === 'true';
     this.requestId = 0;
     this.abort = new AbortController();
     this.compact = window.matchMedia(compactQuery).matches;
     this.desktopSidebarOpen = preference('sidebar-open', 'true') === 'true';
-    activeStudios.add(this);
+    if (cmsToolbar) activeStudios.add(this);
     this.build();
+    this.exports = new DocumentExport({
+      root, snapshot:() => this.exportSnapshot(), notice:message => this.notice(message), signal:this.abort.signal
+    });
     this.motion = new LayoutMotion(this.root);
     this.renderer = new DocumentRenderer(data => this.renderResult(data));
     this.source = new EditorView({
@@ -146,7 +118,7 @@ export class WritingStudio {
     this.responsiveLayout = new ResponsiveEditorLayout(this);
     this.toolbarMenus = new ToolbarMenus(this);
     this.setMode(preference('mode', 'render'));
-    window.addEventListener('pagehide', () => this.saveBackup(), {
+    if (backup) window.addEventListener('pagehide', () => this.backup.flush(), {
       signal: this.abort.signal
     });
     if (cmsToolbar) this.detachToolbar = attachToolbar(this);
@@ -181,18 +153,20 @@ export class WritingStudio {
       this.modeButtons[mode] = item;
       modes.append(item);
     }
-    this.metadataToggle = button('元数据', () => {
-      const visible = this.root.classList.contains('studio-sidebar-open') && this.activeSide === 'metadata';
-      this.toggleSidebar(!visible);
-      if (!visible) this.showSidebar('metadata');
-    });
+    if (this.metadataEnabled) {
+      this.metadataToggle = button('元数据', () => {
+        const visible = this.root.classList.contains('studio-sidebar-open') && this.activeSide === 'metadata';
+        this.toggleSidebar(!visible);
+        if (!visible) this.showSidebar('metadata');
+      });
+      tools.append(compactAction(this.metadataToggle, 'metadata'));
+    }
     this.swapButton = compactAction(button('交换左右', () => this.swapPanes()), 'swap');
     this.swapButton.classList.add('studio-swap-toggle');
-    if (this.metadataEnabled) tools.append(compactAction(this.metadataToggle, 'metadata'));
     tools.append(compactAction(button('查找替换', () => {
       if (this.compact) this.toggleSidebar(false);
       openSearchPanel(this.source);
-    }), 'search'), this.swapButton, compactAction(button('导出', () => this.exportDialog()), 'download'));
+    }), 'search'), this.swapButton, compactAction(button('导出', () => this.exports.open()), 'download'));
     this.toolbarTools.append(this.extraActionsSlot, tools, this.cmsToolsSlot);
     const leading = el('div', 'studio-toolbar-leading');
     this.leadingActionsSlot = el('div', 'studio-extra-actions');
@@ -223,9 +197,12 @@ export class WritingStudio {
       sidebarNav.append(item);
     }
     this.sideContent = el('div', 'studio-side-content');
-    this.metadataSlot = el('div', 'studio-metadata-slot');
-    this.metadataSlot.hidden = true;
-    this.sidebar.append(sidebarNav, this.sideContent, this.metadataSlot);
+    this.sidebar.append(sidebarNav, this.sideContent);
+    if (this.metadataEnabled) {
+      this.metadataSlot = el('div', 'studio-metadata-slot');
+      this.metadataSlot.hidden = true;
+      this.sidebar.append(this.metadataSlot);
+    }
     this.sidebarDivider = el('div', 'studio-sidebar-divider');
     this.workspace = el('div', 'studio-workspace');
     this.sourcePane = el('div', 'studio-source');
@@ -388,9 +365,11 @@ export class WritingStudio {
     this.sidebarToggle.setAttribute('aria-expanded', String(open));
     this.sidebarToggle.setAttribute('aria-label', open ? '隐藏侧栏' : '显示侧栏');
     this.sidebarToggle.title = open ? '隐藏侧栏' : '显示侧栏';
-    const metadataVisible = open && this.activeSide === 'metadata';
-    this.metadataToggle.setAttribute('aria-expanded', String(metadataVisible));
-    this.metadataToggle.title = metadataVisible ? '关闭元数据侧栏' : '打开元数据侧栏';
+    if (this.metadataToggle) {
+      const metadataVisible = open && this.activeSide === 'metadata';
+      this.metadataToggle.setAttribute('aria-expanded', String(metadataVisible));
+      this.metadataToggle.title = metadataVisible ? '关闭元数据侧栏' : '打开元数据侧栏';
+    }
   }
   toggleSidebar(force) {
     const open = force ?? !this.root.classList.contains('studio-sidebar-open');
@@ -456,55 +435,21 @@ export class WritingStudio {
   commit(text) {
     if (this.value === text) return;
     this.value = text;
-    this.edited = true;
     this.onChange(text);
-    clearTimeout(this.backupTimer);
-    this.backupTimer = setTimeout(() => this.saveBackup(), 500);
+    this.backup?.changed();
     this.queueRender();
   }
-  saveBackup() {
-    if (!this.backupEnabled) return;
-    if (!this.edited) return;
-    if (this.value === this.original) {
-      if (this.edited) {
-        try {
-          localStorage.removeItem(this.key);
-        } catch {/* Optional cleanup. */}
-      }
-      return;
-    }
-    try {
-      localStorage.setItem(this.key, JSON.stringify({
-        version: 1,
-        body: this.value,
-        base: this.original,
-        time: Date.now()
-      }));
-      this.notice('已备份到本机');
-    } catch {
-      this.notice('本地空间不足或不可用，请及时保存到仓库或导出正文。');
-    }
-  }
   offerRecovery() {
-    if (!this.backupEnabled) return;
-    let backup;
-    try {
-      backup = readBackup(localStorage, this.key, this.value);
-    } catch {
-      return;
-    }
+    const backup = this.backup?.read();
     if (!backup) return;
     this.recovery.hidden = false;
     this.recovery.append(el('span', '', `本地备份 · ${new Date(backup.time).toLocaleString('zh-CN')}`), button('恢复副本', () => {
       this.commit(backup.body);
-      this.setValue(backup.body);
       this.updateSource();
       this.recovery.hidden = true;
     }), button('忽略此副本', () => {
       this.recovery.hidden = true;
-      try {
-        localStorage.removeItem(this.key);
-      } catch {/* Optional cleanup. */}
+      this.backup.clear();
     }));
   }
   queueRender(delay = 400) {
@@ -582,11 +527,12 @@ export class WritingStudio {
     }
   }
   showSidebar(tab) {
+    if (tab === 'metadata' && !this.metadataEnabled) return;
     const changed = this.activeSide !== tab;
     this.activeSide = tab;
     this.sidebar.dataset.section = tab;
     this.sideContent.hidden = tab === 'metadata';
-    this.metadataSlot.hidden = tab !== 'metadata';
+    if (this.metadataSlot) this.metadataSlot.hidden = tab !== 'metadata';
     for (const [key, item] of Object.entries(this.sidebarButtons)) item.setAttribute('aria-pressed', String(key === tab));
     this.updateSidebarToggle();
     const items = tab === 'outline' ? this.documentInfo?.headings : tab === 'images' ? this.documentInfo?.images : null;
@@ -755,53 +701,12 @@ export class WritingStudio {
       title:this.documentTitle?.() || this.metadataDock?.form?.querySelector('input[id^="title-field"]')?.value?.trim() || '文章正文'
     };
   }
-  exportDialog() {
-    this.closeExportDialog?.();
-    const dialog = el('dialog', 'studio-dialog studio-export-dialog');
-    const title = el('h2', '', '导出');
-    title.id = 'studio-export-title';
-    dialog.setAttribute('aria-labelledby', title.id);
-    const formats = el('div', 'studio-export-formats');
-    const markdown = button('Markdown (.md)', () => { dialog.close(); this.download(); });
-    const pdf = button('PDF (.pdf)', () => {
-      const snapshot = this.exportSnapshot();
-      this.closePdfExport?.();
-      this.closePdfExport = startPdfExport(snapshot, message => { if (!this.destroyed) this.notice(message); });
-      dialog.close();
-    });
-    const html = button('HTML (.html)', async () => {
-      const snapshot = this.exportSnapshot();
-      dialog.close();
-      this.notice('正在导出 HTML…');
-      try {
-        const {downloadHtml} = await import('./html-export.js');
-        await downloadHtml(snapshot, this.abort.signal);
-        if (!this.destroyed) this.notice('HTML 已导出');
-      } catch (error) {
-        if (!this.destroyed) this.notice('HTML 导出失败：' + error.message);
-      }
-    });
-    formats.append(compactAction(markdown, 'source'), compactAction(pdf, 'render'), compactAction(html, 'source'));
-    const actions = el('div', 'studio-dialog-actions');
-    actions.append(button('取消', () => dialog.close()));
-    dialog.append(title, formats, actions);
-    this.root.append(dialog);
-    const cleanup = () => { dialog.remove(); if (this.closeExportDialog === cleanup) this.closeExportDialog = null; };
-    this.closeExportDialog = cleanup;
-    dialog.addEventListener('close', cleanup, {once:true});
-    dialog.showModal();
-    markdown.focus();
-  }
-  download() {
-    downloadText(this.value, 'text/markdown;charset=utf-8', this.exportSnapshot().title + '.md');
-  }
   notice(text) {
     this.status.textContent = text;
   }
   destroy() {
-    this.saveBackup();
-    this.closeExportDialog?.();
-    this.closePdfExport?.();
+    this.backup?.destroy();
+    this.exports.destroy();
     this.destroyed = true;
     this.toolbarMenus?.destroy();
     this.detachToolbar?.();
@@ -814,7 +719,6 @@ export class WritingStudio {
     this.motion?.destroy();
     this.responsiveLayout?.destroy();
     clearTimeout(this.sidebarMotionTimer);
-    clearTimeout(this.backupTimer);
     clearTimeout(this.renderTimer);
     cancelAnimationFrame(this.dragFrame);
     this.renderer.destroy();

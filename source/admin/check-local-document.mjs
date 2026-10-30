@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {LocalDocument, writeCheckedFile, validateMarkdownFile} from './src/local-document.js';
+import {LocalDocument, validateMarkdownFile} from './src/local-document.js';
+import {writeCheckedFile, writeFileContent, createFileStore} from '../tools/shared/local-files.mjs';
 
 function file(name, text) {
   return {
@@ -67,4 +68,14 @@ assert.equal(unchanged.writes, 0);
 validateMarkdownFile({name:'中文.MD', size:100});
 assert.throws(() => validateMarkdownFile({name:'image.png', size:100}));
 assert.throws(() => validateMarkdownFile({name:'huge.md', size:11 * 1024 * 1024}));
+
+
+// Interrupted writes must not be treated as a cancelled file picker.
+let aborted = false;
+await assert.rejects(() => writeFileContent({createWritable:async () => ({
+  write:async () => {throw Object.assign(Error('Interrupted'), {name:'AbortError'});},
+  abort:async () => {aborted = true;}
+})}, 'text'), {name:'WriteInterruptedError'});
+assert.equal(aborted, true);
+await assert.rejects(() => createFileStore(undefined, 'test').load('id'), /无法保存文件关联/);
 console.log('Local Markdown file checks passed: save, conflict, copies, failed writes and concurrent edits.');

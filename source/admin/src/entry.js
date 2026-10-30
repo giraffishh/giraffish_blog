@@ -1,21 +1,30 @@
 import React from 'react';
 import { CMS } from './cms.js';
 import { configureToolbar, setEditorLoadFailure } from './toolbar-bridge.js';
-import { loadEditor, warmEditor } from './editor-loader.js';
-import { safeImageUrl, templates } from './document-utils.js';
+import { templates } from './templates.js';
 import './studio.css';
-import { createImageThumbnail, imagePreviewUrl } from './image-preview.js';
+import {initializeStudioUI} from './studio-ui.js';
+import {safeImageUrl, createImageThumbnail, imagePreviewUrl} from './images.js';
 import { installArticleMedia } from './article-media.js';
-import { installResponsiveViewport } from './responsive-layout.js';
 import './responsive.css';
 import './toolbar.css';
-import {codeStyles} from './code-theme.js';
-const codeStyle = document.createElement('style');
-codeStyle.textContent = codeStyles;
-document.head.append(codeStyle);
+initializeStudioUI();
+
+let pending;
+function loadEditor() {
+  return pending ||= import('./studio.js').catch(error => {
+    pending = null;
+    throw error;
+  });
+}
+function warmEditor() {
+  const warm = () => loadEditor().catch(() => {});
+  if ('requestIdleCallback' in window) requestIdleCallback(warm, {timeout:2500});
+  else setTimeout(warm, 1500);
+}
+
 const h = React.createElement;
 installArticleMedia(CMS);
-installResponsiveViewport();
 class MarkdownControl extends React.Component {
   componentDidMount() {
     this.mountEditor();
@@ -146,7 +155,6 @@ export async function initialize(config) {
     // changes. This catches configuration issues hidden by a simplified demo.
     const {TestBackend} = await import('decap-cms-backend-test');
     CMS.registerBackend('test-repo', TestBackend);
-    config.load_config_file = false;
     config.backend = {
       name: 'test-repo'
     };

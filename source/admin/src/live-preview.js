@@ -19,7 +19,7 @@ class MarkdownBlock extends WidgetType {
   toDOM(view) {
     const node = document.createElement('div');
     node.className = 'studio-rendered-block studio-rendered-editable studio-typography';
-    populateRendered(node, this.block.html, () => { if (view.dom.isConnected) view.requestMeasure(); });
+    populateRendered(node, this.block.html, () => { if (view.dom.isConnected) view.requestMeasure(); }, {codeActions:true});
     node.addEventListener('toggle', () => view.requestMeasure(), true);
     node.addEventListener('click', event => {
       const href = event.composedPath()[0].closest?.('a')?.getAttribute('href');

@@ -1,6 +1,5 @@
 import {renderMode} from './live-preview.js';
-import {reducedMotion} from './layout-motion.js';
-import {dividerRatio} from './split-layout.js';
+import {reducedMotion, dividerRatio} from './layout-utils.js';
 
 const positionFor = studio => dividerRatio(studio.mode,studio.ratio,studio.sourceFirst) / 100;
 

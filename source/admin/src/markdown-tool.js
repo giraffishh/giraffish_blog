@@ -1,38 +1,29 @@
 import { WritingStudio } from './studio.js';
-import { LocalDocument, fileStore, validateMarkdownFile } from './local-document.js';
-import { installResponsiveViewport } from './responsive-layout.js';
+import {MarkdownToolbar} from './markdown-toolbar.js';
+import {button, initializeStudioUI} from './studio-ui.js';
+import { LocalDocument, validateMarkdownFile } from './local-document.js';
+import {createFileStore} from '../../tools/shared/local-files.mjs';
 import { downloadText } from './export-utils.js';
-import { codeStyles } from './code-theme.js';
 import './studio.css';
 import './responsive.css';
 import './toolbar.css';
 import './markdown-tool.css';
 
+initializeStudioUI();
+
 const DRAFT_KEY = 'giraffish.tools.markdown.draft.v1';
 const types = [{description:'Markdown 文档', accept:{'text/markdown':['.md', '.markdown', '.txt']}}];
 const root = document.getElementById('markdown-editor');
-const store = fileStore(window.indexedDB);
+const store = createFileStore(window.indexedDB, 'giraffish.tools.markdown');
 let current = new LocalDocument(), studio, operation = false, draftTimer, saveTimer;
 let associationId = '', draftStored = true, storageWarning = '', pendingRecovery;
-const style = document.createElement('style');
-style.textContent = codeStyles;
-document.head.append(style);
-installResponsiveViewport();
 
-function button(label, action, className = '') {
-  const node = document.createElement('button');
-  node.type = 'button';
-  node.textContent = label;
-  node.className = className;
-  node.addEventListener('click', action);
-  return node;
-}
+const toolbar = new MarkdownToolbar({onNew:newDocument, onOpen:openFile, onSave:save});
 function updateStatus(message) {
-  filename.textContent = current.name + (current.dirty ? ' •' : '');
-  filename.title = current.name;
-  document.title = `${current.dirty ? '• ' : ''}${current.name} · Markdown`;
-  storageStatus.textContent = storageWarning || (current.automatic ? '自动保存到原文件' : current.handle ? '文件已关联 · 点击保存以恢复自动保存' : '草稿');
-  saveButton.disabled = operation || current.busy;
+  toolbar.update({
+    name:current.name, dirty:current.dirty, busy:operation || current.busy,
+    status:storageWarning || (current.automatic ? '自动保存到原文件' : current.handle ? '文件已关联 · 点击保存以恢复自动保存' : '草稿')
+  });
   if (message) studio.notice(message);
 }
 function rememberDraft() {
@@ -72,16 +63,6 @@ function confirmReplace() {
   }
   return !current.dirty || window.confirm('当前内容尚未保存到文件，确定放弃这些修改吗？');
 }
-const compactFileActions = window.matchMedia('(max-width:760px)');
-function placeFileActions() {
-  if (compactFileActions.matches) {
-    studio.actionsSlot.append(saveButton);
-    studio.extraActionsSlot.append(newButton, openButton, copyButton);
-  } else {
-    studio.actionsSlot.append(newButton, openButton, saveButton, copyButton);
-  }
-}
-compactFileActions.addEventListener('change', () => placeFileActions());
 function mount() {
   studio?.destroy();
   root.replaceChildren();
@@ -97,51 +78,21 @@ function mount() {
       scheduleSave();
     }
   });
-  root.classList.add('studio-toolbar-integrated', 'markdown-tool');
-  const back = document.createElement('a');
-  back.href = '/tools/';
-  back.className = 'markdown-back';
-  back.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  back.title = '返回工具集';
-  back.setAttribute('aria-label', '返回工具集');
-  studio.exitSlot.append(back);
-  studio.leadingActionsSlot.append(filename);
-  placeFileActions();
-  studio.footer.prepend(storageStatus);
+  toolbar.mount(studio);
   updateStatus();
 }
-const filename = document.createElement('span');
-filename.className = 'markdown-filename';
-const storageStatus = document.createElement('span');
-storageStatus.className = 'markdown-storage';
-storageStatus.setAttribute('role', 'status');
-const saveButton = button('保存', () => save(), 'markdown-save');
-saveButton.title = '保存（Ctrl / ⌘ + S）';
-const openButton = button('打开', () => openFile());
-const copyButton = button('另存为', () => save(true));
-const newButton = button('新建', () => {
+function newDocument() {
   if (operation || current.busy || !confirmReplace()) return;
   clearTimeout(saveTimer);
   current = new LocalDocument();
   associationId = '';
   mount();
   rememberDraft();
-});
-for (const action of [newButton, openButton, saveButton, copyButton]) action.classList.add('markdown-file-action');
-const input = document.createElement('input');
-input.type = 'file';
-input.accept = '.md,.markdown,.txt';
-input.hidden = true;
-document.body.append(input);
-input.addEventListener('change', () => {
-  const file = input.files[0];
-  input.value = '';
-  if (file) openFile({file});
-});
+}
 
 async function openFile(provided) {
   if (operation || current.busy || !confirmReplace()) return;
-  if (!provided && !window.showOpenFilePicker) { input.click(); return; }
+  if (!provided && !window.showOpenFilePicker) { toolbar.chooseFile(); return; }
   operation = true;
   const replacingText = current.text;
   clearTimeout(saveTimer);

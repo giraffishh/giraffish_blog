@@ -7,7 +7,6 @@ body { background:#f4f6f2; }
 .writing-studio button { border:1px solid transparent; background:transparent; color:inherit; border-radius:6px; padding:6px 10px; cursor:pointer; font:inherit; white-space:nowrap; }
 .writing-studio button:hover { background:#eaf0e8; }
 .writing-studio button:focus-visible, .writing-studio a:focus-visible { outline:2px solid #418b71; outline-offset:2px; }
-.writing-studio button.studio-primary { background:var(--studio-green); color:white; padding:8px 14px; }
 .studio-nav > button[aria-expanded=true] { background:#edf2ec; color:var(--studio-green); }
 .studio-body { display:flex; height:600px; min-height:350px; min-width:0; overflow:hidden; }
 .studio-sidebar { width:0; min-width:0; flex-shrink:0; background:#f9faf6; overflow:hidden auto; opacity:0; visibility:hidden; }
@@ -71,6 +70,16 @@ body { background:#f4f6f2; }
 .studio-typography li { margin:.3em 0; }.studio-typography li > :is(ul,ol) { margin:.4em 0; }
 .studio-typography hr { border:0; border-top:1px solid var(--studio-line); margin:1.5em 0; }
 .studio-typography pre { margin:0 0 1em; background:#f0f3ed; border:1px solid #e1e8df; padding:18px; border-radius:8px; overflow:auto; white-space:pre; }
+.studio-typography .studio-code-block { position:relative; margin:0 0 1em; border:1px solid #e1e8df; border-radius:8px; background:#f0f3ed; min-width:0; }
+.studio-typography .studio-code-block > pre { margin:0; padding:42px 18px 18px; border:0; background:transparent; border-radius:inherit; }
+.studio-code-toolbar { position:absolute; z-index:1; top:7px; right:9px; display:flex; align-items:center; gap:7px; height:26px; max-width:calc(100% - 18px); user-select:none; }
+.studio-code-language { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#73817d; font:11px/1.4 var(--studio-code-font,monospace); }
+.writing-studio .studio-code-copy { display:inline-flex; align-items:center; justify-content:center; flex:none; width:26px; height:26px; min-height:26px; padding:5px; border:0; border-radius:5px; background:transparent; color:#73817d; }
+.writing-studio .studio-code-copy:hover { background:#e1e9df; color:var(--studio-green); }
+.studio-code-copy svg { display:block; width:16px; height:16px; pointer-events:none; }
+.studio-code-copy[data-state=copied] { color:#285d4e; }
+.studio-code-copy[data-state=error] { color:#a53434; }
+.studio-code-status { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .studio-typography code { font-family:'Cascadia Code',Consolas,monospace; font-size:.87em; background:#eef2eb; border-radius:3px; padding:.15em .25em; }.studio-typography pre code { padding:0; background:none; }
 .studio-typography table { display:block; margin:0 0 1em; max-width:100%; overflow:auto; border-collapse:collapse; font-size:1em; }.studio-typography th, .studio-typography td { border:1px solid #dce5df; padding:9px 12px; }.studio-typography th { background:#eff3ed; font-weight:600; }
 .studio-typography blockquote { margin:1em 0; padding:6px 20px; border-left:3px solid #82a890; background:#f2f6ef; color:#577061; }.studio-typography .katex-display { overflow:auto hidden; padding:8px 0; }.studio-typography details { border:1px solid #dce5df; border-radius:6px; padding:12px; }
@@ -96,15 +105,12 @@ body { background:#f4f6f2; }
 .studio-image-preview .studio-image-retry { position:absolute; right:8px; bottom:8px; border:1px solid #cddbd2; border-radius:5px; padding:3px 10px; background:white; color:#285d4e; font:inherit; cursor:pointer; }
 .studio-image-preview > a:focus-visible { outline:2px solid #418b71; outline-offset:-3px; }
 .studio-recovery { padding:12px 16px; background:#fff2d8; font-size:12px; }.studio-recovery button { border:1px solid #d6bd83; margin-left:8px; }.writing-studio [hidden] { display:none!important; }
-.studio-dialog { color:var(--studio-ink); border:1px solid var(--studio-line); border-radius:14px; padding:24px; width:min(480px,90vw); box-shadow:0 20px 80px #16332930; }.studio-dialog::backdrop { background:#15332366; }.studio-dialog h2 { font-size:20px; margin-top:0; }.studio-dialog label { display:block; margin:16px 0; font-size:13px; }
-.studio-dialog input { display:block; width:100%; padding:10px 12px; margin-top:8px; border:1px solid #b9cbbd; border-radius:6px; font:14px system-ui; }.studio-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }.studio-error { color:#a53434; font-size:13px; }
+.studio-dialog { color:var(--studio-ink); border:1px solid var(--studio-line); border-radius:14px; padding:24px; width:min(480px,90vw); max-height:calc(100vh - 48px); overflow:auto; box-shadow:0 20px 80px #16332930; }.studio-dialog::backdrop { background:#15332366; }.studio-dialog h2 { font-size:20px; margin-top:0; }
+.studio-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
 .studio-image-field { display:flex; flex-direction:column; gap:8px; }.studio-image-field input { width:100%; }
 .studio-image-field-preview { width:100%; max-width:360px; }.studio-image-field-preview .studio-image-preview > a { height:180px; }
-.studio-dialog { max-height:calc(100vh - 48px); overflow:auto; }
 .studio-demo-notice { position:fixed; bottom:0; left:0; right:0; z-index:1000; background:#285d4e; color:white; padding:7px; text-align:center; font:12px system-ui; }.studio-demo .studio-focus { bottom:36px; }
 #studio-loading { max-width:440px; margin:18vh auto; text-align:center; color:#285d4e; font:16px/1.8 system-ui,sans-serif; }
-@media (max-width:760px) {
-}
 
 .studio-preview { color:var(--studio-ink); }
 /* Contain child margins so lazy blocks and CodeMirror widgets measure their full spacing. */

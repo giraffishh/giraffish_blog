@@ -1,3 +1,5 @@
+import {createFileStore, writeFileContent, writeCheckedFile} from '../shared/local-files.mjs?v=9a86a1cd5b0b';
+
 /* 界面与交互入口。依赖 mindmap-core.js；内部组件仅在本文件使用。 */
 (() => {
   'use strict';
@@ -156,58 +158,6 @@
       };
     }
     return { create, rgbToHex };
-  })();
-
-  // ── 本地文件关联存储 ──────────────────────────────────────────
-  const MindmapFileStore = (() => {
-    'use strict';
-    function create(indexedDB) {
-      function open() {
-        return new Promise((resolve, reject) => {
-          if (!indexedDB) return reject(new Error('此浏览器无法保存文件关联'));
-          let settled = false;
-          const request = indexedDB.open('giraffish.tools.mindmap', 1);
-          request.onupgradeneeded = () => {
-            if (!request.result.objectStoreNames.contains('files'))
-              request.result.createObjectStore('files');
-          };
-          request.onerror = () => {
-            settled = true;
-            reject(request.error);
-          };
-          request.onblocked = () => {
-            settled = true;
-            reject(new Error('文件关联存储被其他页面占用'));
-          };
-          request.onsuccess = () => {
-            if (settled) request.result.close();
-            else resolve(request.result);
-          };
-        });
-      }
-      async function transact(mode, action) {
-        const db = await open();
-        try {
-          return await new Promise((resolve, reject) => {
-            const transaction = db.transaction('files', mode);
-            const request = action(transaction.objectStore('files'));
-            transaction.oncomplete = () => resolve(request.result);
-            transaction.onabort = () => reject(transaction.error || new Error('未能保存文件关联'));
-            transaction.onerror = () => reject(transaction.error || request.error);
-          });
-        } finally {
-          db.close();
-        }
-      }
-      return {
-        save: (id, handle) => transact('readwrite', (store) => store.put({ id, handle }, 'active')),
-        async load(id) {
-          const record = await transact('readonly', (store) => store.get('active'));
-          return record?.id === id ? record.handle : null;
-        },
-      };
-    }
-    return { create };
   })();
 
   // ── 文件拖入 ──────────────────────────────────────────
@@ -461,7 +411,7 @@
     pendingHandle = null,
     pendingReason = '',
     associationSaved = true;
-  const fileStore = MindmapFileStore.create(window.indexedDB);
+  const fileStore = createFileStore(window.indexedDB, 'giraffish.tools.mindmap');
   const feedback = MindmapFeedback.create(document, {
     retry: () => saveFromNotice(),
     copy: () => saveFromNotice(true),
@@ -586,12 +536,6 @@
         : '保存未完成，内容已保留为草稿。请重试或另存为副本。')
     );
   }
-  function fileConflictError() {
-    return Object.assign(
-      Error('原文件已在其他地方修改。当前内容已保留，请另存为副本，或重新打开原文件。'),
-      { name: 'ConflictError' },
-    );
-  }
   function suspendFile(error, chosen = handle || pendingHandle) {
     pendingHandle = chosen;
     mode = 'manual';
@@ -625,29 +569,6 @@
     if (saving || drag) return;
     if (editing) await saveEdit();
     if (!editing) await saveMap(copy);
-  }
-  async function writeFileContent(chosen, text) {
-    let writer;
-    try {
-      writer = await chosen.createWritable();
-      await writer.write(text);
-      await writer.close();
-    } catch (error) {
-      try {
-        await writer?.abort();
-      } catch {}
-      // Cancelling the picker is harmless; an interrupted write still needs feedback.
-      if (error?.name === 'AbortError')
-        throw Object.assign(Error('文件写入被中断，当前内容已保留。请重试保存。'), {
-          name: 'WriteInterruptedError',
-        });
-      throw error;
-    }
-  }
-  async function writeCheckedFile(chosen, expected, updated) {
-    const current = await (await chosen.getFile()).text();
-    if (current !== expected && current !== updated) throw fileConflictError();
-    if (current !== updated) await writeFileContent(chosen, updated);
   }
   async function saveToNewLocation(saveAs = false) {
     if (!window.showSaveFilePicker) {

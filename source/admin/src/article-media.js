@@ -1,10 +1,9 @@
+import {element as node, button, compactAction} from './studio-ui.js';
 import { mediaCatalog, filterMedia } from './media-catalog.js';
-import { createImageThumbnail } from './image-preview.js';
-import { imageMarkdown } from './document-utils.js';
+import {createImageThumbnail, imageMarkdown} from './images.js';
 import { MediaSizeLoader, NativeMediaSizes, showFileSize } from './media-size.js';
 import './article-media.css';
 import { requestArticleRecord } from './analysis-client.js';
-import { compactAction } from './action-icon.js';
 const maxPageSize = 48;
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
@@ -13,18 +12,6 @@ const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   day: '2-digit'
 });
 const formatDate = time => Number.isFinite(time) ? dateFormatter.format(time) : '日期未知';
-const node = (tag, cls, text) => {
-  const el = document.createElement(tag);
-  if (cls) el.className = cls;
-  if (text) el.textContent = text;
-  return el;
-};
-const button = (text, action) => {
-  const el = node('button', '', text);
-  el.type = 'button';
-  el.addEventListener('click', action);
-  return el;
-};
 export class ArticleMediaStore {
   constructor() {
     this.saved = new Map();

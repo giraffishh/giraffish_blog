@@ -11,6 +11,8 @@ import { templates } from './src/templates.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.resolve(here, 'assets');
+const entries = ['boot','cms','entry','render-worker','print','markdown-tool'];
+const stylesheets = new Set(['entry','markdown-tool']);
 if (path.relative(here, out) !== 'assets') throw new Error('Unexpected generated asset directory');
 await rm(out, {recursive:true, force:true});
 await mkdir(`${out}/static`, {recursive:true});
@@ -26,7 +28,7 @@ await Promise.all([
 const previews = Object.fromEntries(Object.entries(templates).map(([name,source])=>[name,markdown.render(source)]));
 const result = await build({
   absWorkingDir:here,
-  entryPoints:['src/boot.js','src/cms.js','src/entry.js','src/render-worker.js','src/print.js','src/markdown-tool.js'],
+  entryPoints:entries.map(name => `src/${name}.js`),
   outdir:out, bundle:true, minify:true, format:'esm', splitting:true,
   entryNames:'chunks/[name]-[hash]', chunkNames:'chunks/[name]-[hash]', assetNames:'static/[name]-[hash]',
   publicPath:'/admin/assets', target:['es2022'], legalComments:'linked', metafile:true,
@@ -37,12 +39,13 @@ const result = await build({
 });
 // Tiny revalidated entry files point to immutable content-addressed bundles.
 for (const [file, meta] of Object.entries(result.metafile.outputs)) {
-  if (!meta.entryPoint || !['boot.js','cms.js','entry.js','render-worker.js','print.js','markdown-tool.js'].includes(path.basename(meta.entryPoint)) || !file.endsWith('.js')) continue;
+  if (!meta.entryPoint || !entries.includes(path.basename(meta.entryPoint, '.js')) || !file.endsWith('.js')) continue;
   const name = path.basename(meta.entryPoint);
   const relative = path.relative(out,path.resolve(here,file)).replaceAll(path.sep,'/');
   await writeFile(path.join(out,name), `export * from './${relative}';\n`);
-  if (name === 'entry.js' && meta.cssBundle) await cp(path.resolve(here,meta.cssBundle),`${out}/entry.css`);
-  if (name === 'markdown-tool.js' && meta.cssBundle) await cp(path.resolve(here,meta.cssBundle),`${out}/markdown-tool.css`);
+  if (stylesheets.has(path.basename(name, '.js')) && meta.cssBundle) {
+    await cp(path.resolve(here,meta.cssBundle), path.join(out, name.replace(/\.js$/, '.css')));
+  }
 }
 // The blog's login redirect is a classic script, independent of the admin app.
 await build({absWorkingDir:here,entryPoints:['src/identity-redirect.js'],outdir:out,bundle:true,minify:true,format:'iife',target:['es2022']});

@@ -1,3 +1,19 @@
+import {installResponsiveViewport} from './responsive-layout.js';
+import {codeStyles} from './code-theme.js';
+
+export function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+export function button(label, action, className = '') {
+  const node = element('button', className, label);
+  node.type = 'button';
+  node.addEventListener('click', action);
+  return node;
+}
+
 const paths = {
   swap: 'M3 7h17 M16 3l4 4-4 4 M21 17H4 M8 13l-4 4 4 4',
   source: 'M8 6l-6 6 6 6 M16 6l6 6-6 6 M14 4l-4 16',
@@ -35,4 +51,15 @@ export function compactAction(element, icon, label = element.textContent) {
   element.setAttribute('aria-label', label);
   element.title = label;
   return element;
+}
+
+let initialized = false;
+// Entrypoints call this once; importing UI helpers never changes the page.
+export function initializeStudioUI() {
+  if (initialized) return;
+  initialized = true;
+  const style = document.createElement('style');
+  style.textContent = codeStyles;
+  document.head.append(style);
+  installResponsiveViewport();
 }

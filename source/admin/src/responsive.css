@@ -11,7 +11,7 @@
   .writing-studio button, .studio-media-tabs button, .studio-media-pager button { min-height:40px; }
   .writing-studio .studio-sidebar-toggle { min-width:44px; min-height:44px; }
   .studio-metadata-origin > :not(.studio-editor-field) :where(input:not([type=checkbox]):not([type=radio]),textarea,select),
-  .studio-dialog input, [data-studio-media] [class*="SearchContainer"] input, .studio-media-filter select { font-size:16px; }
+  [data-studio-media] [class*="SearchContainer"] input, .studio-media-filter select { font-size:16px; }
   .studio-focus { top:calc(var(--admin-viewport-top,0px) + var(--studio-header-height,66px)); bottom:auto; height:calc(var(--admin-viewport-height,100dvh) - var(--studio-header-height,66px) - env(safe-area-inset-bottom,0px) - var(--studio-bottom-gap,0px)); }
   .studio-demo .studio-focus { --studio-bottom-gap:28px; bottom:auto; }
 }
@@ -141,7 +141,6 @@
   .writing-studio .studio-source .cm-panel.cm-search label { min-height:28px; padding:2px 3px; font-size:12px; }
   .writing-studio .studio-source .cm-panel.cm-search button[name=close] { top:8px; right:4px; width:34px; height:32px; }
   .studio-dialog { max-width:calc(100vw - 24px); max-height:calc(var(--admin-viewport-height,100dvh) - 24px); padding:18px; }
-  .studio-dialog input { font-size:14px; min-height:32px; }
   .studio-dialog-actions button { min-height:32px; }
 
   /* Full-width media dialog with reachable controls and a scrolling result area. */

@@ -1,4 +1,4 @@
-import { safeImageUrl } from './document-utils.js';
+import { safeImageUrl } from './images.js';
 const site = 'https://blog.giraffish.top';
 export function normalizeMediaUrl(value) {
   const safe = safeImageUrl(typeof value === 'string' ? value.trim() : '');

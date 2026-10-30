@@ -5,7 +5,7 @@ import {lazyGateway} from './build-adapters.mjs';
 import {DocumentAnalysis,markdown} from './src/document.js';
 import {collectArticleImages,articleRecord} from './src/article-record.js';
 import {mediaCatalog,filterMedia} from './src/media-catalog.js';
-import {modeAtRatio,dividerRatio} from './src/split-layout.js';
+import {modeAtRatio,dividerRatio} from './src/layout-utils.js';
 
 const toolbar=await import('./src/toolbar-bridge.js');
 toolbar.configureToolbar({show_preview_links:false});assert.equal(toolbar.previewLinksEnabled,false);
@@ -138,7 +138,7 @@ try {
   const recovered=failed.requestArticleRecord('recovered',{});workers.at(-1).reply({article:{id:'recovered'}});
   assert.equal((await recovered).id,'recovered');
 } finally {globalThis.Worker=originalWorker;}
-const {reloadDocumentImages}=await import('./src/image-reload.js');
+const {reloadDocumentImages}=await import('./src/images.js');
 const originalFetch=globalThis.fetch;
 try {
   let inFlight=0,peak=0;
@@ -158,4 +158,60 @@ try {
   await reloadDocumentImages(root,records,cancelled.signal,()=>{});
   assert.equal(requests.length,7);
 } finally {globalThis.fetch=originalFetch;}
+// Editor backup compatibility and lifecycle: old drafts, cancelled timers and blocked storage.
+{
+  const {EditorBackup, preference, storePreference} = await import('./src/studio-storage.js');
+  const records = new Map();
+  let writes = 0, body = 'original';
+  const notices = [];
+  const storage = {getItem:key => records.get(key) ?? null,
+    setItem:(key,value) => { records.set(key,value); writes++; }, removeItem:key => records.delete(key)};
+  const backup = new EditorBackup({entryKey:'posts/example', value:body, getValue:() => body,
+    notice:message => notices.push(message), storage:() => storage});
+  const key = 'studio:backup:v1:posts/example:body';
+  records.set(key, JSON.stringify({version:1, body:'older draft', base:'original', time:123}));
+  assert.equal(backup.read().body, 'older draft');
+  assert.equal(new EditorBackup({entryKey:'posts/other', value:body, getValue:() => body,
+    notice:() => {}, storage:() => storage}).read(), null);
+  for (const invalid of ['{bad', JSON.stringify({version:2,body:'draft',time:123}),
+    JSON.stringify({version:1,body:'original\n',time:123}), JSON.stringify({version:1,body:'draft',time:null})]) {
+    records.set(key, invalid);
+    assert.equal(backup.read(), null);
+  }
+  body = 'changed'; backup.changed(); backup.flush();
+  assert.equal(JSON.parse(records.get(key)).body, body);
+  assert.equal(JSON.parse(records.get(key)).base, 'original');
+  body = 'original'; backup.changed(); backup.flush();
+  assert.equal(records.has(key), false);
+  body = 'saved body'; backup.changed(); backup.saved();
+  assert.equal(records.has(key), false);
+  body = 'edit after save'; backup.changed(); backup.destroy();
+  assert.equal(JSON.parse(records.get(key)).base, 'saved body');
+  assert.equal(JSON.parse(records.get(key)).body, body);
+  const savedWrites = writes;
+  // A disposed editor or completed CMS save must not leave delayed writes.
+  await new Promise(resolve => setTimeout(resolve, 550));
+  assert.equal(writes, savedWrites);
+  backup.saved(); assert.equal(records.has(key), false);
+  const blocked = new EditorBackup({entryKey:'blocked', value:'', getValue:() => 'draft',
+    storage:() => {throw Error('storage disabled');}, notice:message => notices.push(message)});
+  assert.equal(blocked.read(), null);
+  blocked.changed(); blocked.destroy();
+  assert.match(notices.at(-1), /本地空间不足或不可用/);
+  assert.doesNotThrow(() => blocked.saved());
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  try {
+    Object.defineProperty(globalThis, 'localStorage', {configurable:true, get:() => storage});
+    storePreference('mode', 'split');
+    assert.equal(records.get('studio:mode'), 'split');
+    assert.equal(preference('mode', 'render'), 'split');
+    Object.defineProperty(globalThis, 'localStorage', {configurable:true, get:() => {throw Error('blocked');}});
+    assert.equal(preference('mode', 'render'), 'render');
+    assert.doesNotThrow(() => storePreference('mode', 'source'));
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else delete globalThis.localStorage;
+  }
+}
+console.log('Passed: editor draft compatibility, save/disposal timer cancellation and storage failure fallback.');
 console.log('Passed: guarded gateway imports; Markdown/Fluid/math/HTML; media indexing/filtering; split endpoints; worker priority/coalescing/cache/failure/retry/disposal; source/render syntax highlighting; export snapshots/cancellation/names; image reload deduplication/concurrency/cancellation.');
