@@ -472,9 +472,8 @@ footer:
       <span id="times">载入时分秒...</span>
       <script src="/js/duration.js"></script>
     </div>
-    <!-- PixiJS -->
-    <script src="https://fastly.jsdelivr.net/npm/pixi.js@7.x/dist/pixi.min.js"></script>
-    <script src="https://hexo-blog-netlify.oss-cn-shenzhen.aliyuncs.com/live2d-widget/autoload.js"></script>
+    <!-- Live2D: SUSTech mirror, pinned Git revision; PixiJS is bundled. -->
+    <script defer src="/js/live2d-loader.js" data-assets="https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/1cce92d3bb678330cfcab94fb1c0bdc098f07b1c/live2d/"></script>
     <!-- twikoo -->
     <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
     <script defer src="https://fastly.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>
