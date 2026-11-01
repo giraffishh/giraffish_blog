@@ -118,6 +118,13 @@ function decideCachingStrategy(url, request) {
     return null;
   }
 
+  // Live2D follows main: honor the mirror's HTTP cache TTL instead of
+  // retaining mutable scripts/styles until the next website deployment.
+  if (hostname === 'mirrors.sustech.edu.cn' &&
+      path.startsWith('/git/giraffish/image-hosting/-/raw/main/live2d/')) {
+    return null;
+  }
+
   // Image files: Cache-first, but only from allowed hosts
   if (path.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|bmp|webm)$/i)) {
     if (ALLOWED_IMAGE_HOSTS.includes(hostname)) {

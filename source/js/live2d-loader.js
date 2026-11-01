@@ -1,21 +1,15 @@
-// GitLab Raw serves JS/CSS as text/plain + nosniff. Read the immutable,
-// CORS-enabled mirror files, verify SRI, then load them with explicit types.
+// GitLab Raw serves JS/CSS as text/plain + nosniff. Fetch the mirror
+// files with CORS, then load scripts and styles with explicit types.
 (() => {
   const entry = document.currentScript;
   if (screen.width < 768 || window.__giraffishLive2DLoading) return;
   const base = entry.dataset.assets;
   if (!base) return;
-  const integrity = {
-  "waifu.css": "sha256-VncW8rE7tYjJ0oO4bbRrJlPllkjBJMZJm9h0cZx0+Dc=",
-  "live2dcubismcore.min.js": "sha256-Ja6TjLT+KCzhibNXvMl+YD0eH37Hi/BBUNQBwjzceS8=",
-  "live2d.min.js": "sha256-ITXHawpj0PbJxI33RtDuxurRMZmbpvlnhIhHLpXh7dY=",
-  "waifu-tips.js": "sha256-s+QrpEtxRS4Tv92mXohsSK/CMYSLEGE/RQtHFQ6/cnY="
-};
   window.__giraffishLive2DLoading = true;
 
   async function readAsset(name) {
     const response = await fetch(new URL(name, base), {
-      mode: 'cors', credentials: 'omit', integrity: integrity[name]
+      mode: 'cors', credentials: 'omit'
     });
     if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
     return response.arrayBuffer();
