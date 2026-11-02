@@ -3,7 +3,7 @@ navbar:
   ground_glass:
     enable: true
 index:
-  banner_img: https://hexo-blog-netlify.oss-cn-shenzhen.aliyuncs.com/IMG_2537.jpg
+  banner_img: https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-11-02-1793556154212.webp
   banner_img_height: 100
   slogan:
     text: 欢迎阅读Giraffish的个人博客
