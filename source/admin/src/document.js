@@ -1,7 +1,62 @@
 import MarkdownIt from 'markdown-it';
 import math from '@traptitech/markdown-it-katex';
+import katex from 'katex';
 import { fluidTags } from './fluid.js';
 import { highlightCode } from './code-highlight.js';
+
+const mathOptions = {throwOnError:false, trust:false, strict:false, maxExpand:1000, maxSize:20};
+
+// Register before Markdown's escape rule so TeX delimiters survive tokenization.
+function texDelimiters(md) {
+  const closingAt = (source, close, from) => {
+    for (let at = source.indexOf(close, from); at >= 0; at = source.indexOf(close, at + 2)) {
+      let slashes = 0;
+      for (let i = at - 1; i >= 0 && source[i] === '\\'; i--) slashes++;
+      if (slashes % 2 === 0) return at;
+    }
+    return -1;
+  };
+  md.inline.ruler.before('escape', 'tex_math', (state, silent) => {
+    const open = state.src.slice(state.pos, state.pos + 2);
+    if (open !== '\\(' && open !== '\\[') return false;
+    const end = closingAt(state.src, open === '\\(' ? '\\)' : '\\]', state.pos + 2);
+    if (end < 0 || end >= state.posMax) return false;
+    if (!silent) {
+      const token = state.push(open === '\\(' ? 'math_inline' : 'tex_display', 'math', 0);
+      token.content = state.src.slice(state.pos + 2, end);
+      token.markup = open;
+    }
+    state.pos = end + 2;
+    return true;
+  });
+  md.renderer.rules.tex_display = (tokens, index) => katex.renderToString(tokens[index].content, {...mathOptions, displayMode:true});
+  md.block.ruler.before('paragraph', 'tex_display_block', (state, start, end, silent) => {
+    const from = state.bMarks[start] + state.tShift[start];
+    if (state.sCount[start] - state.blkIndent >= 4 || state.src.slice(from, from + 2) !== '\\[') return false;
+    const lines = [];
+    let last = start;
+    for (; last < end; last++) {
+      if (last > start && !state.isEmpty(last) && state.sCount[last] < state.blkIndent) return false;
+      const line = state.src.slice(state.bMarks[last] + state.tShift[last] + (last === start ? 2 : 0), state.eMarks[last]);
+      const close = closingAt(line, '\\]', 0);
+      if (close >= 0) {
+        if (line.slice(close + 2).trim()) return false;
+        lines.push(line.slice(0, close));
+        break;
+      }
+      lines.push(line);
+    }
+    if (last === end) return false;
+    if (silent) return true;
+    const token = state.push('math_block', 'math', 0);
+    token.block = true;
+    token.content = lines.join('\n');
+    token.markup = '\\[';
+    token.map = [start, last + 1];
+    state.line = last + 1;
+    return true;
+  }, {alt:['paragraph', 'reference', 'blockquote', 'list']});
+}
 
 export const markdown = new MarkdownIt({
   html: true,
@@ -10,13 +65,7 @@ export const markdown = new MarkdownIt({
   breaks: true,
   typographer: true,
   quotes: '“”‘’'
-}).use(math, {
-  throwOnError: false,
-  trust: false,
-  strict: false,
-  maxExpand: 1000,
-  maxSize: 20
-}).use(fluidTags);
+}).use(math, {...mathOptions}).use(texDelimiters).use(fluidTags);
 function parseDocument(text) {
   const env = {};
   return {
@@ -74,6 +123,9 @@ export function inspectDocument(text, tokens = markdown.parse(text, {})) {
   };
 }
 export function renderBlocks(text, parsed = parseDocument(text)) {
+  // CodeMirror and markdown-it normalize line endings. Widget offsets must use
+  // that same coordinate system, even when the opened file retains CRLF on disk.
+  text = text.replace(/\r\n?/g, '\n');
   const {
     tokens,
     env

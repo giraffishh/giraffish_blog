@@ -73,6 +73,37 @@ for(const [language,code] of fences) {
 }
 
 
+// Widget ranges must match CodeMirror's normalized document, including CRLF files.
+{
+  const {renderBlocks} = await import('./src/document.js');
+  const text = '## 标题\n\n中文正文 😀\n\n***\n\n$$\nh_t=f(h_{t-1})\n$$\n\n末尾';
+  const expected = renderBlocks(text);
+  for (const separator of ['\r\n', '\r']) {
+    const original = text.replaceAll('\n', separator);
+    const editorText = EditorState.create({doc:original}).doc.toString();
+    const blocks = renderBlocks(original);
+    assert.equal(editorText, text);
+    assert.deepEqual(blocks, expected);
+    let cursor = 0;
+    for (const block of blocks) {
+      assert.equal(editorText.slice(cursor, block.from).trim(), '');
+      assert.ok(block.to <= editorText.length);
+      cursor = block.to;
+    }
+    assert.equal(editorText.slice(cursor).trim(), '');
+  }
+  for (const source of ['行内 \\(x_t\\) 与行末', 'Policy \\[ a_t=\\pi_\\theta(z_t) \\]，概率分布', '\\[\nx_t=1\n\n+y_t\n\\]']) {
+    assert.match(markdown.render(source), /class="katex"/);
+    assert.ok(!markdown.render(source).includes('katex-error'));
+  }
+  const standalone = renderBlocks('前文\n\\[\nx_t=1\n\\]\n后文');
+  assert.equal(standalone.length, 3);
+  assert.deepEqual(standalone.map(b=>b.line), [1,2,5]);
+  for (const source of ['`\\(x\\)`', '~~~tex\n\\[x\\]\n~~~', '    \\[x\\]', '\\\\[x\\]', '\\[not closed']) {
+    assert.ok(!markdown.render(source).includes('class="katex"'), source);
+  }
+  assert.match(markdown.render('**SimNorm: **正文'), /\*\*SimNorm: \*\*/);
+}
 const url='https://example.com/a.webp';
 const images=collectArticleImages(`![A](${url})\n\n<img src="${url}"/>\n\n\`\`\`md\n![忽略](https://example.com/code.png)\n\`\`\``,{banner_img:url});
 assert.equal(images.length,1);
