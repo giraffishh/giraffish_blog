@@ -63,3 +63,13 @@ export function initializeStudioUI() {
   document.head.append(style);
   installResponsiveViewport();
 }
+
+export const saveIconPaths = {
+  saved:'m5 12 4 4L19 6',
+  save:'M5 3h12l4 4v14H3V3h2m2 0v6h10V3M7 21v-8h10v8',
+  saving:'M20 12a8 8 0 1 1-8-8'
+};
+export function savePresentation(dirty, saving) {
+  return saving ? {state:'saving',label:'保存中',icon:'saving'}
+    : dirty ? {state:'dirty',label:'未保存',icon:'save'} : {state:'saved',label:'已保存',icon:'saved'};
+}

@@ -6,7 +6,7 @@ body { margin:0; overflow:hidden; }
 .markdown-tool .studio-unified-nav .markdown-file-action { display:inline-flex; align-items:center; justify-content:center; height:var(--toolbar-control-height); min-height:var(--toolbar-control-height); padding:4px 8px; border:0; border-radius:6px; background:transparent; color:var(--studio-ink); font:var(--toolbar-font-size)/20px var(--studio-font); }
 .markdown-tool .studio-unified-nav .markdown-file-action:not(:disabled):hover { background:#eaf0e8; }
 .markdown-tool .studio-actions-slot { gap:6px; }
-.markdown-tool .markdown-save:disabled { opacity:.5; cursor:wait; }
+.markdown-tool .markdown-save:disabled { cursor:wait; }
 .markdown-tool .studio-footer { flex-wrap:wrap; }
 .markdown-tool .markdown-storage { order:1; }
 .markdown-tool .studio-footer-info { order:2; }
@@ -22,7 +22,7 @@ body { margin:0; overflow:hidden; }
 }
 
 @media (min-width:761px) and (max-width:1200px) {
-  .markdown-tool .studio-unified-nav { grid-template-columns:minmax(0,1fr) auto auto; }
+  .markdown-tool .studio-unified-nav { grid-template-columns:minmax(0,1fr) auto auto auto; }
   .markdown-tool .studio-toolbar-leading > .studio-extra-actions { border:0; padding:0; }
 }
 @media (min-width:761px) and (max-width:1000px) {

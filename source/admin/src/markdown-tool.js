@@ -15,13 +15,13 @@ const DRAFT_KEY = 'giraffish.tools.markdown.draft.v1';
 const types = [{description:'Markdown 文档', accept:{'text/markdown':['.md', '.markdown', '.txt']}}];
 const root = document.getElementById('markdown-editor');
 const store = createFileStore(window.indexedDB, 'giraffish.tools.markdown');
-let current = new LocalDocument(), studio, operation = false, draftTimer, saveTimer;
+let current = new LocalDocument(), studio, operation = false, saving = false, draftTimer, saveTimer;
 let associationId = '', draftStored = true, storageWarning = '', pendingRecovery;
 
 const toolbar = new MarkdownToolbar({onNew:newDocument, onOpen:openFile, onSave:save});
 function updateStatus(message) {
   toolbar.update({
-    name:current.name, dirty:current.dirty, busy:operation || current.busy,
+    name:current.name, dirty:current.dirty, unsaved:current.dirty || !current.saved || Boolean(current.handle && !current.automatic), saving, busy:operation || current.busy,
     status:storageWarning || (current.automatic ? '关联本地文件' : '草稿'),
     statusTitle:storageWarning || (current.automatic ? '修改自动写回本地文件' : current.handle ? '点击保存尝试授权，或重新打开文件' : '草稿保存在此浏览器')
   });
@@ -31,7 +31,7 @@ function rememberDraft() {
   if (pendingRecovery) return;
   clearTimeout(draftTimer);
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({version:1, text:current.text, base:current.base, name:current.name, associationId, time:Date.now()}));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({version:1, text:current.text, base:current.base, name:current.name, saved:current.saved, associationId, time:Date.now()}));
     draftStored = true;
     storageWarning = '';
   } catch {
@@ -110,7 +110,7 @@ async function openFile(provided) {
     }
     // Keep the previous draft recoverable until selection and reading succeed.
     pendingRecovery = null;
-    current = new LocalDocument({text, name:file.name, handle});
+    current = new LocalDocument({text, name:file.name, handle, saved:true});
     current.automatic = automatic;
     associationId = '';
     mount();
@@ -126,13 +126,14 @@ async function save(copy = false, automatic = false) {
   if (automatic && (!current.automatic || !current.dirty)) return;
   operation = true;
   clearTimeout(saveTimer);
+  saving = true;
   updateStatus('正在保存…');
   try {
     let chosen = current.handle;
     if (copy || !chosen) {
       if (!window.showSaveFilePicker) {
         downloadText(current.text, 'text/markdown;charset=utf-8', current.name.replace(/\.(md|markdown|txt)$/i, '') + (copy ? ' - 副本' : '') + '.md');
-        if (!copy) current.base = current.text;
+        if (!copy) { current.base = current.text; current.saved = true; }
         rememberDraft();
         updateStatus('已下载副本 · 当前浏览器不支持关联本地文件');
         return;
@@ -152,6 +153,7 @@ async function save(copy = false, automatic = false) {
     rememberDraft();
   } finally {
     operation = false;
+    saving = false;
     updateStatus();
     scheduleSave();
   }

@@ -96,11 +96,20 @@ export class MarkdownShortcuts {
     const title = element('h2','','快捷键');
     title.id = `studio-shortcuts-${++helpId}`; title.tabIndex = -1;
     dialog.setAttribute('aria-labelledby',title.id);
-    const platform = element('select'); platform.setAttribute('aria-label','快捷键系统');
-    for (const [value,label] of [['win','Windows / Linux'],['mac','Mac']]) {
-      const option = element('option','',label); option.value=value; platform.append(option);
+    const platform = element('div','studio-shortcut-platform');
+    platform.setAttribute('role','radiogroup'); platform.setAttribute('aria-label','快捷键系统');
+    let selectedPlatform = this.platform || (/Mac|iPhone|iPad/.test(navigator.platform) ? 'mac' : 'win');
+    platform.dataset.platform = selectedPlatform;
+    for (const [value,text] of [['win','Win'],['mac','Mac']]) {
+      const label = element('label'), input = element('input');
+      input.type='radio'; input.name=title.id+'-platform'; input.value=value;
+      input.checked=value===selectedPlatform;
+      label.append(input,element('span','',text)); platform.append(label);
+      input.addEventListener('change',()=>{
+        if (!input.checked) return;
+        selectedPlatform=this.platform=value; platform.dataset.platform=value; update();
+      });
     }
-    platform.value = /Mac|iPhone|iPad/.test(navigator.platform) ? 'mac' : 'win';
     const close = button('×',()=>dialog.close()); close.setAttribute('aria-label','关闭快捷键说明');
     header.append(title,platform,close);
     const table = element('table');
@@ -110,9 +119,9 @@ export class MarkdownShortcuts {
       const row=element('tr'), name=element('td','',label), cell=element('td'), keycap=element('kbd');
       cell.append(keycap); row.append(name,cell); table.append(row); return [key,keycap];
     });
-    const update = () => {for (const [key,node] of keys) node.textContent = key.split('-').map(part=>part==='Mod' ? (platform.value==='mac' ? '⌘' : 'Ctrl') : part==='Shift' && platform.value==='mac' ? '⇧' : part.toUpperCase()).join(' + ');};
-    platform.addEventListener('change',update); update();
-    dialog.append(header,element('p','studio-shortcut-note','格式快捷键在正文编辑区使用；选中文字后操作，未选中时可插入标记继续输入。'),table);
+    const update = () => {for (const [key,node] of keys) node.textContent = key.split('-').map(part=>part==='Mod' ? (selectedPlatform==='mac' ? '⌘' : 'Ctrl') : part==='Shift' && selectedPlatform==='mac' ? '⇧' : part.toUpperCase()).join(' + ');};
+    update();
+    dialog.append(header,table);
     dialog.addEventListener('close',()=>{dialog.remove();this.dialog=null;},{once:true});
     this.studio.root.append(dialog); dialog.showModal(); title.focus();
   }

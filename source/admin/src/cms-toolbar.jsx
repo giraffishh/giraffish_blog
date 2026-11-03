@@ -1,16 +1,15 @@
 import React from 'react';
+import {saveIconPaths, savePresentation} from './studio-ui.js';
 import {createPortal} from 'react-dom';
 import {translate} from 'react-polyglot';
 import {EditorToolbar as NativeToolbar} from 'decap-cms-core/dist/esm/components/Editor/EditorToolbar';
 import {currentToolbar, subscribeToolbar, previewLinksEnabled, usesStudioEditor, editorLoadFailure} from './toolbar-bridge.js';
 
 const paths = {
+  ...saveIconPaths,
   exit:'M19 12H5m6-6-6 6 6 6',
-  saved:'m5 12 4 4L19 6',
   publish:'M12 16V3m-5 5 5-5 5 5M4 14v7h16v-7',
   status:'M9 6h11M9 12h11M9 18h11M3 6h1M3 12h1M3 18h1',
-  save:'M5 3h12l4 4v14H3V3h2m2 0v6h10V3M7 21v-8h10v8',
-  saving:'M20 12a8 8 0 1 1-8-8',
   delete:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7'
 };
 const icon = name => <svg className="studio-toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]}/></svg>;
@@ -77,8 +76,7 @@ export class StudioToolbar extends NativeToolbar {
   saveControl(native) {
     const {hasChanged, isPersisting, isNewEntry, hasWorkflow, onPersist} = this.props;
     const dirty = hasChanged || isNewEntry;
-    const state = isPersisting ? 'saving' : dirty ? 'dirty' : 'saved';
-    const label = isPersisting ? '保存中' : dirty ? '未保存' : '已保存';
+    const {state,label,icon:saveIcon} = savePresentation(dirty,isPersisting);
     const action = hasWorkflow ? '保存修改' : '保存并发布';
     const props = {
       className:'studio-save', 'data-save-state':state,
@@ -87,7 +85,7 @@ export class StudioToolbar extends NativeToolbar {
       'aria-keyshortcuts':'Control+s Meta+s',
       'aria-busy':Boolean(isPersisting),
       disabled:Boolean(isPersisting || (native ? native.props.disabled : !dirty)),
-      children:<>{icon(state === 'saved' ? 'saved' : state === 'saving' ? 'saving' : 'save')}<span className="studio-save-label">{label}</span></>
+      children:<>{icon(saveIcon)}<span className="studio-save-label">{label}</span></>
     };
     return native ? React.cloneElement(native, props) : <button type="button" {...props} onClick={onPersist}/>;
   }

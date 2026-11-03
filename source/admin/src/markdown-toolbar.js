@@ -1,6 +1,6 @@
 import {compactQuery} from './responsive-layout.js';
 
-import {button} from './studio-ui.js';
+import {button, element, saveIconPaths, savePresentation} from './studio-ui.js';
 
 // Presentation only: the tool entry owns documents, persistence and save state.
 export class MarkdownToolbar {
@@ -10,7 +10,13 @@ export class MarkdownToolbar {
     this.storageStatus = document.createElement('span');
     this.storageStatus.className = 'markdown-storage';
     this.storageStatus.setAttribute('role', 'status');
-    this.saveButton = button('保存', () => onSave(), 'markdown-save');
+    this.saveButton = button('', () => onSave(), 'markdown-save studio-save');
+    this.saveLabel = element('span','studio-save-label');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    for (const [key,value] of Object.entries({class:'studio-toolbar-icon',viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.7','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'})) svg.setAttribute(key,value);
+    this.savePath = document.createElementNS(svg.namespaceURI,'path');
+    svg.append(this.savePath); this.saveButton.append(svg,this.saveLabel);
+    this.saveButton.setAttribute('aria-keyshortcuts','Control+s Meta+s');
     this.saveButton.title = '保存（Ctrl / ⌘ + S）';
     this.newButton = button('新建', onNew);
     this.openButton = button('打开', () => onOpen());
@@ -55,12 +61,19 @@ export class MarkdownToolbar {
       actionsSlot.append(this.newButton, this.openButton, this.saveButton, this.copyButton);
     }
   }
-  update({name, dirty, busy, status, statusTitle}) {
+  update({name, dirty, unsaved = dirty, saving = false, busy, status, statusTitle}) {
     this.filename.textContent = name + (dirty ? ' •' : '');
     this.filename.title = name;
     document.title = (dirty ? '• ' : '') + name + ' · Markdown';
     this.storageStatus.textContent = status;
     this.storageStatus.title = statusTitle || '';
+    const {state,label,icon} = savePresentation(unsaved,saving);
+    this.saveButton.dataset.saveState = state;
+    this.saveLabel.textContent = label;
+    this.savePath.setAttribute('d',saveIconPaths[icon]);
+    this.saveButton.title = label + '（Ctrl / ⌘ + S）';
+    this.saveButton.setAttribute('aria-label',label === '未保存' ? '保存（未保存）' : label);
+    this.saveButton.setAttribute('aria-busy',String(saving));
     this.saveButton.disabled = busy;
   }
   chooseFile() { this.input.click(); }

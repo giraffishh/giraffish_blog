@@ -29,16 +29,16 @@
 .studio-editor-tools { margin-left:auto; }
 .studio-account-label, .writing-studio .studio-toolbar-more { display:none; }
 #nc-root .studio-unified-nav .studio-exit { border-radius:6px; display:inline-flex; align-items:center; gap:6px; flex:none; padding:4px 8px; height:var(--toolbar-control-height); min-height:var(--toolbar-control-height); border:0; background:transparent; color:inherit; font:var(--toolbar-font-size)/20px var(--studio-font); text-decoration:none; }
-#nc-root .studio-unified-nav :is([class*="ToolbarButton"],[class*="DropdownButton"],.studio-save) { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:var(--toolbar-control-height); min-height:var(--toolbar-control-height); margin:0; padding:4px 8px; border:0; border-radius:6px; background:transparent; color:var(--studio-ink); box-shadow:none; font:var(--toolbar-font-size)/20px var(--studio-font); white-space:nowrap; vertical-align:middle; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav :is([class*="ToolbarButton"],[class*="DropdownButton"],.studio-save) { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:var(--toolbar-control-height); min-height:var(--toolbar-control-height); margin:0; padding:4px 8px; border:0; border-radius:6px; background:transparent; color:var(--studio-ink); box-shadow:none; font:var(--toolbar-font-size)/20px var(--studio-font); white-space:nowrap; vertical-align:middle; }
 #nc-root .studio-unified-nav [class*="ToolbarDropdown"] { margin:0; flex:none; }
 #nc-root .studio-unified-nav [class*="DropdownButton"] { padding-right:26px; }
 #nc-root .studio-unified-nav [class*="DropdownButton"]::after { top:50%; right:8px; margin-top:0; transform:translateY(-50%); }
-#nc-root .studio-unified-nav .studio-save { min-width:76px; }
-#nc-root .studio-unified-nav .studio-save[data-save-state=dirty] { color:#886222; background:transparent; }
-#nc-root .studio-unified-nav .studio-save[data-save-state=saved] { color:#356b51; background:transparent; opacity:1; }
-#nc-root .studio-unified-nav .studio-save[data-save-state=saving] { color:#718178; background:transparent; }
-#nc-root .studio-unified-nav :is(.studio-exit,.studio-save,.studio-delete,[class*="DropdownButton"]):not(:disabled):hover { background:#eaf0e8; }
-#nc-root .studio-unified-nav .studio-save[data-save-state=dirty]:not(:disabled):hover { color:#785418; background:#fff5df; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save { min-width:76px; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save[data-save-state=dirty] { color:#886222; background:transparent; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save[data-save-state=saved] { color:#356b51; background:transparent; opacity:1; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save[data-save-state=saving] { color:#718178; background:transparent; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav :is(.studio-exit,.studio-save,.studio-delete,[class*="DropdownButton"]):not(:disabled):hover { background:#eaf0e8; }
+:is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save[data-save-state=dirty]:not(:disabled):hover { color:#785418; background:#fff5df; }
 .studio-toolbar-icon { display:block; width:16px; height:16px; flex:none; }
 .studio-save[data-save-state=saving] .studio-toolbar-icon { animation:studio-saving 900ms linear infinite; }
 @keyframes studio-saving { to { transform:rotate(360deg); } }
@@ -92,7 +92,7 @@
   #nc-root .studio-unified-nav .studio-exit { width:28px; min-width:28px; padding:0; justify-content:center; }
   .studio-unified-nav .studio-exit > span { display:none; }
   .studio-unified-nav .studio-actions-slot, .studio-unified-nav .studio-publication-controls { gap:6px; }
-  #nc-root .studio-unified-nav .studio-save { position:relative; width:var(--toolbar-control-height); min-width:var(--toolbar-control-height); padding:0; }
+  :is(#nc-root,.markdown-tool) .studio-unified-nav .studio-save { position:relative; width:var(--toolbar-control-height); min-width:var(--toolbar-control-height); padding:0; }
   .studio-unified-nav .studio-save-label { display:none; }
   .studio-unified-nav .studio-save[data-save-state=dirty]::after { content:''; position:absolute; top:4px; right:4px; width:4px; height:4px; border-radius:50%; background:#c49a52; }
   #nc-root .studio-unified-nav [class*="DropdownButton"] { padding-inline:8px 23px; }
@@ -129,9 +129,18 @@
 .studio-shortcut-help { width:min(540px,calc(100vw - 32px)); }
 .studio-shortcut-head { display:flex; align-items:center; gap:12px; }
 .studio-shortcut-head h2 { margin:0; flex:1; }
-.studio-shortcut-head select { max-width:150px; padding:5px; border:1px solid var(--studio-line); border-radius:5px; background:var(--studio-paper); color:inherit; font:inherit; }
-.studio-shortcut-note { color:var(--studio-muted); font-size:12px; }
 .studio-shortcut-help table { width:100%; border-collapse:collapse; }
 .studio-shortcut-help td { padding:7px 0; border-bottom:1px solid var(--studio-line); }
 .studio-shortcut-help td:last-child { text-align:right; }
 .studio-shortcut-help kbd { white-space:nowrap; padding:3px 6px; border:1px solid var(--studio-line); border-radius:4px; background:#f4f6f2; font:12px var(--studio-code-font); }
+
+.studio-shortcut-head { margin-bottom:16px; }
+.studio-shortcut-platform { position:relative; display:grid; grid-template-columns:1fr 1fr; flex:none; box-sizing:border-box; width:96px; height:28px; padding:2px; margin-left:auto; border:1px solid #e0e5ea; border-radius:8px; background:#f1f3f5; }
+.studio-shortcut-platform::before { content:''; position:absolute; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); border-radius:5px; background:#fff; box-shadow:0 1px 3px #00000012; transition:transform .16s ease; }
+.studio-shortcut-platform[data-platform=mac]::before { transform:translateX(100%); }
+.studio-shortcut-platform label { position:relative; margin:0; cursor:pointer; text-align:center; }
+.studio-shortcut-platform input { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip-path:inset(50%); }
+.studio-shortcut-platform label span { display:block; padding:2px 6px; font-size:12px; line-height:18px; color:#71808c; }
+.studio-shortcut-platform input:checked + span { color:#354555; font-weight:600; }
+.studio-shortcut-platform input:focus-visible + span { outline:2px solid currentColor; outline-offset:1px; border-radius:5px; }
+@media (prefers-reduced-motion:reduce) { .studio-shortcut-platform::before { transition:none; } }

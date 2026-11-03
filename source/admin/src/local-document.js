@@ -6,8 +6,8 @@ export function validateMarkdownFile(file) {
 }
 
 export class LocalDocument {
-  constructor({text = '', name = '未命名.md', base = text, handle = null} = {}) {
-    Object.assign(this, {text, name, base, handle, automatic:false, busy:false});
+  constructor({text = '', name = '未命名.md', base = text, handle = null, saved = Boolean(handle)} = {}) {
+    Object.assign(this, {text, name, base, handle, saved, automatic:false, busy:false});
   }
   get dirty() { return this.text !== this.base; }
   async restoreAssociation() {
@@ -17,7 +17,7 @@ export class LocalDocument {
     const text = await file.text();
     // Match Mindmap: restore by reading, never by writing an old cached draft.
     if (this.dirty && text !== this.text) return false;
-    Object.assign(this, {text, base:text, automatic:true});
+    Object.assign(this, {text, base:text, automatic:true, saved:true});
     return true;
   }
   async save(chosen = this.handle, copy = false) {
@@ -31,7 +31,7 @@ export class LocalDocument {
       if (same) await writeCheckedFile(chosen, this.base, snapshot);
       else await writeFileContent(chosen, snapshot);
       if (!copy || same) {
-        Object.assign(this, {handle:chosen, name:chosen.name, base:snapshot, automatic:true});
+        Object.assign(this, {handle:chosen, name:chosen.name, base:snapshot, automatic:true, saved:true});
       }
     } catch (error) {
       if (same) this.automatic = false;

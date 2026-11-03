@@ -222,6 +222,13 @@ for(const [language,code] of fences) {
   const plain=editor('正文§',false);assert.equal(previewNewline(plain),false);assert.equal(plain.state.doc.toString(),'正文');
   const exiting=editor('- 第一项\n- §');previewNewline(exiting);assert.ok(!exiting.state.doc.toString().endsWith('- '));
 }
+{
+  const {savePresentation,saveIconPaths} = await import('./src/studio-ui.js');
+  assert.deepEqual(savePresentation(true,false),{state:'dirty',label:'未保存',icon:'save'});
+  assert.deepEqual(savePresentation(false,false),{state:'saved',label:'已保存',icon:'saved'});
+  assert.deepEqual(savePresentation(true,true),{state:'saving',label:'保存中',icon:'saving'});
+  for (const icon of ['save','saved','saving']) assert.ok(saveIconPaths[icon]);
+}
 const url='https://example.com/a.webp';
 const images=collectArticleImages(`![A](${url})\n\n<img src="${url}"/>\n\n\`\`\`md\n![忽略](https://example.com/code.png)\n\`\`\``,{banner_img:url});
 assert.equal(images.length,1);
