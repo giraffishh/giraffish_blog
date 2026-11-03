@@ -227,3 +227,9 @@ body { background:#f4f6f2; }
 .writing-studio:not([data-pane-mode]) .studio-workspace::after { content:"正在加载正文…"; position:absolute; inset:0; display:grid; place-items:center; color:var(--studio-muted); font:14px/1.5 var(--studio-font); }
 
 .writing-studio:not([data-pane-mode]) .studio-workspace[data-initial-error]::after { content:"预览加载失败，可切换源码继续编辑"; }
+
+/* Allow the last line to reach the typing margin, including on small viewports.
+   Higher specificity keeps mobile/render-mode padding from removing this space. */
+.writing-studio .studio-source .cm-editor .cm-content {
+  padding-bottom:min(90px,calc(var(--admin-viewport-height,100vh) / 8));
+}

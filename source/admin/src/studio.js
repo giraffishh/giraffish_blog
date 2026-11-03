@@ -71,7 +71,10 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping, search({
+        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping,
+        // Keep typing comfortably above the footer instead of merely exposing the cursor.
+        EditorView.scrollMargins.of(view => ({bottom:Math.min(90, view.scrollDOM.clientHeight / 8)})),
+        search({
           top: true
         }), EditorState.phrases.of({
           'Find': '查找内容',
