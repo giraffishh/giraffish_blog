@@ -2,7 +2,7 @@ import { WritingStudio } from './studio.js';
 import {MarkdownToolbar} from './markdown-toolbar.js';
 import {button, initializeStudioUI} from './studio-ui.js';
 import { LocalDocument, validateMarkdownFile } from './local-document.js';
-import {createFileStore} from '../../tools/shared/local-files.mjs';
+import {createFileStore, hasFilePermission} from '../../tools/shared/local-files.mjs';
 import { downloadText } from './export-utils.js';
 import './studio.css';
 import './responsive.css';
@@ -22,7 +22,8 @@ const toolbar = new MarkdownToolbar({onNew:newDocument, onOpen:openFile, onSave:
 function updateStatus(message) {
   toolbar.update({
     name:current.name, dirty:current.dirty, busy:operation || current.busy,
-    status:storageWarning || (current.automatic ? '自动保存到原文件' : current.handle ? '文件已关联 · 点击保存以恢复自动保存' : '草稿')
+    status:storageWarning || (current.automatic ? '关联本地文件' : '草稿'),
+    statusTitle:storageWarning || (current.automatic ? '修改自动写回本地文件' : current.handle ? '点击保存尝试授权，或重新打开文件' : '草稿保存在此浏览器')
   });
   if (message) studio.notice(message);
 }
@@ -57,10 +58,6 @@ function showError(error) {
   updateStatus(message);
 }
 function confirmReplace() {
-  if (pendingRecovery) {
-    studio.notice('请先恢复或忽略上次草稿。');
-    return false;
-  }
   return !current.dirty || window.confirm('当前内容尚未保存到文件，确定放弃这些修改吗？');
 }
 function mount() {
@@ -84,6 +81,7 @@ function mount() {
 function newDocument() {
   if (operation || current.busy || !confirmReplace()) return;
   clearTimeout(saveTimer);
+  pendingRecovery = null;
   current = new LocalDocument();
   associationId = '';
   mount();
@@ -107,9 +105,11 @@ async function openFile(provided) {
     if (current.text !== replacingText && current.dirty && !window.confirm('替换当前尚未保存的内容？')) return;
     let automatic = false;
     if (handle) {
-      try { automatic = await handle.requestPermission({mode:'readwrite'}) === 'granted'; }
+      try { automatic = await hasFilePermission(handle, {request:!provided}); }
       catch { /* Read-only imports remain editable and can be saved explicitly. */ }
     }
+    // Keep the previous draft recoverable until selection and reading succeed.
+    pendingRecovery = null;
     current = new LocalDocument({text, name:file.name, handle});
     current.automatic = automatic;
     associationId = '';
@@ -138,7 +138,7 @@ async function save(copy = false, automatic = false) {
         return;
       }
       chosen = await window.showSaveFilePicker({id:'markdown-save', suggestedName:current.name.replace(/\.(md|markdown|txt)$/i, '') + (copy ? ' - 副本' : '') + '.md', types});
-    } else if (!automatic && await chosen.requestPermission({mode:'readwrite'}) !== 'granted') {
+    } else if (!automatic && !await hasFilePermission(chosen, {request:true})) {
       throw Object.assign(new Error('未获得写入权限'), {name:'NotAllowedError'});
     }
     await current.save(chosen, copy);
@@ -236,14 +236,20 @@ if (pendingRecovery) {
   studio.recovery.append(message, button('恢复草稿', async () => {
     if (operation || (current.dirty && !window.confirm('恢复草稿将替换当前内容，是否继续？'))) return;
     operation = true;
+    const restoringText = current.text;
     try {
       const handle = draft.associationId ? await store.load(draft.associationId).catch(() => null) : null;
-      current = new LocalDocument({...draft, handle});
+      const restored = new LocalDocument({...draft, handle});
+      let restoreError;
+      try { await restored.restoreAssociation(); } catch (error) { restoreError = error; }
+      if (current.text !== restoringText && current.dirty && !window.confirm('恢复草稿将替换当前内容，是否继续？')) return;
+      current = restored;
       associationId = handle ? draft.associationId : '';
       pendingRecovery = null;
       mount();
       rememberDraft();
-      updateStatus(handle ? '草稿已恢复，点击保存确认文件权限并恢复自动保存。' : '草稿已恢复');
+      if (restoreError) showError(restoreError);
+      else updateStatus('已恢复上次内容');
     } finally { operation = false; updateStatus(); }
   }), button('忽略草稿', () => {
     pendingRecovery = null;

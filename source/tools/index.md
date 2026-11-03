@@ -13,7 +13,7 @@ date: 2026-10-26 00:00:00
       </span>
       <div class="tool-info">
         <h2>Markdown</h2>
-        <p>在线编辑 & 实时渲染 Markdown</p>
+        <p>在线编辑 & 实时预览 Markdown</p>
       </div>
       <span class="tool-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" focusable="false"><path d="M6 18 18 6M6 6h12v12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </a>

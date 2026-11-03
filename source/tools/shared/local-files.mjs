@@ -1,3 +1,9 @@
+// Restoration and background work only query; permission prompts require a user action.
+export async function hasFilePermission(handle, {mode = 'readwrite', request = false} = {}) {
+  if (!handle) return false;
+  if (await handle.queryPermission?.({mode}) === 'granted') return true;
+  return request && await handle.requestPermission?.({mode}) === 'granted';
+}
 // Shared file I/O for Markdown and Mindmap; document state and UI stay in each app.
 export async function writeFileContent(handle, text) {
   let writer;

@@ -104,6 +104,124 @@ for(const [language,code] of fences) {
   }
   assert.match(markdown.render('**SimNorm: **正文'), /\*\*SimNorm: \*\*/);
 }
+// Crossing a rendered block must reveal it before native vertical navigation.
+{
+  const {livePreview, renderedBlocks, renderMode, editingBlock, moveRenderedLine} = await import('./src/live-preview.js');
+  const {EditorSelection} = await import('@codemirror/state');
+  for (const forward of [false,true]) for (const extend of [false,true]) for (const gap of ['\n','\n\n']) {
+    const doc = forward ? gap + '## Heading\n' : '## Heading' + gap;
+    const block = new DocumentAnalysis().analyze(doc).blocks[0];
+    const start = forward ? gap.length - 1 : doc.length - gap.length + 1;
+    const target = forward ? block.from : block.to;
+    const view = {
+      state:EditorState.create({doc, selection:{anchor:start}, extensions:[livePreview]}),
+      moveToLineBoundary:(range, direction) => {
+        const line = view.state.doc.lineAt(range.head);
+        return EditorSelection.cursor(direction ? line.to : line.from);
+      },
+      moveVertically:range => {
+        assert.equal(view.state.field(livePreview).decorations.size, 0, 'Target must be editable before native motion');
+        assert.equal(range.head, start, 'Native motion must start at the original cursor');
+        return EditorSelection.cursor(target);
+      },
+      dispatch:transaction => {
+        view.state = (transaction.state ? transaction : view.state.update(transaction)).state;
+      }
+    };
+    view.dispatch({effects:[renderedBlocks.of([block]),renderMode.of(true),editingBlock.of(true)]});
+    assert.equal(view.state.field(livePreview).decorations.size, 1);
+    assert.equal(moveRenderedLine(view, forward, extend), true);
+    assert.equal(view.state.selection.main.head, target);
+    assert.equal(view.state.selection.main.anchor, extend ? start : target);
+    assert.equal(view.state.doc.toString(), doc);
+    assert.equal(view.state.field(livePreview).revealed.length, 0);
+    assert.equal(view.state.field(livePreview).decorations.size, 0);
+    view.dispatch({effects:renderMode.of(false)});
+    assert.equal(moveRenderedLine(view, forward), false);
+  }
+  // A wrapped visual row still belongs to normal CodeMirror navigation.
+  const doc = '## Heading\nlong wrapped source';
+  let state = EditorState.create({doc, selection:{anchor:doc.length}, extensions:[livePreview]});
+  state = state.update({effects:[renderedBlocks.of(new DocumentAnalysis().analyze(doc).blocks),renderMode.of(true),editingBlock.of(true)]}).state;
+  const wrapped = {state, moveToLineBoundary:() => EditorSelection.cursor(doc.length - 3), dispatch:() => assert.fail('Do not intercept wrapped-row motion')};
+  assert.equal(moveRenderedLine(wrapped, false), false);
+}
+// Shared formatting commands: toggles, selection/caret placement and undo in both modes.
+{
+  const {formatMarkdown,markdownShortcuts} = await import('./src/markdown-shortcuts.js');
+  const {history,undo,redo} = await import('@codemirror/commands');
+  const {EditorSelection} = await import('@codemirror/state');
+  const {livePreview,renderMode,renderedBlocks} = await import('./src/live-preview.js');
+  function editor(doc, from=0, to=doc.length, render=false) {
+    const view={state:EditorState.create({doc,selection:{anchor:from,head:to},extensions:[history(),livePreview]}),
+      dispatch:tr=>{view.state=(tr.state ? tr : view.state.update(tr)).state;}};
+    view.dispatch({effects:[renderedBlocks.of(new DocumentAnalysis().analyze(doc).blocks),renderMode.of(render)]});
+    return view;
+  }
+  for (const render of [false,true]) {
+    for (const [kind,wrapped] of [['bold','**文字**'],['italic','*文字*'],['underline','<u>文字</u>'],['strike','~~文字~~'],['code','`文字`']]) {
+      const view=editor('文字',0,2,render);
+      assert.equal(formatMarkdown(view,kind),true);
+      assert.equal(view.state.doc.toString(),wrapped);
+      assert.equal(view.state.sliceDoc(view.state.selection.main.from,view.state.selection.main.to),'文字');
+      if(render) assert.equal(view.state.field(livePreview).decorations.size,0);
+      formatMarkdown(view,kind); assert.equal(view.state.doc.toString(),'文字');
+      undo(view); assert.equal(view.state.doc.toString(),wrapped);
+      undo(view); assert.equal(view.state.doc.toString(),'文字');
+      redo(view); assert.equal(view.state.doc.toString(),wrapped);
+    }
+    const empty=editor('',0,0,render);formatMarkdown(empty,'bold');
+    assert.equal(empty.state.doc.toString(),'****'); assert.equal(empty.state.selection.main.head,2);
+  }
+  const spaced=editor(' text ');formatMarkdown(spaced,'bold');assert.equal(spaced.state.doc.toString(),' **text** ');
+  const url=editor('标题');formatMarkdown(url,'link');assert.equal(url.state.doc.toString(),'[标题](https://)');
+  assert.equal(url.state.sliceDoc(url.state.selection.main.from,url.state.selection.main.to),'https://');
+  const quote=editor('第一行\n第二行\n第三行',0,8);formatMarkdown(quote,'quote');
+  assert.equal(quote.state.doc.toString(),'> 第一行\n> 第二行\n第三行');
+  formatMarkdown(quote,'quote');assert.equal(quote.state.doc.toString(),'第一行\n第二行\n第三行');
+  const heading=editor('## 原标题');formatMarkdown(heading,'heading3');assert.equal(heading.state.doc.toString(),'### 原标题');
+  formatMarkdown(heading,'heading0');assert.equal(heading.state.doc.toString(),'原标题');
+  const list=editor('a\nb');formatMarkdown(list,'ordered');assert.equal(list.state.doc.toString(),'1. a\n2. b');
+  formatMarkdown(list,'unordered');assert.equal(list.state.doc.toString(),'- a\n- b');
+  const fence=editor('a\n```\nb');formatMarkdown(fence,'fence');assert.match(fence.state.doc.toString(),/^````\na\n```\nb\n````$/);
+  // Enable multiple selections explicitly; ordinary editor defaults keep one selection.
+  const multiple={state:EditorState.create({doc:'a b',extensions:[EditorState.allowMultipleSelections.of(true)],selection:EditorSelection.create([EditorSelection.range(0,1),EditorSelection.range(2,3)])}),dispatch:tr=>{multiple.state=tr.state;}};
+  formatMarkdown(multiple,'bold');assert.equal(multiple.state.doc.toString(),'**a** **b**');
+  const tick=editor('a`');formatMarkdown(tick,'code');assert.ok(markdown.render(tick.state.doc.toString()).includes('<code>a`</code>'));
+  const locked={state:EditorState.create({doc:'locked',extensions:[EditorState.readOnly.of(true)]}),dispatch:()=>assert.fail('read-only')};
+  assert.equal(formatMarkdown(locked,'bold'),false);
+  assert.equal(new Set(markdownShortcuts.map(s=>s[0])).size,markdownShortcuts.length);
+}
+// Preview Enter creates paragraphs, but preserves literal blocks and list continuation.
+{
+  const {previewNewline,livePreview,renderMode} = await import('./src/live-preview.js');
+  const {history,undo} = await import('@codemirror/commands');
+  const cases = [
+    ['正文§','正文\n\n'], ['前§后','前\n\n后'], ['## 标题§','## 标题\n\n'],
+    ['正文\n\n§','正文\n\n\n'], ['§','\n'],
+    ['- 第一项§','- 第一项\n- '], ['1. 第一项§','1. 第一项\n2. '],
+    ['> 引用§','> 引用\n> '],
+    ['```js\nvalue§\n```','```js\nvalue\n\n```'],
+    ['$$\nx_t=1§\n$$','$$\nx_t=1\n\n$$'],
+    ['\\[\nx_t=1§\n\\]','\\[\nx_t=1\n\n\\]'],
+    ['$$\nx=1\n$$§','$$\nx=1\n$$\n\n'],
+    ['```\n$$\n```\n\n正文§','```\n$$\n```\n\n正文\n\n']
+  ];
+  function editor(marked, enabled=true) {
+    const pos=marked.indexOf('§'), doc=marked.replace('§','');
+    const view={state:EditorState.create({doc,selection:{anchor:pos},extensions:[sourceMarkdown(),livePreview,history()]}),dispatch:tr=>{view.state=(tr.state?tr:view.state.update(tr)).state;}};
+    view.dispatch({effects:renderMode.of(enabled)}); return view;
+  }
+  for (const [marked,expected] of cases) {
+    const view=editor(marked);
+    assert.equal(previewNewline(view),true,marked);
+    assert.equal(view.state.doc.toString(),expected,marked);
+    undo(view);assert.equal(view.state.doc.toString(),marked.replace('§',''));
+  }
+  const soft=editor('前§后'); previewNewline(soft,true);assert.equal(soft.state.doc.toString(),'前\n后');
+  const plain=editor('正文§',false);assert.equal(previewNewline(plain),false);assert.equal(plain.state.doc.toString(),'正文');
+  const exiting=editor('- 第一项\n- §');previewNewline(exiting);assert.ok(!exiting.state.doc.toString().endsWith('- '));
+}
 const url='https://example.com/a.webp';
 const images=collectArticleImages(`![A](${url})\n\n<img src="${url}"/>\n\n\`\`\`md\n![忽略](https://example.com/code.png)\n\`\`\``,{banner_img:url});
 assert.equal(images.length,1);

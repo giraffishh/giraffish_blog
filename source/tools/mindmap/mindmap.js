@@ -1,4 +1,4 @@
-import {createFileStore, writeFileContent, writeCheckedFile} from '../shared/local-files.mjs?v=9a86a1cd5b0b';
+import {createFileStore, writeFileContent, writeCheckedFile, hasFilePermission} from '../shared/local-files.mjs?v=1e4910b827ca';
 
 /* 界面与交互入口。依赖 mindmap-core.js；内部组件仅在本文件使用。 */
 (() => {
@@ -707,7 +707,7 @@ import {createFileStore, writeFileContent, writeCheckedFile} from '../shared/loc
       }
       pendingHandle = chosen;
       if (pendingReason !== 'missing') pendingReason = 'permission';
-      if ((await chosen.queryPermission({ mode: touchMode ? 'read' : 'readwrite' })) === 'granted')
+      if (await hasFilePermission(chosen, {mode:touchMode ? 'read' : 'readwrite'}))
         await readAssociatedFile(chosen);
     } catch (error) {
       suspendFile(error, pendingHandle);
@@ -721,7 +721,7 @@ import {createFileStore, writeFileContent, writeCheckedFile} from '../shared/loc
     const chosen = pendingHandle;
     try {
       if (
-        (await chosen.requestPermission({ mode: touchMode ? 'read' : 'readwrite' })) !== 'granted'
+        !await hasFilePermission(chosen, {mode:touchMode ? 'read' : 'readwrite', request:true})
       ) {
         suspendFile({ name: 'NotAllowedError' }, chosen);
         rememberDraft();
@@ -1528,7 +1528,7 @@ import {createFileStore, writeFileContent, writeCheckedFile} from '../shared/loc
       let writable = false;
       if (chosen && !touchMode) {
         try {
-          writable = (await chosen.queryPermission({ mode: 'readwrite' })) === 'granted';
+          writable = await hasFilePermission(chosen);
         } catch {}
       }
       await loadSource(

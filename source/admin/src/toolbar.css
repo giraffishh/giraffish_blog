@@ -123,3 +123,15 @@
 .studio-editor-loading-status p { margin:0; }
 .studio-editor-loading-status button { border:1px solid var(--studio-line); border-radius:6px; padding:8px 16px; background:transparent; color:var(--studio-green); font:inherit; cursor:pointer; }
 #nc-root:has(.studio-editor-loading) :is([class*="ControlPaneContainer"],[class*="PreviewPaneContainer"]) { visibility:hidden; }
+
+.studio-unified-nav { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto; }
+.writing-studio .studio-shortcuts-toggle { grid-column:4; grid-row:1; width:30px; height:30px; padding:0; border:0; border-radius:50%; color:var(--studio-muted); font:600 16px/30px var(--studio-font); }
+.studio-shortcut-help { width:min(540px,calc(100vw - 32px)); }
+.studio-shortcut-head { display:flex; align-items:center; gap:12px; }
+.studio-shortcut-head h2 { margin:0; flex:1; }
+.studio-shortcut-head select { max-width:150px; padding:5px; border:1px solid var(--studio-line); border-radius:5px; background:var(--studio-paper); color:inherit; font:inherit; }
+.studio-shortcut-note { color:var(--studio-muted); font-size:12px; }
+.studio-shortcut-help table { width:100%; border-collapse:collapse; }
+.studio-shortcut-help td { padding:7px 0; border-bottom:1px solid var(--studio-line); }
+.studio-shortcut-help td:last-child { text-align:right; }
+.studio-shortcut-help kbd { white-space:nowrap; padding:3px 6px; border:1px solid var(--studio-line); border-radius:4px; background:#f4f6f2; font:12px var(--studio-code-font); }

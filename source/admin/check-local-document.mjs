@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {LocalDocument, validateMarkdownFile} from './src/local-document.js';
-import {writeCheckedFile, writeFileContent, createFileStore} from '../tools/shared/local-files.mjs';
+import {writeCheckedFile, writeFileContent, createFileStore, hasFilePermission} from '../tools/shared/local-files.mjs';
 
 function file(name, text) {
   return {
@@ -79,3 +79,113 @@ await assert.rejects(() => writeFileContent({createWritable:async () => ({
 assert.equal(aborted, true);
 await assert.rejects(() => createFileStore(undefined, 'test').load('id'), /无法保存文件关联/);
 console.log('Local Markdown file checks passed: save, conflict, copies, failed writes and concurrent edits.');
+
+// Exercise the actual tool controller with an outstanding recovery prompt.
+{
+  const {readFile} = await import('node:fs/promises');
+  const {runInNewContext} = await import('node:vm');
+  const source = await readFile(new URL('./src/markdown-tool.js', import.meta.url), 'utf8');
+  const controller = source.slice(source.indexOf('initializeStudioUI();'));
+  const oldDraft = JSON.stringify({version:1,text:'old draft',base:'',name:'note.md',time:1});
+  function setup(picker, handle = null, draft = oldDraft) {
+    const app = {stored:draft, selected:0, buttons:new Map()};
+    const node = () => ({append(){},replaceChildren(){},remove(){},classList:{add(){},remove(){}}});
+    const window = {indexedDB:null,confirm:() => true,addEventListener(){}};
+    app.window = window;
+    if (picker) window.showOpenFilePicker = picker;
+    runInNewContext(controller, {
+      window, document:{getElementById:node,createElement:node,addEventListener(){}},
+      LocalDocument, validateMarkdownFile, hasFilePermission, initializeStudioUI(){},
+      createFileStore:() => ({save:async()=>{},load:async()=>handle}),
+      button:(label,action) => {app.buttons.set(label,action);return {label,action};},
+      WritingStudio:class {
+        constructor(root,options) { this.recovery=node(); this.notice=()=>{}; this.destroy=()=>{}; app.editor=options; }
+      },
+      MarkdownToolbar:class {
+        constructor(actions) {app.actions=actions;}
+        update(status) {app.status=status;}
+        mount() {}
+        chooseFile() {app.selected++;}
+      },
+      localStorage:{getItem:() => app.stored,setItem:(key,value) => {app.stored=value;}},
+      setTimeout:()=>1,clearTimeout(){},setInterval(){},crypto:{randomUUID:()=> 'test'},downloadText(){}
+    });
+    return app;
+  }
+  const imported = {name:'new.md',size:10,text:async()=> '# new file'};
+  const cancelled = setup(async()=> {throw Object.assign(Error('cancel'),{name:'AbortError'});});
+  await cancelled.actions.onOpen();
+  assert.equal(cancelled.stored, oldDraft);
+  assert.equal(cancelled.editor.value, '');
+  const failed = setup();
+  await failed.actions.onOpen({file:{...imported,text:async()=>{throw Error('read failed');}}});
+  assert.equal(failed.stored, oldDraft);
+  const fallback = setup();
+  await fallback.actions.onOpen();
+  assert.equal(fallback.selected, 1);
+  assert.equal(fallback.stored, oldDraft);
+  await fallback.actions.onOpen({file:imported});
+  assert.equal(fallback.editor.value, '# new file');
+  assert.equal(JSON.parse(fallback.stored).name, 'new.md');
+  const native = setup(async()=> [{getFile:async()=>imported,requestPermission:async()=> 'denied'}]);
+  await native.actions.onOpen();
+  assert.equal(native.editor.value, '# new file');
+  assert.equal(JSON.parse(native.stored).text, '# new file');
+  assert.equal(native.status.busy, false);
+  const dirty = setup();
+  dirty.editor.onChange('new unsaved edits');
+  dirty.window.confirm = () => false;
+  await dirty.actions.onOpen({file:imported});
+  assert.equal(dirty.status.dirty, true);
+  assert.equal(dirty.stored, oldDraft);
+  // Edits made while reading still require confirmation before replacement.
+  const reading = setup();
+  let finishRead;
+  const opening = reading.actions.onOpen({file:{...imported,text:()=>new Promise(resolve=>{finishRead=resolve;})}});
+  reading.editor.onChange('typed while loading');
+  reading.window.confirm = () => false;
+  finishRead('# new file');
+  await opening;
+  assert.equal(reading.status.dirty, true);
+  assert.equal(reading.stored, oldDraft);
+  for (const permission of ['granted','prompt']) {
+    const recovery = setup(null, {queryPermission:async()=>permission,getFile:async()=>({name:'note.md',size:7,text:async()=> 'current'})}, JSON.stringify({version:1,text:'cached',base:'cached',name:'note.md',associationId:'test',time:1}));
+    await recovery.buttons.get('恢复草稿')();
+    assert.equal(recovery.editor.value,permission==='granted' ? 'current' : 'cached');
+    assert.equal(recovery.status.status,permission==='granted' ? '关联本地文件' : '草稿');
+  }
+  const creating = setup();
+  creating.actions.onNew();
+  assert.equal(JSON.parse(creating.stored).text, '');
+}
+// Restore like Mindmap: silent permission check, read current file, no cached writes.
+{
+  let prompts = 0, writes = 0, disk = 'disk current', permission = 'granted';
+  const handle = {
+    name:'note.md', queryPermission:async()=>permission,
+    requestPermission:async()=>{prompts++;return 'granted';},
+    getFile:async()=>({name:'note.md',size:disk.length,text:async()=>disk}),
+    createWritable:async()=>{writes++;throw Error('Restore must not write');}
+  };
+  const clean = new LocalDocument({text:'old disk',handle});
+  assert.equal(await clean.restoreAssociation(),true);
+  assert.equal(clean.text,disk);assert.equal(clean.base,disk);assert.equal(clean.automatic,true);
+  const changed = new LocalDocument({text:'unsaved draft',base:'old disk',handle});
+  assert.equal(await changed.restoreAssociation(),false);
+  assert.equal(changed.text,'unsaved draft');assert.equal(changed.automatic,false);
+  disk='unsaved draft';
+  assert.equal(await changed.restoreAssociation(),true);assert.equal(changed.dirty,false);
+  for (permission of ['prompt','denied']) {
+    const paused = new LocalDocument({text:'cached',handle});
+    assert.equal(await paused.restoreAssociation(),false);
+    assert.equal(paused.text,'cached');assert.equal(paused.automatic,false);
+  }
+  assert.equal(prompts,0);assert.equal(writes,0);
+  assert.equal(await hasFilePermission(handle,{request:true}),true);assert.equal(prompts,1);
+  permission='granted';
+  assert.equal(await hasFilePermission(handle,{request:true}),true);assert.equal(prompts,1);
+  assert.equal(await hasFilePermission(null),false);
+  const missing = new LocalDocument({text:'keep',handle:{...handle,getFile:async()=>{throw Object.assign(Error('missing'),{name:'NotFoundError'});}}});
+  await assert.rejects(()=>missing.restoreAssociation(),{name:'NotFoundError'});
+  assert.equal(missing.text,'keep');assert.equal(missing.automatic,false);
+}

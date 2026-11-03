@@ -1,4 +1,4 @@
-import {writeFileContent, writeCheckedFile} from '../../tools/shared/local-files.mjs';
+import {writeFileContent, writeCheckedFile, hasFilePermission} from '../../tools/shared/local-files.mjs';
 
 export function validateMarkdownFile(file) {
   if (!/\.(md|markdown|txt)$/i.test(file.name)) throw new Error('请选择 .md、.markdown 或 .txt 文件。');
@@ -10,6 +10,16 @@ export class LocalDocument {
     Object.assign(this, {text, name, base, handle, automatic:false, busy:false});
   }
   get dirty() { return this.text !== this.base; }
+  async restoreAssociation() {
+    if (!await hasFilePermission(this.handle)) return false;
+    const file = await this.handle.getFile();
+    validateMarkdownFile(file);
+    const text = await file.text();
+    // Match Mindmap: restore by reading, never by writing an old cached draft.
+    if (this.dirty && text !== this.text) return false;
+    Object.assign(this, {text, base:text, automatic:true});
+    return true;
+  }
   async save(chosen = this.handle, copy = false) {
     if (this.busy) throw new Error('正在保存，请稍候。');
     if (!chosen) throw new Error('请先选择保存位置。');

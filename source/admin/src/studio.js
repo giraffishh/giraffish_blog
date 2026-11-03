@@ -8,7 +8,7 @@ import {EditorBackup, preference, storePreference} from './studio-storage.js';
 import {element as el, button, compactAction} from './studio-ui.js';
 import {DocumentExport} from './document-export.js';
 import { templates } from './templates.js';
-import { livePreview, liveFocus, renderedBlocks } from './live-preview.js';
+import { livePreview, liveFocus, liveNavigation, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
 import {clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST, LayoutMotion, reducedMotion} from './layout-utils.js';
@@ -18,6 +18,7 @@ import {createImageThumbnail, imagePreviewUrl, reloadDocumentImages} from './ima
 import { MetadataDock } from './metadata-dock.js';
 import { PaneLayout } from './pane-layout.js';
 import { compactQuery, ResponsiveEditorLayout } from './responsive-layout.js';
+import {MarkdownShortcuts} from './markdown-shortcuts.js';
 import { DocumentRenderer } from './analysis-client.js';
 import { attachToolbar } from './toolbar-bridge.js';
 import { ToolbarMenus } from './toolbar-menus.js';
@@ -59,6 +60,7 @@ export class WritingStudio {
     this.compact = window.matchMedia(compactQuery).matches;
     this.desktopSidebarOpen = preference('sidebar-open', 'true') === 'true';
     if (cmsToolbar) activeStudios.add(this);
+    this.shortcuts = new MarkdownShortcuts(this, !cmsToolbar);
     this.build();
     this.exports = new DocumentExport({
       root, snapshot:() => this.exportSnapshot(), notice:message => this.notice(message), signal:this.abort.signal
@@ -69,7 +71,7 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [basicSetup, livePreview, liveFocus, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping, search({
+        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping, search({
           top: true
         }), EditorState.phrases.of({
           'Find': '查找内容',
@@ -146,7 +148,7 @@ export class WritingStudio {
     const modes = el('div', 'studio-modes');
     modes.setAttribute('aria-label', '编辑模式');
     this.modeButtons = {};
-    for (const [mode, label] of [['source', '源码'], ['split', '分屏'], ['render', '渲染']]) {
+    for (const [mode, label] of [['source', '源码'], ['split', '分屏'], ['render', '预览']]) {
       const item = button(label, () => { if (this.compact) this.toggleSidebar(false); this.setMode(mode); });
       compactAction(item, mode);
       item.setAttribute('aria-pressed', 'false');
@@ -171,7 +173,10 @@ export class WritingStudio {
     const leading = el('div', 'studio-toolbar-leading');
     this.leadingActionsSlot = el('div', 'studio-extra-actions');
     leading.append(this.exitSlot, this.actionsSlot, this.leadingActionsSlot);
-    nav.append(leading, modes, this.toolbarMore, this.toolbarTools);
+    const help = button('?', () => this.shortcuts.open(), 'studio-shortcuts-toggle');
+    help.setAttribute('aria-label', '快捷键说明');
+    help.title = '快捷键（F1）';
+    nav.append(leading, modes, this.toolbarMore, this.toolbarTools, help);
     tools.addEventListener('click', () => this.toggleToolbarTools(false));
     document.addEventListener('pointerdown', event => {
       if (!this.toolbarTools.contains(event.target) && !this.toolbarMore.contains(event.target)) this.toggleToolbarTools(false);
@@ -333,7 +338,7 @@ export class WritingStudio {
     this.divider.setAttribute('aria-orientation', this.compact ? 'horizontal' : 'vertical');
     this.divider.setAttribute('aria-label', this.compact ? '拖动调整源码和预览高度' : '拖动调整源码和预览宽度');
     this.divider.setAttribute('aria-valuenow', String(Math.round(value)));
-    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? `渲染，向${before}拖动展开源码` : this.mode === 'source' ? `源码，向${after}拖动展开预览` : '预览 ' + Math.round(preview) + '%，源码 ' + Math.round(100 - preview) + '%');
+    this.divider.setAttribute('aria-valuetext', this.mode === 'render' ? `预览，向${before}拖动展开源码` : this.mode === 'source' ? `源码，向${after}拖动展开预览` : '预览 ' + Math.round(preview) + '%，源码 ' + Math.round(100 - preview) + '%');
     this.divider.title = this.mode === 'split' ? `拖动调整${this.compact ? '高度' : '宽度'}，拖到边缘切换单栏` : this.mode === 'source' ? `向${after}拖动展开预览` : `向${before}拖动展开源码`;
   }
   swapPanes() {
@@ -707,6 +712,7 @@ export class WritingStudio {
   destroy() {
     this.backup?.destroy();
     this.exports.destroy();
+    this.shortcuts.destroy();
     this.destroyed = true;
     this.toolbarMenus?.destroy();
     this.detachToolbar?.();

@@ -55,11 +55,12 @@ export class MarkdownToolbar {
       actionsSlot.append(this.newButton, this.openButton, this.saveButton, this.copyButton);
     }
   }
-  update({name, dirty, busy, status}) {
+  update({name, dirty, busy, status, statusTitle}) {
     this.filename.textContent = name + (dirty ? ' •' : '');
     this.filename.title = name;
     document.title = (dirty ? '• ' : '') + name + ' · Markdown';
     this.storageStatus.textContent = status;
+    this.storageStatus.title = statusTitle || '';
     this.saveButton.disabled = busy;
   }
   chooseFile() { this.input.click(); }
