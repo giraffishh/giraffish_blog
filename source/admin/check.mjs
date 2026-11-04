@@ -188,6 +188,8 @@ for(const [language,code] of fences) {
   const multiple={state:EditorState.create({doc:'a b',extensions:[EditorState.allowMultipleSelections.of(true)],selection:EditorSelection.create([EditorSelection.range(0,1),EditorSelection.range(2,3)])}),dispatch:tr=>{multiple.state=tr.state;}};
   formatMarkdown(multiple,'bold');assert.equal(multiple.state.doc.toString(),'**a** **b**');
   const tick=editor('a`');formatMarkdown(tick,'code');assert.ok(markdown.render(tick.state.doc.toString()).includes('<code>a`</code>'));
+  formatMarkdown(tick,'code');assert.equal(tick.state.doc.toString(),'a`');
+  const bracketed=editor('标题 [A]');formatMarkdown(bracketed,'link');assert.ok(bracketed.state.doc.toString().includes('\\[A\\]'));
   const locked={state:EditorState.create({doc:'locked',extensions:[EditorState.readOnly.of(true)]}),dispatch:()=>assert.fail('read-only')};
   assert.equal(formatMarkdown(locked,'bold'),false);
   assert.equal(new Set(markdownShortcuts.map(s=>s[0])).size,markdownShortcuts.length);
@@ -228,6 +230,56 @@ for(const [language,code] of fences) {
   assert.deepEqual(savePresentation(false,false),{state:'saved',label:'已保存',icon:'saved'});
   assert.deepEqual(savePresentation(true,true),{state:'saving',label:'保存中',icon:'saving'});
   for (const icon of ['save','saved','saving']) assert.ok(saveIconPaths[icon]);
+}
+// Quote containers survive multi-line paste, list formatting, and math Enter.
+{
+  const {quotedPaste,previewNewline,livePreview,renderMode} = await import('./src/live-preview.js');
+  const {formatMarkdown} = await import('./src/markdown-shortcuts.js');
+  const create = (doc,position=doc.length) => EditorState.create({doc,selection:{anchor:position},extensions:[sourceMarkdown(),livePreview]});
+  const math = '$$\n\\begin{aligned}\nx&=1\\\\\n\ny&=2\n\\end{aligned}\n$$';
+  const quoted = '> '+quotedPaste(math,create('> '));
+  assert.equal(quoted,math.split('\n').map(line=>'> '+line).join('\n'));
+  const html = markdown.render(quoted+'\n\n后文');
+  assert.ok(!html.includes('katex-error'));
+  assert.match(html,/<blockquote>[\s\S]*class="katex-display"[\s\S]*<\/blockquote>\s*<p>后文<\/p>/);
+  const lists = '> '+quotedPaste('- 一\n- 二\n\n1. 三\n2. 四',create('> '));
+  assert.match(markdown.render(lists),/<blockquote>[\s\S]*<ul>[\s\S]*<ol>[\s\S]*<\/blockquote>/);
+  assert.equal(quotedPaste('> 一\n> 二',create('> ')),'一\n> 二');
+  assert.equal(quotedPaste('a\nb',create('> > ')),'a\n> > b');
+  assert.equal(quotedPaste('$$\nx=1\n$$',create('> - ')),'$$\n>   x=1\n>   $$');
+  assert.equal(quotedPaste('$$\nx=1\n$$',create('> 说明')),'\n> \n> $$\n> x=1\n> $$');
+  assert.equal(quotedPaste('a\nb',create('> ```\n> code')),'a\nb');
+  assert.equal(quotedPaste('a\nb',create('正文')),'a\nb');
+  for (const enabled of [false,true]) {
+    const view={state:create('> 第一行\n> 第二行'),dispatch:tr=>{view.state=(tr.state?tr:view.state.update(tr)).state;}};
+    view.dispatch({selection:{anchor:2,head:view.state.doc.length},effects:renderMode.of(enabled)});
+    formatMarkdown(view,'ordered');assert.equal(view.state.doc.toString(),'> 1. 第一行\n> 2. 第二行');
+    formatMarkdown(view,'unordered');assert.equal(view.state.doc.toString(),'> - 第一行\n> - 第二行');
+    formatMarkdown(view,'unordered');assert.equal(view.state.doc.toString(),'> 第一行\n> 第二行');
+    for (const [text,expected] of [['> $$\n> x=1','> $$\n> x=1\n> '],['> - $$','> - $$\n>   '],['> $$\n> ','> $$\n> \n> '],['> > $$\n> > x','> > $$\n> > x\n> > ']]) {
+      view.state=create(text);view.dispatch({effects:renderMode.of(enabled)});
+      assert.equal(previewNewline(view),true);
+      assert.equal(view.state.doc.toString(),expected);
+    }
+    for (const kind of ['math','fence']) {
+      view.state=create('> x=1\n> y=2');
+      view.dispatch({selection:{anchor:2,head:view.state.doc.length}});
+      formatMarkdown(view,kind);
+      const delimiter=kind==='math' ? '$$' : '```';
+      assert.equal(view.state.doc.toString(),`> ${delimiter}\n> x=1\n> y=2\n> ${delimiter}`);
+      const rendered=markdown.render(view.state.doc.toString());
+      assert.ok(!rendered.includes('katex-error'));
+      assert.ok(rendered.startsWith('<blockquote>'));
+    }
+    view.state=create('> - 引用内文本');view.dispatch({effects:renderMode.of(enabled)});
+    assert.equal(previewNewline(view,true),true);assert.equal(view.state.doc.toString(),'> - 引用内文本\n>   ');
+    if (enabled) {
+      for (const [text,expected] of [['> - 一','> - 一\n> - '],['> 1. 一','> 1. 一\n> 2. '],['> $$\n> x\n\n外部','> $$\n> x\n\n外部\n\n']]) {
+        view.state=create(text);view.dispatch({effects:renderMode.of(true)});previewNewline(view);
+        assert.equal(view.state.doc.toString(),expected);
+      }
+    }
+  }
 }
 const url='https://example.com/a.webp';
 const images=collectArticleImages(`![A](${url})\n\n<img src="${url}"/>\n\n\`\`\`md\n![忽略](https://example.com/code.png)\n\`\`\``,{banner_img:url});

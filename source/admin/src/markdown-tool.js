@@ -101,13 +101,13 @@ async function openFile(provided) {
     if (handle) file = await handle.getFile();
     validateMarkdownFile(file);
     const text = await file.text();
-    // Reading the chosen file may take time; recheck edits made while it loaded.
-    if (current.text !== replacingText && current.dirty && !window.confirm('替换当前尚未保存的内容？')) return;
+    // Reading and requesting permission may both outlive edits in the current document.
     let automatic = false;
     if (handle) {
       try { automatic = await hasFilePermission(handle, {request:!provided}); }
       catch { /* Read-only imports remain editable and can be saved explicitly. */ }
     }
+    if (current.text !== replacingText && current.dirty && !window.confirm('替换当前尚未保存的内容？')) return;
     // Keep the previous draft recoverable until selection and reading succeed.
     pendingRecovery = null;
     current = new LocalDocument({text, name:file.name, handle, saved:true});
@@ -122,7 +122,7 @@ async function openFile(provided) {
 }
 
 async function save(copy = false, automatic = false) {
-  if (operation || current.busy || pendingRecovery) return;
+  if (operation || current.busy || (automatic && pendingRecovery)) return;
   if (automatic && (!current.automatic || !current.dirty)) return;
   operation = true;
   clearTimeout(saveTimer);
@@ -133,7 +133,7 @@ async function save(copy = false, automatic = false) {
     if (copy || !chosen) {
       if (!window.showSaveFilePicker) {
         downloadText(current.text, 'text/markdown;charset=utf-8', current.name.replace(/\.(md|markdown|txt)$/i, '') + (copy ? ' - 副本' : '') + '.md');
-        if (!copy) { current.base = current.text; current.saved = true; }
+        if (!copy) { current.base = current.text; current.saved = true; pendingRecovery = null; studio.recovery.hidden = true; }
         rememberDraft();
         updateStatus('已下载副本 · 当前浏览器不支持关联本地文件');
         return;
@@ -143,6 +143,7 @@ async function save(copy = false, automatic = false) {
       throw Object.assign(new Error('未获得写入权限'), {name:'NotAllowedError'});
     }
     await current.save(chosen, copy);
+    if (!copy) { pendingRecovery = null; studio.recovery.hidden = true; }
     await rememberAssociation();
     rememberDraft();
     updateStatus(copy ? '已另存为副本' : '已保存');
@@ -180,9 +181,9 @@ window.addEventListener('drop', async event => {
   await openFile({file:files[0], handle:handle?.kind === 'file' ? handle : null});
 }, {capture:true});
 window.addEventListener('keydown', event => {
-  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-  if (event.key.toLowerCase() === 's') { event.preventDefault(); save(event.shiftKey); }
-  if (event.key.toLowerCase() === 'o') { event.preventDefault(); openFile(); }
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.isComposing || root.querySelector('dialog[open]')) return;
+  if (event.key.toLowerCase() === 's') { event.preventDefault(); if (!event.repeat) save(event.shiftKey); }
+  if (event.key.toLowerCase() === 'o') { event.preventDefault(); if (!event.repeat) openFile(); }
 }, {capture:true});
 window.addEventListener('pagehide', rememberDraft);
 window.addEventListener('beforeunload', event => {

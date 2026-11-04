@@ -1,7 +1,7 @@
 import {EditorSelection, Prec} from '@codemirror/state';
 import {keymap} from '@codemirror/view';
 import {isolateHistory} from '@codemirror/commands';
-import {editingBlock} from './live-preview.js';
+import {editingBlock, quotePrefix, quoteContinuation} from './live-preview.js';
 import {element, button} from './studio-ui.js';
 
 export const markdownShortcuts = [
@@ -17,7 +17,7 @@ const markers = {bold:'**',italic:'*',underline:'<u>',strike:'~~'};
 function inlineChange(state, range, kind) {
   const text = state.sliceDoc(range.from, range.to);
   if (kind === 'link' || kind === 'image') {
-    const label = text || (kind === 'link' ? '链接文字' : '图片描述');
+    const label = (text || (kind === 'link' ? '链接文字' : '图片描述')).replace(/[\\\[\]]/g, '\\$&').replace(/[\r\n]+/g, ' ');
     const prefix = kind === 'image' ? '![' : '[';
     const insert = `${prefix}${label}](https://)`;
     const from = range.from + (text ? prefix.length + label.length + 2 : prefix.length);
@@ -26,6 +26,14 @@ function inlineChange(state, range, kind) {
   if (kind === 'fence' || kind === 'math') {
     const longest = Math.max(0,...Array.from(text.matchAll(/`+/g), match=>match[0].length));
     const fence = kind === 'math' ? '$$' : '`'.repeat(Math.max(3,longest+1));
+    const line = state.doc.lineAt(range.from);
+    const container = quoteContinuation(line,range.from);
+    if (container) {
+      const content = text.split('\n').map((part,i)=>i && part.startsWith(container) ? part.slice(container.length) : part).join('\n'+container);
+      const before = (range.from > line.from+container.length ? '\n'+container : '') + fence+'\n'+container;
+      const after = '\n'+container+fence+(range.to < state.doc.length && state.sliceDoc(range.to,range.to+1)!=='\n' ? '\n'+container : '');
+      return {changes:{from:range.from,to:range.to,insert:before+content+after},range:EditorSelection.range(range.from+before.length,range.from+before.length+content.length)};
+    }
     const before = (range.from && state.sliceDoc(range.from-1,range.from) !== '\n' ? '\n' : '') + fence + '\n';
     const after = '\n' + fence + (range.to < state.doc.length && state.sliceDoc(range.to,range.to+1) !== '\n' ? '\n' : '');
     return {changes:{from:range.from,to:range.to,insert:before+text+after},range:EditorSelection.range(range.from+before.length,range.from+before.length+text.length)};
@@ -46,6 +54,9 @@ function inlineChange(state, range, kind) {
   }
   if (kind === 'code') {
     const pad = /^`|`$/.test(text) || (/^ .+ $/s.test(text) && text.trim()) ? ' ' : '';
+    if (pad && state.sliceDoc(Math.max(0,range.from-open.length-1),range.from) === open+pad && state.sliceDoc(range.to,range.to+close.length+1) === pad+close) {
+      return {changes:[{from:range.from-open.length-1,to:range.from},{from:range.to,to:range.to+close.length+1}],range:EditorSelection.range(range.from-open.length-1,range.to-open.length-1)};
+    }
     const from = range.from + open.length + pad.length;
     return {changes:{from:range.from,to:range.to,insert:open+pad+text+pad+close},range:EditorSelection.range(from,from+text.length)};
   }
@@ -70,9 +81,18 @@ export function formatMarkdown(view, kind) {
     }
     const pattern = kind.startsWith('heading') ? /^#{1,6} / : kind === 'quote' ? /^> / : /^(?:[-+*]|\d+\.) /;
     const prefix = kind.startsWith('heading') ? '#'.repeat(Number(kind.slice(7))) : kind === 'quote' ? '>' : kind === 'ordered' ? '1.' : '-';
-    const selected = [...lines.values()].sort((a,b)=>a.from-b.from);
-    const remove = prefix && selected.every(line => kind === 'ordered' ? /^\d+\. /.test(line.text) : line.text.startsWith(prefix+' '));
-    const changes = state.changes(selected.map((line,i) => ({from:line.from,to:line.from+(line.text.match(pattern)?.[0].length || 0),insert:remove || !prefix ? '' : (kind==='ordered' ? `${i+1}.` : prefix)+' '})));
+    const selected = [...lines.values()].sort((a,b)=>a.from-b.from).map(line => {
+      const quote = kind === 'quote' ? '' : quotePrefix(line.text);
+      const indent = kind === 'quote' ? '' : line.text.slice(quote.length).match(/^[ \t]*/)[0];
+      const offset = quote.length + indent.length;
+      return {line,offset,text:line.text.slice(offset),level:quote+indent};
+    });
+    const remove = prefix && selected.every(item => kind === 'ordered' ? /^\d+\. /.test(item.text) : item.text.startsWith(prefix+' '));
+    const counters = new Map();
+    const changes = state.changes(selected.map(({line,offset,text,level}) => {
+      const number = (counters.get(level) || 0) + 1; counters.set(level,number);
+      return {from:line.from+offset,to:line.from+offset+(text.match(pattern)?.[0].length || 0),insert:remove || !prefix ? '' : (kind==='ordered' ? `${number}.` : prefix)+' '};
+    }));
     spec = {changes,selection:state.selection.map(changes)};
   } else spec = state.changeByRange(range => inlineChange(state,range,kind));
   view.dispatch(state.update({...spec,effects:editingBlock.of(true),annotations:isolateHistory.of('full'),scrollIntoView:true,userEvent:'input.format'}));

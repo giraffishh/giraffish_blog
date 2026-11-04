@@ -8,7 +8,7 @@ import {EditorBackup, preference, storePreference} from './studio-storage.js';
 import {element as el, button, compactAction} from './studio-ui.js';
 import {DocumentExport} from './document-export.js';
 import { templates } from './templates.js';
-import { livePreview, liveFocus, liveNavigation, renderedBlocks } from './live-preview.js';
+import { livePreview, liveFocus, liveNavigation, quoteEditing, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
 import {clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST, LayoutMotion, reducedMotion} from './layout-utils.js';
@@ -71,7 +71,7 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping,
+        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, quoteEditing, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping,
         // Keep typing comfortably above the footer instead of merely exposing the cursor.
         EditorView.scrollMargins.of(view => ({bottom:Math.min(90, view.scrollDOM.clientHeight / 8)})),
         search({

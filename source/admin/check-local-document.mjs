@@ -170,6 +170,19 @@ console.log('Local Markdown file checks passed: save, conflict, copies, failed w
   copying.actions.onNew();
   await copying.actions.onSave(true);
   assert.equal(copying.status.unsaved,true);
+  // The permission prompt can take longer than the file read. Keep newer edits.
+  const authorizing = setup(async()=>[{getFile:async()=>imported,queryPermission:async()=> 'prompt',requestPermission:()=>new Promise(resolve=>{grant=resolve;})}]);
+  let grant;
+  const permissionOpen=authorizing.actions.onOpen();
+  while (!grant) await new Promise(resolve=>setImmediate(resolve));
+  authorizing.editor.onChange('typed while authorizing');
+  authorizing.window.confirm=()=>false;
+  grant('granted');await permissionOpen;
+  assert.equal(authorizing.status.dirty,true);assert.equal(authorizing.stored,oldDraft);
+  const savePending=setup();savePending.editor.onChange('new draft while recovery pending');
+  await savePending.actions.onSave();
+  assert.equal(JSON.parse(savePending.stored).text,'new draft while recovery pending');
+  assert.equal(savePending.status.unsaved,false);
   const creating = setup();
   creating.actions.onNew();
   assert.equal(JSON.parse(creating.stored).text, '');

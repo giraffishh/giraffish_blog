@@ -171,6 +171,36 @@ export function moveRenderedLine(view, forward, extend = false) {
   }
 }
 
+// Share container handling between paste, block shortcuts and math editing.
+export function quotePrefix(text) { return text.match(/^ {0,3}>[ \t]?(?: {0,3}>[ \t]?)*/)?.[0] || ''; }
+export function quoteContinuation(line, position) {
+  const quote = quotePrefix(line.text);
+  if (!quote || position < line.from + quote.length) return '';
+  const body = line.text.slice(quote.length);
+  const marker = body.match(/^[ \t]*(?:[-+*]|\d+[.)])[ \t]+/);
+  const indent = marker && position >= line.from + quote.length + marker[0].length
+    ? marker[0].replace(/[^\t]/g,' ') : body.match(/^[ \t]*/)[0];
+  return quote + indent;
+}
+export function quotedPaste(text, state) {
+  if (!/[\r\n]/.test(text) || state.selection.ranges.length !== 1) return text;
+  const range = state.selection.main, line = state.doc.lineAt(range.from);
+  const prefix = quoteContinuation(line,range.from);
+  if (!prefix || state.doc.lineAt(range.to).number !== line.number) return text;
+  const tree = ensureSyntaxTree(state,range.to,50);
+  if (!tree || withinNode(tree,range.from,['FencedCode','CodeBlock','InlineCode','HTMLBlock'])) return text;
+  const quote = quotePrefix(line.text);
+  const lines = text.replace(/\r\n?/g,'\n').split('\n');
+  // A copied quote already has its container markers. Reuse, rather than nest, them.
+  if (lines[0].startsWith(quote)) lines[0] = lines[0].slice(quote.length);
+  let result = lines.map((part,i) => i && !quotePrefix(part) ? prefix+part : part).join('\n');
+  const beginsBlock = /^\s*(?:\$\$|\\\[|`{3,}|~{3,}|[-+*]\s|\d+[.)]\s)/.test(lines[0]);
+  const before = state.sliceDoc(line.from+prefix.length,range.from);
+  if (beginsBlock && before.trim()) result = '\n'+prefix+'\n'+prefix+result;
+  if (beginsBlock && state.sliceDoc(range.to,line.to).trim()) result += '\n'+prefix+'\n'+prefix;
+  return result;
+}
+export const quoteEditing = EditorView.clipboardInputFilter.of(quotedPaste);
 function withinNode(tree, position, names) {
   for (let node = tree.resolveInner(position, -1); node; node = node.parent) {
     if (names.includes(node.name)) return true;
@@ -178,12 +208,16 @@ function withinNode(tree, position, names) {
   return false;
 }
 function withinMathBlock(state, tree, position) {
-  let delimiter = null;
+  let delimiter = null, quoteDepth = 0;
   const last = state.doc.lineAt(position).number;
   for (let n = 1; n <= last; n++) {
     const line = state.doc.line(n);
     if (withinNode(tree, Math.min(line.from + 1, line.to), ['FencedCode','CodeBlock','HTMLBlock'])) continue;
-    const text = state.sliceDoc(line.from, Math.min(line.to, position)).trim();
+    const raw = state.sliceDoc(line.from, Math.min(line.to, position));
+    const depth = (quotePrefix(raw).match(/>/g) || []).length;
+    if (delimiter && depth !== quoteDepth) delimiter = null;
+    quoteDepth = depth;
+    const text = raw.slice(quotePrefix(raw).length).replace(/^[ \t]*(?:[-+*]|\d+[.)])[ \t]+/, '').trim();
     if (delimiter) {
       if (text.endsWith(delimiter)) delimiter = null;
     } else if (text.startsWith('$$')) {
@@ -196,11 +230,21 @@ function withinMathBlock(state, tree, position) {
 }
 export function previewNewline(view, soft = false) {
   const state = view.state;
-  if (!state.field(livePreview, false)?.enabled || state.readOnly || view.composing) return false;
-  if (soft) return insertNewlineAndIndent(view);
+  if (state.readOnly || view.composing) return false;
   const tree = ensureSyntaxTree(state, state.selection.ranges.reduce((end,r)=>Math.max(end,r.to),0), 50);
   // If parsing is still catching up, prefer the existing safe Markdown behavior.
   if (!tree) return false;
+  // Inside quoted equations, Enter continues the container, not a list item.
+  if (state.selection.ranges.every(range => quoteContinuation(state.doc.lineAt(range.from),range.from) && (soft || withinMathBlock(state,tree,range.from)) && !withinNode(tree,range.from,['FencedCode','CodeBlock','HTMLBlock']))) {
+    const spec = state.changeByRange(range => {
+      const insert = '\n' + quoteContinuation(state.doc.lineAt(range.from),range.from);
+      return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.cursor(range.from+insert.length)};
+    });
+    view.dispatch(state.update({...spec,effects:editingBlock.of(true),scrollIntoView:true,userEvent:'input'}));
+    return true;
+  }
+  if (!state.field(livePreview, false)?.enabled) return false;
+  if (soft) return insertNewlineAndIndent(view);
   if (state.selection.ranges.some(range => withinNode(tree, range.head, ['ListItem','Blockquote']))) {
     return continuePreviewMarkup(view);
   }
