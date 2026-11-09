@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774442387365.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774421924055.webp
 title: VLA-RTC：[NeurIPS 2025] RTC
 categories:
   - 论文批读
@@ -188,7 +188,7 @@ Modern AI systems, especially those interacting with the physical world, increas
 > - **实验**: Kinetix 仿真（12 个高动态任务）+ 真实双臂操作（6 个任务，用 π₀.₅ 作为 base policy）
 > - **结果**: 即使在 300ms+ 推理延迟下，仍能完成点火柴这种高精度任务。速度比同步推理快 20%，平滑性优于所有竞争方法。
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774451320771.webp)
+![](https://cdn.giraffish.top/blog/26-03-25-1774451320771.webp)
 *Figure 1: Top: RTC 使机器人能在超过 300ms 的推理延迟下完成高灵巧、高动态任务（如点火柴)。Bottom: RTC 比同步推理快 20%，比 temporal ensembling 更平滑。展示的是一只手臂肩关节在真实自主点火柴过程前 10 秒的位置、速度和加速度。*
 
 > 💡 **Figure 1 批读**:
@@ -315,7 +315,7 @@ Now, let $\Delta t$ be sampling period of the controller, i.e., the duration of 
 > **结论**: 即使只看 prefill (46ms) vs Δt (20ms)，就已经不可能实时了。加上 denoising steps + 网络延迟，总延迟是控制周期的好几倍。
 
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774454416490.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-03-26-1774454416490.webp)
 *Figure 2: 连续 chunk 之间典型的分叉示意。推理在 timestep 3 和 4 之间开始。原始 chunk（黑色）计划从障碍物上方绕过，而新生成的 chunk（红色）从下方绕过。但新 chunk 要 d=7 步后才可用。Naive 异步算法会从 a₁₀ 跳到 a'₁₁，产生非常高的 OOD 加速度。Temporal ensembling 减小了加速度但产生了糟糕的 action。*
 
 > 💡 **Figure 2 批读**:
@@ -344,7 +344,7 @@ We define $d := \lfloor\delta/\Delta t\rfloor$ and call this quantity the infere
 > - **问题**: 从 $s-d$ 开始推理，但 $s-d$ 到 $s$ 之间会发生什么，模型不知道 → 新旧 chunk 在 $s$ 处可能不连续
 
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774454444359.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-03-26-1774454444359.webp)
 
 *Figure 3: RTC 中 action 生成如何关注前一个 action chunk 的示意图。如果推理在 a₋₁ 执行后开始，inference delay d=4，则新 chunk 在 a₃ 被消费后才可用。因此 a₀:₃ 被"冻住"，guidance weight 为 1。中间区域 a₄:₁₀ 的前一个 chunk action 可用但可以更新，指导权重指数衰减。最后 s=5 个 action 超出了前一个 chunk 的范围，需要全新生成。*
 
@@ -403,7 +403,7 @@ Our key insight is to pose real-time chunking as an inpainting problem. To make 
 
 Inpainting is a known strength of iterative denoising frameworks such as diffusion and flow matching. We build on the training-free image inpainting algorithm from Pokle et al. [48], which is itself based on pseudoinverse guidance (ΠGDM; [55]). The algorithm operates by adding a gradient-based guidance term to the learned velocity field $\mathbf{v}$ at each denoising step (Equation 1) that encourages the final generation to match some target value, $\mathbf{Y}$, which is a corrupted version of the desired result. In the case of image inpainting, the corruption operator is masking, $\mathbf{Y}$ is the masked image, and the desired result is a full image consistent with $\mathbf{Y}$ in the non-masked areas. The ΠGDM gradient correction, specialized to our setting, is given by
 
-![Equation 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774490456101.webp)
+![Equation 2](https://cdn.giraffish.top/blog/26-03-26-1774490456101.webp)
 
 > 💡 **ΠGDM Guidance 公式解读**:
 > 这个公式是 RTC 的数学核心。让我分步解释：
@@ -466,7 +466,7 @@ $$
 Intuitively, W modulates the "attention" paid to each corresponding action from the previous chunk. See Appendix A.4 for a comparison between different decay schedules.
 
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774490545266.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-03-26-1774490545266.webp)
 
 *Figure 4: Hard masking 和 soft masking 的对比。Hard masking 不能很好地匹配 frozen 区域，方向变化更剧烈。*
 
@@ -581,7 +581,7 @@ Most simulated imitation learning benchmarks are quasi-static, and standard chun
 > BID 的计算量是 RTC 的 ~50 倍，但效果还更差。这是 RTC 最有说服力的对比。
 
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774499556192.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-03-26-1774499556192.webp)
 *Figure 5: Top left: Kinetix 环境（绿色物体碰到蓝色物体即成功）。Bottom left: Execution horizon vs solve rate（固定 delay=1）。Right: Inference delay vs solve rate（固定 $s = \max(d, 1)$)。每个数据点 2048 trials，95% Wilson 置信区间。*
 
 > 💡 **Figure 5 批读——仿真核心结果**:
@@ -649,7 +649,7 @@ We do not compare to BID [39] in the real world, as we found in simulation that 
 > 💡 **BID 被排除的原因**: 仿真中已经证明 BID 效果更差且计算量更大（π₀.₅ 上 BID 延迟是 RTC 的 2.3 倍）。合理的决策。
 
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774499544052.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-03-26-1774499544052.webp)
 *Figure 6: Top: 各任务的 controller steps vs cumulative progress。Left: 时间 vs cumulative progress（所有任务汇总，X轴 log scale）。Right: Inference delay vs average throughput（任务完成比例/时间)。TE 在 +100ms 和 +200ms 延迟下振荡太大，触发机器人保护性停机。*
 
 > 💡 **批读——真实世界核心结果**:
@@ -792,7 +792,7 @@ The goal of our work is to improve the speed and performance of learned policies
 
 ### A.2 The Necessity of Guidance Weight Clipping (β)
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508994235.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-03-26-1774508994235.webp)
 
 *Figure 7: Top left: guidance 权重 $\frac{1-\tau}{\tau \cdot r_\tau^2}$ 随 τ 的变化。Top right: β 消融。Bottom left: 不同 β 下 n=5 和 n=100 的 action chunk 对比。Bottom right: β vs 最大加速度。*
 
@@ -853,7 +853,7 @@ The goal of our work is to improve the speed and performance of learned policies
 
 ### A.4 Soft Masking Ablation
 
-![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-26-1774508990089.webp)
+![Figure 8](https://cdn.giraffish.top/blog/26-03-26-1774508990089.webp)
 
 *Figure 8: Left: 不同 soft masking decay schedule 对比。Right: Diffuser inpainting 方法 vs RTC guidance-based inpainting 对比。*
 

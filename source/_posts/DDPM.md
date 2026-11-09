@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999762761.webp
+  https://cdn.giraffish.top/blog/26-08-29-1787999762761.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp
+  https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp
 title: 'Diffusion：[NeurIPS 2020] DDPM'
 categories:
   - 论文批读
@@ -214,7 +214,7 @@ Deep generative models of all kinds have recently exhibited high quality samples
 >
 > DDPM 的目标，是把**潜变量概率模型的训练框架**与**score-based 迭代生成的样本质量**连接起来。
 
-![Figure 1 generated samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787998974929.webp)
+![Figure 1 generated samples](https://cdn.giraffish.top/blog/26-08-29-1787998974929.webp)
 
 *Figure 1: Generated samples on CelebA-HQ 256 × 256 (left) and unconditional CIFAR10 (right)*
 
@@ -233,7 +233,7 @@ This paper presents progress in diffusion probabilistic models [53]. A diffusion
 >
 > **为什么小步加噪很重要？** 如果一步就把图像变成纯噪声，逆问题会极度多解；拆成许多足够小的步骤后，相邻分布只发生局部变化，反向条件分布可以用高斯近似，并由神经网络预测其均值。这是 DDPM 用较长采样链换取简单单步建模的核心交易。
 
-![Figure 2 directed graphical model](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787998982688.webp)
+![Figure 2 directed graphical model](https://cdn.giraffish.top/blog/26-08-29-1787998982688.webp)
 
 *Figure 2: The directed graphical model considered in this work.*
 
@@ -2046,7 +2046,7 @@ which resembles denoising score matching over multiple noise scales indexed by $
 >
 > 也就是说，我们表面上是在训练网络“识别噪声”，实际上同时是在学习不同噪声尺度 $t$ 下的数据分布 score，并用它指导类似 Langevin dynamics 的反向生成过程。
 
-![Algorithm 1 training and Algorithm 2 sampling](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999007937.webp)
+![Algorithm 1 training and Algorithm 2 sampling](https://cdn.giraffish.top/blog/26-08-29-1787999007937.webp)
 
 *Algorithm 1 Training; Algorithm 2 Sampling*
 
@@ -2160,7 +2160,7 @@ To summarize, we can train the reverse process mean function approximator $\bold
 
 We assume that image data consists of integers in $\{0,1,\ldots,255\}$ scaled linearly to $[-1,1]$. This ensures that the neural network reverse process operates on consistently scaled inputs starting from the standard normal prior $p(\mathbf{x}_T)$. To obtain discrete log likelihoods, we set the last term of the reverse process to an independent discrete decoder derived from the Gaussian $\mathcal{N}(\mathbf{x}_0;\boldsymbol{\mu}_\theta(\mathbf{x}_1,1),\sigma_1^2\mathbf{I})$:
 
-![Equation 13 discrete reverse-process decoder](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999019067.webp)
+![Equation 13 discrete reverse-process decoder](https://cdn.giraffish.top/blog/26-08-29-1787999019067.webp)
 
 > 💡 **式 (13)｜连续高斯如何给离散像素概率**:
 >
@@ -2376,7 +2376,7 @@ To represent the reverse process, we use a U-Net backbone similar to an unmasked
 
 ### 4.1 Sample quality
 
-![Table 1 CIFAR10 results and Table 2 ablation](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999027175.webp)
+![Table 1 CIFAR10 results and Table 2 ablation](https://cdn.giraffish.top/blog/26-08-29-1787999027175.webp)
 
 *Table 1: CIFAR10 results. NLL measured in bits/dim. Table 2: Unconditional CIFAR10 reverse process parameterization and training objective ablation. Blank entries were unstable to train and generated poor samples with out-of-range scores.*
 
@@ -2392,13 +2392,13 @@ To represent the reverse process, we use a U-Net backbone similar to an unmasked
 
 Table 1 shows Inception scores, FID scores, and negative log likelihoods (lossless codelengths) on CIFAR10. With our FID score of 3.17, our unconditional model achieves better sample quality than most models in the literature, including class conditional models. Our FID score is computed with respect to the training set, as is standard practice; when we compute it with respect to the test set, the score is 5.24, which is still better than many of the training set FID scores in the literature.
 
-![Figure 3 LSUN Church samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999033200.webp)
+![Figure 3 LSUN Church samples](https://cdn.giraffish.top/blog/26-08-29-1787999033200.webp)
 
 *Figure 3: LSUN Church samples. FID=7.89*
 
 > 💡 **图示解读**: 样本能稳定生成教堂轮廓、尖顶和植被纹理，说明模型已学到场景的整体结构；但补充 Table 3 中 DDPM 的 FID 7.89 仍高于 StyleGAN2 的 3.86。左上样本还出现了明显的 Shutterstock 水印，说明模型也会复现训练数据中的水印与文字偏差；这反映数据分布中的伪特征，但不能仅凭一张图断言逐样本记忆。该图证明视觉样本具有合理性，却不能证明 DDPM 在 LSUN Church 上达到最佳结果。
 
-![Figure 4 LSUN Bedroom samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999038720.webp)
+![Figure 4 LSUN Bedroom samples](https://cdn.giraffish.top/blog/26-08-29-1787999038720.webp)
 
 *Figure 4: LSUN Bedroom samples. FID=4.90*
 
@@ -2520,7 +2520,7 @@ $$
 
 due to Eq. (4). (A stochastic reconstruction $\mathbf{x}_0\sim p_\theta(\mathbf{x}_0\mid\mathbf{x}_t)$ is also valid, but we do not consider it here because it makes distortion more difficult to evaluate.) Figure 5 shows the resulting rate-distortion plot on the CIFAR10 test set. At each time $t$, the distortion is calculated as the root mean squared error $\sqrt{\|\mathbf{x}_0-\hat{\mathbf{x}}_0\|^2/D}$, and the rate is calculated as the cumulative number of bits received so far at time $t$. The distortion decreases steeply in the low-rate region of the rate-distortion plot, indicating that the majority of the bits are indeed allocated to imperceptible distortions.
 
-![Figure 5 rate-distortion curves](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999043602.webp)
+![Figure 5 rate-distortion curves](https://cdn.giraffish.top/blog/26-08-29-1787999043602.webp)
 
 *Figure 5: Unconditional CIFAR10 test set rate-distortion vs. time. Distortion is measured in root mean squared error on a [0, 255] scale. See Table 4 for details.*
 
@@ -2534,13 +2534,13 @@ due to Eq. (4). (A stochastic reconstruction $\mathbf{x}_0\sim p_\theta(\mathbf{
 
 **Progressive generation** We also run a progressive unconditional generation process given by progressive decompression from random bits. In other words, we predict the result of the reverse process, $\hat{\mathbf{x}}_0$, while sampling from the reverse process using Algorithm 2. Figures 6 and 10 show the resulting sample quality of $\hat{\mathbf{x}}_0$ over the course of the reverse process. Large scale image features appear first and details appear last. Figure 7 shows stochastic predictions $\mathbf{x}_0\sim p_\theta(\mathbf{x}_0\mid\mathbf{x}_t)$ with $\mathbf{x}_t$ frozen for various $t$. When $t$ is small, all but fine details are preserved, and when $t$ is large, only large scale features are preserved. Perhaps these are hints of conceptual compression [18].
 
-![Figure 6 progressive generation](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999046954.webp)
+![Figure 6 progressive generation](https://cdn.giraffish.top/blog/26-08-29-1787999046954.webp)
 
 *Figure 6: Unconditional CIFAR10 progressive generation ($\hat{\mathbf{x}}_0$ over time, from left to right). Extended samples and sample quality metrics over time in the appendix (Figs. 10 and 14).*
 
 > 💡 **图示解读**: 图中展示的是每个中间状态 $x_t$ 经式 (15) 得到的 $\hat x_0$，不是原始的带噪 $x_t$。从左到右，类别轮廓和大色块先稳定，局部纹理最后补齐；它把 Figure 5 的数值曲线转化为可见的 coarse-to-fine 生成过程。
 
-![Figure 7 shared latent samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999169547.webp)
+![Figure 7 shared latent samples](https://cdn.giraffish.top/blog/26-08-29-1787999169547.webp)
 
 *Figure 7: When conditioned on the same latent, CelebA-HQ $256 \times 256$ samples share high-level attributes. Bottom-right quadrants are $\mathbf{x}_t$, and other quadrants are samples from $p_\theta(\mathbf{x}_0\mid\mathbf{x}_t)$.*
 
@@ -2615,7 +2615,7 @@ We can interpolate source images $\mathbf{x}_0,\mathbf{x}'_0\sim q(\mathbf{x}_0)
 >
 > 原文的 “fixed the noise” 是说改变 $\lambda$ 时固定已经采样出的两个带噪端点，避免端点重新采样干扰插值比较；它不表示两张源图必须共用同一份噪声。官方代码分别生成两个端点，并保留了是否改用共享噪声的 TODO。
 
-![Figure 8 CelebA-HQ interpolations](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999053940.webp)
+![Figure 8 CelebA-HQ interpolations](https://cdn.giraffish.top/blog/26-08-29-1787999053940.webp)
 
 *Figure 8: Interpolations of CelebA-HQ 256x256 images with 500 timesteps of diffusion.*
 
@@ -2627,7 +2627,7 @@ We can interpolate source images $\mathbf{x}_0,\mathbf{x}'_0\sim q(\mathbf{x}_0)
 
 LSUN FID scores for LSUN datasets are included in Table 3. Scores marked with ∗ are reported by StyleGAN2 as baselines, and other scores are reported by their respective authors.
 
-![Table 3 LSUN FID scores](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999057697.webp)
+![Table 3 LSUN FID scores](https://cdn.giraffish.top/blog/26-08-29-1787999057697.webp)
 
 *Table 3: FID scores for LSUN 256 × 256 datasets*
 
@@ -2635,7 +2635,7 @@ LSUN FID scores for LSUN datasets are included in Table 3. Scores marked with �
 
 Progressive compression Our lossy compression argument in Section 4.3 is only a proof of concept, because Algorithms 3 and 4 depend on a procedure such as minimal random coding [20], which is not tractable for high dimensional data. These algorithms serve as a compression interpretation of the variational bound (5) of Sohl-Dickstein et al. [53], not yet as a practical compression system.
 
-![Table 4 CIFAR10 rate-distortion values](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999061142.webp)
+![Table 4 CIFAR10 rate-distortion values](https://cdn.giraffish.top/blog/26-08-29-1787999061142.webp)
 
 *Table 4: Unconditional CIFAR10 test set rate-distortion values (accompanies Fig. 5)*
 
@@ -2888,13 +2888,13 @@ Appendix B 给出了原始 DDPM 的完整复现配方，并量化了 1000 步采
 
 #### 插值与渐进生成
 
-![Figure 9 coarse-to-fine interpolations](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999070847.webp)
+![Figure 9 coarse-to-fine interpolations](https://cdn.giraffish.top/blog/26-08-29-1787999070847.webp)
 
 *Figure 9: Coarse-to-fine interpolations that vary the number of diffusion steps prior to latent mixing.*
 
 > 💡 **Figure 9**: 列方向改变插值系数 $\lambda$，纵向改变混合前的加噪深度。$t=0$ 接近像素混合；$t$ 越大，源图约束越弱、模型补全越多，直至产生新样本。完整插值公式见 [04 Experiments 的潜空间插值笔记](04-experiments.md#L236)
 
-![Figure 10 progressive sampling quality](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999121559.webp)
+![Figure 10 progressive sampling quality](https://cdn.giraffish.top/blog/26-08-29-1787999121559.webp)
 
 *Figure 10: Unconditional CIFAR10 progressive sampling quality over time*
 
@@ -2902,31 +2902,31 @@ Appendix B 给出了原始 DDPM 的完整复现配方，并量化了 1000 步采
 
 #### 未筛选样本与最近邻
 
-![Figure 11 CelebA-HQ samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999076194.webp)
+![Figure 11 CelebA-HQ samples](https://cdn.giraffish.top/blog/26-08-29-1787999076194.webp)
 
 *Figure 11: CelebA-HQ 256 × 256 generated samples*
 
 > 💡 **Figure 11**: 未筛选网格展示姿态、背景和发型的多样性，但不能估计长尾失败率、身份覆盖或训练数据记忆。
 
-![Figure 12 CelebA-HQ nearest neighbors](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999079312.webp)
+![Figure 12 CelebA-HQ nearest neighbors](https://cdn.giraffish.top/blog/26-08-29-1787999079312.webp)
 
 *Figure 12: CelebA-HQ 256 × 256 nearest neighbors, computed on a 100 × 100 crop surrounding the faces. Generated samples are in the leftmost column, and training set nearest neighbors are in the remaining columns.*
 
 > 💡 **Figure 12**: 像素距离偏向颜色和位置对齐，Inception 特征更偏向语义外观。没有明显逐图复制只能排除最简单的记忆形式，不能排除组合复制或隐私泄漏。
 
-![Figure 13 CIFAR10 samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999129986.webp)
+![Figure 13 CIFAR10 samples](https://cdn.giraffish.top/blog/26-08-29-1787999129986.webp)
 
 *Figure 13: Unconditional CIFAR10 generated samples*
 
 > 💡 **Figure 13**: 无类别条件的模型生成了多种语义，但 $32\times32$ 分辨率限制了对纹理和局部伪影的判断。
 
-![Figure 14 CIFAR10 progressive generation](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999087232.webp)
+![Figure 14 CIFAR10 progressive generation](https://cdn.giraffish.top/blog/26-08-29-1787999087232.webp)
 
 *Figure 14: Unconditional CIFAR10 progressive generation*
 
 > 💡 **Figure 14**: 轨迹先形成大色块和类别轮廓，再细化边缘与纹理，与 [04 Experiments 的渐进生成分析](04-experiments.md#L180) 一致。最终结果同时受初始 $x_T$ 和各步反向噪声影响，并非确定性解码。
 
-![Figure 15 CIFAR10 nearest neighbors](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999092071.webp)
+![Figure 15 CIFAR10 nearest neighbors](https://cdn.giraffish.top/blog/26-08-29-1787999092071.webp)
 
 *Figure 15: Unconditional CIFAR10 nearest neighbors. Generated samples are in the leftmost column, and training set nearest neighbors are in the remaining columns.*
 
@@ -2934,25 +2934,25 @@ Appendix B 给出了原始 DDPM 的完整复现配方，并量化了 1000 步采
 
 #### LSUN 样本网格
 
-![Figure 16 LSUN Church samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999097535.webp)
+![Figure 16 LSUN Church samples](https://cdn.giraffish.top/blog/26-08-29-1787999097535.webp)
 
 *Figure 16: LSUN Church generated samples. FID=7.89*
 
 > 💡 **Figure 16**: Church 样本具有构图多样性，也出现几何失真和文字样伪影。FID 7.89 并非该类别的最佳结果，且不会直接揭示这些对象级失败。
 
-![Figure 17 large LSUN Bedroom samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999137663.webp)
+![Figure 17 large LSUN Bedroom samples](https://cdn.giraffish.top/blog/26-08-29-1787999137663.webp)
 
 *Figure 17: LSUN Bedroom generated samples, large model. FID=4.90*
 
 > 💡 **Figure 17**: 约 256M 参数的大模型得到 FID 4.90；与小模型比较时，模型容量和训练步数同时变化。
 
-![Figure 18 small LSUN Bedroom samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999105570.webp)
+![Figure 18 small LSUN Bedroom samples](https://cdn.giraffish.top/blog/26-08-29-1787999105570.webp)
 
 *Figure 18: LSUN Bedroom generated samples, small model. FID=6.36*
 
 > 💡 **Figure 18**: 114M 小模型 FID 为 6.36，比大模型高 1.46；没有受控变量或重复运行，因此只能视为规模趋势。
 
-![Figure 19 LSUN Cat samples](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-29-1787999147832.webp)
+![Figure 19 LSUN Cat samples](https://cdn.giraffish.top/blog/26-08-29-1787999147832.webp)
 
 *Figure 19: LSUN Cat generated samples. FID=19.75*
 

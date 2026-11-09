@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774442387365.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774421924055.webp
 title: VLA-RTC：Introduction
 categories:
   - 学习笔记

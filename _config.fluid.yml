@@ -472,8 +472,8 @@ footer:
       <span id="times">载入时分秒...</span>
       <script src="/js/duration.js"></script>
     </div>
-    <!-- Live2D: SUSTech mirror, main branch; PixiJS is bundled. -->
-    <script defer src="/js/live2d-loader.js" data-assets="https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/live2d/"></script>
+    <!-- Live2D: CDN assets; PixiJS is bundled. -->
+    <script defer src="/js/live2d-loader.js" data-assets="https://cdn.giraffish.top/live2d/"></script>
     <!-- twikoo -->
     <script defer src="https://cdn.giraffish.top/vendor/katex/0.19.1/katex.min.js"></script>
     <script defer src="https://cdn.giraffish.top/vendor/katex/0.19.1/contrib/auto-render.min.js"></script>

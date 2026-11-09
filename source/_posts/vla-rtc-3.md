@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774442387365.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774421924055.webp
 title: 'VLA-RTC：[Arxiv 2512.01031] VLASH'
 categories:
   - 论文批读
@@ -199,12 +199,12 @@ To prevent this stop-and-go behavior, researchers have proposed asynchronous inf
 
 > 💡 **动机批注**: 第二段说明 async inference 的吸引力很直接：一边执行当前 chunk，一边准备下一段动作。只要执行时间长于推理时间，就能显著减少 idle period，同时提升对环境变化的响应频率，持续进行推理，能实时感知环境，反应更快、更准确
 
-![Figure 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148177345.webp)
+![Figure 1](https://cdn.giraffish.top/blog/26-04-03-1775148177345.webp)
 *Figure 1. VLASH enables VLA to play ping-pong rallies with humans. Snapshots showing $\pi _ { 0 . 5 }$ [16] with VLASH successfully tracking and striking a fast-moving ping-pong ball during a rally. The robot initiates its reaction by the third frame, demonstrating low-latency perception-to-action response. The task requires both fast reaction and smooth continuous motion, which are enabled by our asynchronous inference with future-state-awareness. Under synchronous inference, the robot fails to achieve this dynamic interaction.*
 
 > 💡 **Figure 1 批读**: 图中展示的是 π0.5 模型在使用 VLASH 后，能够成功追踪并击打快速移动的乒乓球：让 VLA 在高动态、高精度任务里真正做到连续反应。机器人在第三帧就做出了反应，体现了极低的感知-动作延迟。
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148175350.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-04-03-1775148175350.webp)
 *Figure 2. Prediction-execution misalignment in asynchronous inference. Due to inference delay $\Delta$ , the model predicts actions for the prediction interval $[ t , t + K )$ but they execute during the execution interval $[ t + \Delta , t + \Delta + K )$ .*
 
 > 💡 **Figure 2 批读**: Figure 2 把 async 的根本矛盾画得很清楚：模型在区间 `[t, t+K)` 看到环境并做预测，但因为推理耗时 `Δ`，动作实际落地在区间 `[t+Δ, t+Δ+K)`。只要 `Δ > 0`，这种“用旧状态控制未来世界”的时间错位就是不可避免的根本性挑战（fundamental challenge）。
@@ -265,7 +265,7 @@ Asynchronous VLA Inference. Asynchronous inference offers a promising way to eli
 > - **VLASH**: 不在运行时补救，也不加额外头，而是通过 future-state-aware conditioning 改变模型生成动作时看的 state。
 > - 所以 VLASH 的卖点不只是“效果更好”，而是“少做了很多额外的事”
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148207324.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-04-03-1775148207324.webp)
 *Figure 3. Comparison between VLASH and existing methods. (a) Synchronous inference: the robot stalls during inference, introducing slow reactions. (b) Naive async: the model predicts based on stale state $s _ { 1 }$ while execution begins at future state $s _ { 3 }$ , causing misalignment and discontinuity. (c) VLASH rolls forward the robot state $( s _ { 3 } = s _ { 1 } + a _ { 1 } + a _ { 2 } )$ ) and condition on the execution-time state, achieving fast reaction and smooth actions.*
 
 > 💡 **技术细节**: Figure 3 用一张图把三条路线的差异画出来了。Synchronous 的问题是停顿，naive async 的问题是 stale state，VLASH 的思路则是先把 robot state 推进到真正开始执行新 chunk 的时刻，再基于执行时刻的 state 生成新动作
@@ -411,7 +411,7 @@ where each $\left( { { s _ { t + \delta } } , { A _ { t + \delta } } } \right)$ 
 
 > 💡 **核心分析**: 这两个 attention 约束合起来，就把“共享 observation、独立 offset”的结构编码进了 self-attention。它本质上相当于把多个样本拼成一个大样本，但避免了重复编码视觉 token。
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148215625.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-04-03-1775148215625.webp)
 *Figure 4. Attention pattern for efficient fine-tuning with shared observation. We pack one shared observation $o _ { t }$ and multiple offset branches $\left( { { s _ { t + \delta } } , { A _ { t + \delta } } } \right)$ into a single sequence. Blue and yellow cells indicate allowed attention, while gray cells indicate masked attention. Positional encodings of each offset branch are reassigned to start at the same index, equal to the length of observation tokens.*
 
 > 💡 **图片解读**: 可以把它理解成一个 attention 矩阵：
@@ -449,7 +449,7 @@ Our approach is to quantize actions, in analogy to weight quantization for LLMs 
 
 > 💡 **降采样稀疏化**: action quantization 的类比很有意思：像 LLM 里做 weight quantization 一样，这里把高频、细粒度的 micro-action 合并成更粗的 macro-action，用更少步数完成类似位移。
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148218809.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-04-03-1775148218809.webp)
 *Figure 5. Action quantization for efficient execution. We group consecutive fine-grained micro-actions into coarser macro-actions to accelerate robot motion. The original trajectory with fine-grained actions $a _ { 0 } , a _ { 1 } , a _ { 2 } , \dots$ (gray) is quantized into a shorter trajectory with macro-actions $\hat { a } _ { 0 } , \hat { a } _ { 1 } , \hat { a } _ { 2 } , \hat { a } _ { 3 }$ (black), where each macro-action summarizes $q$ consecutive fine-grained actions (e.g., $\hat { a } _ { 0 } = a _ { 0 } + a _ { 1 } + a _ { 2 }$ for quantization factor $q = 3$ ).*
 
 > 💡 **技术细节**: Figure 5 直观看到量化后的轨迹更稀疏。它不是让策略学新动作，而是把已有动作序列在执行时重新聚合成更长的步长。
@@ -521,7 +521,7 @@ Following the setup in RTC [4], we train action chunking flow policies with a pr
 > * Naive async 是最朴素的基线：新 chunk 一算完就切换，不做任何对齐或修正，因此最容易受到 stale state 影响
 > * RTC 在这里是最直接的强基线，因为它同样关注 prediction-execution misalignment，但走的是 runtime inpainting 路线
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148222799.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-04-03-1775148222799.webp)
 *Figure 6. Performance on Kinetix benchmark. We evaluate the success rate under different execution horizons $K$ and inference delays $\Delta$ . Left: Fixed inference delay $\Delta = 1$ with varying execution horizon $K$ . Right: Execution horizon adapts to inference delay, i.e., $K \ = \ \operatorname* { m a x } ( \Delta , 1 )$ , with varying $\Delta$ . For the Sync baseline, inference delay is always $\Delta = 0$ , but the execution horizon $K$ follows the same settings as other baselines for fair comparison.*
 
 > 💡 **实验结论**: Figure 6 是 Kinetix 的核心结果。左图看 execution horizon 变化，右图看 inference delay 增大时的鲁棒性；后者更能体现 VLASH 在大延迟下的稳定优势。
@@ -538,7 +538,7 @@ Experimental Setup. We evaluate on the LIBERO benchmark [23], one of the popular
 
 > 💡 **动机批注**: LIBERO 更偏向慢变化环境，因此不同 async 方法之间不会像 Kinetix 那样迅速拉开差距。这里的重点不在“谁更会追动态目标”，而在“VLASH 会不会破坏原本的操控精度，以及不同 delay 下能否保持合理的速度收益”。
 
-![Table 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148225523.webp)
+![Table 1](https://cdn.giraffish.top/blog/26-04-03-1775148225523.webp)
 *Table 1. Performance on LIBERO benchmarks with different inference delays. We evaluate $\pi _ { 0 . 5 }$ [16] across four LIBERO subbenchmarks (Spatial, Object, Goal, LIBERO-10) under various inference delays (0 to 4 steps). SR: average success rate; Steps: average execution steps to task completion; Time: completion time on a laptop RTX 4090 GPU (inference latency: $1 0 3 \mathrm { m s }$ for 2 images). Sync (w/o state): fine-tuned and evaluated with synchronous inference without robot state input.*
 
 > 💡 **实验结论**: Table 1 是 `π0.5` 在四个 LIBERO 子基准上的细表。它显示小延迟时几乎不伤精度，同时已经开始带来 `1.17x` 到 `1.31x` 的时间收益；更大延迟时速度收益继续放大，但精度会开始小幅下降。
@@ -577,7 +577,7 @@ For each task, we conduct 16 rollouts per method and report both the score perce
 >
 > 每个 task 每种方法做 16 次 rollout，并用 2-point scoring 统计“抓起”和“完成任务”两个层级的成功，这样既能看最终结果，也能看任务中途是否更容易掉链子。
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148229271.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-04-03-1775148229271.webp)
 *Figure 7. Real-world evaluation results on manipulation tasks. We evaluate $\pi _ { 0 . 5 }$ [16] on three tasks with different inference methods. Left: Score percentages (based on 2-point scoring: 1 for success of picking up the object, 1 for task completion) of VLASH and baselines across three tasks. Right: Task completion times with green arrows indicating speedup of VLASH $( q = 2 )$ relative to synchronous baseline. VLASH $( q )$ applies action quantization with quantization ratio $q$ .*
 
 > 💡 **实验结论**: Figure 7 给出了真实机器人里最直观的结果：左图看分数，右图看任务时间。绿色箭头强调的是叠加 action quantization 后，VLASH 相对同步基线的速度收益。
@@ -599,7 +599,7 @@ Experimental Setup. To evaluate the reaction speed improvement of asynchronous i
 
 > 💡 **实验设计**: reaction speed 实验量测的是最大反应延迟，而不是任务总时间。设置 `K=25`、50Hz 后，同步推理的反应延迟本质上等于“整段 chunk 执行时间 + 推理时间”，async 则主要看推理时间本身。
 
-![Table 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148231774.webp)
+![Table 2](https://cdn.giraffish.top/blog/26-04-03-1775148231774.webp)
 *Table 2. Reaction speed comparison across devices. Latency of $\pi _ { 0 . 5 }$ [16] with 1 image input, $K = 2 5$ at $5 0 \mathrm { H z }$ . Execution duration is $5 0 0 \mathrm { m s }$ . Max reaction latency $=$ execution duration $^ +$ inference latency for Sync, inference latency only for Async.*
 
 > 💡 **实验结论**: Table 2 把这个差异定量化了。在 RTX 5090 上，sync 约 530.4ms，而 async 只有 30.4ms，因此得到 `17.4x` 的 reaction-latency speedup
@@ -616,7 +616,7 @@ Experimental Setup. We evaluate the training efficiency gains from our efficient
 
 > 💡 **实验设计**: 训练效率实验最重要的控制变量是“相同 effective batch size”。只有这样，shared-observation 带来的加速才不是因为偷偷增加了总样本量。
 
-![Table 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148234144.webp)
+![Table 3](https://cdn.giraffish.top/blog/26-04-03-1775148234144.webp)
 *Table 3. Fine-tuning efficiency. Original (without offset augmentation) vs VLASH (with offset augmentation and shared observation) on LIBERO with $\pi _ { 0 . 5 }$ [16]. Training on $4 { \times } \mathrm { H } 1 0 0$ GPUs using DDP, with effective batch size 16 per GPU (total 64). We report average LIBERO scores at different training steps. Both evaluated under synchronous inference.*
 
 > 💡 **微调数据**: 
@@ -676,7 +676,7 @@ To further evaluate the generalization of VLASH across different VLAs, we conduc
 
 > 💡 **泛化实验**: 这一节的作用是把 VLASH 从 `π0.5` 扩展到另一类更紧凑的 VLA。若这里也成立，说明方法并不依赖某一个特定 backbone。
 
-![Table 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148238513.webp)
+![Table 4](https://cdn.giraffish.top/blog/26-04-03-1775148238513.webp)
 *Table 4. Performance on LIBERO benchmarks with SmolVLA-450M and different inference delays. We evaluate SmolVLA across four LIBERO sub-benchmarks (Spatial, Object, Goal, LIBERO-10) under various inference delays (1 to 4 steps). SR: average success rate; Steps: average execution steps to task completion; Latency: inference latency in seconds.*
 
 As shown in Table 4, VLASH achieves consistent speedups across all inference delays when applied to SmolVLA. At delay 2 and 3, VLASH achieves up to $1 . 3 5 \times$ speedup compared to synchronous inference. While the success rate shows minor variations across different delays, VLASH at delay 3 achieves $7 9 . 0 6 \%$ success rate, which is comparable to the synchronous baseline $( 7 8 . 9 6 \% )$ , demonstrating that VLASH can maintain performance while providing significant latency improvements. These results further validate that VLASH generalizes effectively across different VLA architectures.
@@ -690,7 +690,7 @@ We present the detailed training hyperparameters used for fine-tuning VLAs in ou
 
 > 💡 **技术细节**: 这段主要服务复现。它说明正文所有 LIBERO 和 real-world fine-tuning 实验都共用一套超参数，避免不同方法因为 recipe 差异而失去可比性。
 
-![Table 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-03-1775148240622.webp)
+![Table 5](https://cdn.giraffish.top/blog/26-04-03-1775148240622.webp)
 *Table 5. Training hyperparameters for fine-tuning VLAs. We use these hyperparameters for fine-tuning $\pi _ { 0 . 5 }$ and SmolVLA on LIBERO and real-world tasks.*
 
 > 💡 **Table 5 批读**: 常规 fine-tuning 组合

@@ -1,6 +1,6 @@
 ---
-index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784027999697.webp'
-banner_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp'
+index_img: 'https://cdn.giraffish.top/blog/26-07-14-1784027999697.webp'
+banner_img: 'https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp'
 title: 'Vision-Transformer：[ICLR 2021] ViT'
 categories:
   - 论文批读
@@ -343,7 +343,7 @@ In model design we follow the original Transformer (Vaswani et al., 2017) as clo
 
 > 💡 **设计原则**: ViT 有意不发明新的视觉 attention，而只改造 Transformer 的输入接口：先把图像变成 token，后面的主干尽量照搬标准 Transformer Encoder。这样做既能直接复用成熟的实现和扩展经验，也让论文的研究问题更干净——如果模型表现随数据规模改变，原因更可能来自 patch 粒度和视觉归纳偏置，而不是某个复杂的新算子。
 
-![Figure 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784027968709.webp)
+![Figure 1](https://cdn.giraffish.top/blog/26-07-14-1784027968709.webp)
 *Figure 1: Model overview. We split an image into fixed-size patches, linearly embed each of them, add position embeddings, and feed the resulting sequence of vectors to a standard Transformer encoder. In order to perform classification, we use the standard approach of adding an extra learnable “classification token” to the sequence. The illustration of the Transformer encoder was inspired by Vaswani et al. (2017).*
 
 > 💡 **Figure 1**:
@@ -364,13 +364,13 @@ The Transformer encoder (Vaswani et al., 2017) consists of alternating layers of
 
 The MLP contains two layers with a GELU non-linearity.
 
-![Equation 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028203542.webp)
+![Equation 1](https://cdn.giraffish.top/blog/26-07-14-1784028203542.webp)
 
-![Equation 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028209278.webp)
+![Equation 2](https://cdn.giraffish.top/blog/26-07-14-1784028209278.webp)
 
-![Equation 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028214500.webp)
+![Equation 3](https://cdn.giraffish.top/blog/26-07-14-1784028214500.webp)
 
-![Equation 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028218207.webp)
+![Equation 4](https://cdn.giraffish.top/blog/26-07-14-1784028218207.webp)
 
 > 💡 **公式解读（Eq. 1–4）**: 以下按照完整前向流程统一讲解四个公式
 
@@ -597,7 +597,7 @@ Datasets. To explore model scalability, we use the ILSVRC-2012 ImageNet dataset 
 
 > 💡 **实验设计**: 三个预训练集不只大小不同，类别、分布和标注方式也不同，所以跨数据集结果不能把提升严格归因于样本数；4.3 的同源 JFT 子集实验控制得更好。
 
-![Table 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028230997.webp)
+![Table 1](https://cdn.giraffish.top/blog/26-07-14-1784028230997.webp)
 
 *Table 1: Details of Vision Transformer model variants.*
 
@@ -627,13 +627,13 @@ Table 2 shows the results. The smaller ViT-L/16 model pre-trained on JFT-300M ou
 
 > 💡 **比较口径**: TPUv3-core-days 可近似比较同代硬件上的训练成本，但不等于 FLOPs 或能耗。Noisy Student 使用半监督流程，ViT 与 BiT 的训练配方也不完全相同，因此 Table 2 比较的是完整训练方案，不是孤立的架构变量。
 
-![Table 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028237945.webp)
+![Table 2](https://cdn.giraffish.top/blog/26-07-14-1784028237945.webp)
 
 *Table 2: Comparison with state of the art on popular image classification benchmarks. We report mean and standard deviation of the accuracies, averaged over three fine-tuning runs. Vision Transformer models pre-trained on the JFT-300M dataset outperform ResNet-based baselines on all datasets, while taking substantially less computational resources to pre-train. ViT pre-trained on the smaller public ImageNet-21k dataset performs well too. <sup>∗</sup>Slightly improved 88.5% result reported in Touvron et al. (2020).*
 
 > 💡 **Table 2 批读**: 同用 JFT-300M 时，ViT-L/16 与 BiT-L 的 ImageNet 为 87.76% vs 87.54%，VTAB 为 76.28 vs 76.29%，预训练成本为 0.68k vs 9.9k core-days；主要优势是计算效率，不是精度大幅领先。ViT-H/14 的 88.55% 与 Noisy Student 的 88.4/88.5% 训练范式不同，应视为相近水平。
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028243007.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-07-14-1784028243007.webp)
 
 *Figure 2: Breakdown of VTAB performance in Natural, Specialized, and Structured task groups.*
 
@@ -651,7 +651,7 @@ First, we pre-train ViT models on datasets of increasing size: ImageNet, ImageNe
 
 > 💡 **实验解读**: ViT-L 在 ImageNet 上不如 ViT-B，在 ImageNet-21k 上接近，直到 JFT-300M 才体现大容量收益。三套数据的分布和标签空间也在变化，因此这里只能确认“数据规模与容量存在交互”，不能隔离纯样本数效应。
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028249831.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-07-14-1784028249831.webp)
 
 *Figure 3: Transfer to ImageNet. While large ViT models perform worse than BiT ResNets (shaded area) when pre-trained on small datasets, they shine when pre-trained on larger datasets. Similarly, larger ViT variants overtake smaller ones as the dataset grows.*
 
@@ -661,7 +661,7 @@ Second, we train our models on random subsets of 9M, 30M, and 90M as well as the
 
 > 💡 **对照强度**: 9M、30M、90M 和 300M 均来自 JFT，比跨数据集实验更接近只改变样本量。但小子集未重调正则化，并采用最佳 early-stopping 点和线性 few-shot，可能影响小数据区的相对结果。
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028257344.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-07-14-1784028257344.webp)
 
 *Figure 4: Linear few-shot evaluation on ImageNet versus pre-training size. ResNets perform better with smaller pre-training datasets but plateau sooner than ViT, which performs better with larger pre-training. ViT-b is ViT-B with all hidden dimensions halved.*
 
@@ -677,7 +677,7 @@ We perform a controlled scaling study of different models by evaluating transfer
 
 Figure 5 contains the transfer performance versus total pre-training compute (see Appendix D.5 for details on computational costs). Detailed results per model are provided in Table 6 in the Appendix. A few patterns can be observed. First, Vision Transformers dominate ResNets on the performance/compute trade-off. ViT uses approximately 2–4× less compute to attain the same performance (average over 5 datasets). Second, hybrids slightly outperform ViT at small computational budgets, but the difference vanishes for larger models. This result is somewhat surprising, since one might expect convolutional local feature processing to assist ViT at any size. Third, Vision Transformers appear not to saturate within the range tried, motivating future scaling efforts.
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028260690.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-07-14-1784028260690.webp)
 
 *Figure 5: Performance versus pre-training compute for different architectures: Vision Transformers, ResNets, and hybrids. Vision Transformers generally outperform ResNets with the same computational budget. Hybrids improve upon pure Transformers for smaller model sizes, but the gap vanishes for larger models.*
 
@@ -691,7 +691,7 @@ After the projection, a learned position embedding is added to the patch represe
 
 > 💡 **表征解读**: Patch 投影的主成分类似局部视觉基函数；位置向量的相似度恢复了邻近、同行和同列结构。这说明 ViT 会学习二维关系，但可视化不是因果证据。
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028817586.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-07-14-1784028817586.webp)
 *Figure 6: Representative examples of attention from the output token to the input space. See Appendix D.7 for details.*
 
 > 💡 **Figure 6 批读**: Class token 的注意热点常覆盖物体主体，但“注意力落在主体上”不等于这些区域对预测具有因果作用。
@@ -702,7 +702,7 @@ We find that some heads attend to most of the image already in the lowest layers
 
 > 💡 **Attention distance**: 它是按注意力权重计算的平均空间距离，可类比有效感受野。低层 head 同时有局部与全局分工，深层趋向全局；该统计不包含方向、内容或多跳信息流。
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028265533.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-07-14-1784028265533.webp)
 
 *Figure 7: Left: Filters of the initial linear embedding of RGB values of ViT-L/32. Center: Similarity of position embeddings of ViT-L/32. Tiles show the cosine similarity between the position embedding of the patch with the indicated row and column and the position embeddings of all other patches. Right: Size of attended area by head and network depth. Each dot shows the mean attention distance across images for one of 16 heads at one layer. See Appendix D.7 for details.*
 
@@ -779,9 +779,9 @@ Standard qkv self-attention (SA, Vaswani et al. (2017)) is a popular building bl
 
 > 💡 **批注**: 输入 $z$ 同时投影出 q/k/v；注意力矩阵 $A$ 的形状为 $N×N$，因此 patch 数直接决定二次复杂度。
 
-![Equations 5-6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028271069.webp)
+![Equations 5-6](https://cdn.giraffish.top/blog/26-07-14-1784028271069.webp)
 
-![Equation 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028273937.webp)
+![Equation 7](https://cdn.giraffish.top/blog/26-07-14-1784028273937.webp)
 
 > 💡 **公式解读（5–7）**: 输入 $z\in\mathbb{R}^{N\times D}$ 先通过 $U_{qkv}\in\mathbb{R}^{D\times 3D_h}$ 一次性得到 $q,k,v\in\mathbb{R}^{N\times D_h}$。随后计算 $qk^\top/\sqrt{D_h}$，softmax 沿 key 维归一化得到 $A\in\mathbb{R}^{N\times N}$，最后以 $Av$ 汇总每个位置可见的 value。$1/\sqrt{D_h}$ 防止维度增大时点积幅值过大、softmax 过早饱和；真正的内存瓶颈是显式的 $N\times N$ 注意力矩阵。
 
@@ -789,7 +789,7 @@ Multihead self-attention (MSA) is an extension of SA in which we run k self-atte
 
 > 💡 **批注**: 增加 head 数时让每头维度降为 $D/k$，拼接后仍回到 D，从而大致保持参数量与计算量。
 
-![Equation 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028281847.webp)
+![Equation 8](https://cdn.giraffish.top/blog/26-07-14-1784028281847.webp)
 
 > 💡 **公式解读（8）**: $k$ 个 head 各自产生 $N\times D_h$ 的输出，沿通道维拼接为 $N\times(kD_h)$，再乘 $U_{msa}\in\mathbb{R}^{kD_h\times D}$ 回到 $N\times D$。当 $D_h=D/k$ 时，拼接宽度仍为 $D$；多头机制主要增加表示子空间的分工，而不是无条件扩大总通道数。实现上各 head 通常不会真的逐个循环，而是把投影和 batched matrix multiplication 融合执行。
 
@@ -815,7 +815,7 @@ Multihead self-attention (MSA) is an extension of SA in which we run k self-atte
 
 Table 3 summarizes our training setups for our different models. We found strong regularization to be key when training models from scratch on ImageNet. Dropout, when used, is applied after every dense layer except for the qkv-projections and directly after adding positional embeddings to patch embeddings. Hybrid models are trained with the exact setup as their ViT counterparts. Finally, all training is done on resolution 224.
 
-![Table 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028286727.webp)
+![Table 3](https://cdn.giraffish.top/blog/26-07-14-1784028286727.webp)
 
 *Table 3: Hyperparameters for training. All models are trained with a batch size of 4096 and learning rate warmup of 10k steps. For ImageNet we found it beneficial to additionally apply gradient clipping at global norm 1. Training resolution is 224.*
 
@@ -830,7 +830,7 @@ Table 3 summarizes our training setups for our different models. We found strong
 
 We fine-tune all ViT models using SGD with a momentum of 0.9. We run a small grid search over learning rates, see learning rate ranges in Table 4. To do so, we use small sub-splits from the training set (10% for Pets and Flowers, 2% for CIFAR, 1% ImageNet) as development set and train on the remaining data. For final results we train on the entire training set and evaluate on the respective test data. For fine-tuning ResNets and hybrid models we use the exact same setup, with the only exception of ImageNet where we add another value 0.06 to the learning rate sweep. Additionally, for ResNets we also run the setup of Kolesnikov et al. (2020) and select the best results across this run and our sweep. Finally, if not mentioned otherwise, all fine-tuning experiments run at 384 resolution (running fine-tuning at different resolution than training is common practice (Kolesnikov et al., 2020)).
 
-![Table 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028294654.webp)
+![Table 4](https://cdn.giraffish.top/blog/26-07-14-1784028294654.webp)
 
 *Table 4: Hyperparameters for fine-tuning. All models are fine-tuned with cosine learning rate decay, a batch size of 512, no weight decay, and grad clipping at global norm 1. If not mentioned otherwise, fine-tuning resolution is 384.*
 
@@ -889,13 +889,13 @@ Lastly, we would like to remark that our instantiation of masked patch predictio
 
 We report detailed results corresponding to the figures presented in the paper. Table 5 corresponds to Figure 3 from the paper and shows transfer performance of different ViT models pre-trained on datasets of increasing size: ImageNet, ImageNet-21k, and JFT-300M. Table 6 corresponds to Figure 5 from the paper and shows the transfer performance of ViT, ResNet, and hybrid models of varying size, as well as the estimated computational cost of their pre-training.
 
-![Table 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028302849.webp)
+![Table 5](https://cdn.giraffish.top/blog/26-07-14-1784028302849.webp)
 
 *Table 5: Top1 accuracy (in %) of Vision Transformer on various datasets when pre-trained on ImageNet, ImageNet-21k or JFT300M. These values correspond to Figure 3 in the main text. Models are fine-tuned at 384 resolution. Note that the ImageNet results are computed without additional techniques (Polyak averaging and 512 resolution images) used to achieve results in Table 2.*
 
 > 💡 **Table 5 批读**: ViT-L/16 的 ImageNet 迁移准确率随预训练数据从 ImageNet、ImageNet-21k 到 JFT-300M 依次为 76.53%、85.15% 和 87.12%；数据规模的增益远大于单纯扩大模型。ViT-H/14 只在更大数据设置中报告，JFT 上达到 88.04%，但这里未使用 Table 2 的 Polyak averaging 与 512/518 高分辨率技巧，因此不能把 88.04% 与主表旗舰数字混为同一配置。
 
-![Table 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028310080.webp)
+![Table 6](https://cdn.giraffish.top/blog/26-07-14-1784028310080.webp)
 
 *Table 6: Detailed results of model scaling experiments. These correspond to Figure 5 in the main paper. We show transfer accuracy on several datasets, as well as the pre-training compute (in exaFLOPs).*
 
@@ -935,7 +935,7 @@ We report detailed results corresponding to the figures presented in the paper. 
 
 ResNets are typically trained with SGD and our use of Adam as optimizer is quite unconventional. Here we show the experiments that motivated this choice. Namely, we compare the fine-tuning performance of two ResNets – 50x1 and 152x2 – pre-trained on JFT with SGD and Adam. For SGD, we use the hyperparameters recommended by Kolesnikov et al. (2020). Results are presented in Table 7. Adam pre-training outperforms SGD pre-training on most datasets and on average. This justifies the choice of Adam as the optimizer used to pre-train ResNets on JFT. Note that the absolute numbers are lower than those reported by Kolesnikov et al. (2020), since we pre-train only for 7 epochs, not 30.
 
-![Table 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028319522.webp)
+![Table 7](https://cdn.giraffish.top/blog/26-07-14-1784028319522.webp)
 
 *Table 7: Fine-tuning ResNet models pre-trained with Adam and SGD.*
 
@@ -949,7 +949,7 @@ ResNets are typically trained with SGD and our use of Adam as optimizer is quite
 
 We ran ablations on scaling different dimensions of the Transformer architecture to find out which are best suited for scaling to very large models. Figure 8 shows 5-shot performance on ImageNet for different configurations. All configurations are based on a ViT model with 8 layers, $D = 1024$, $D _ { M L P } = 2048$ and a patch size of 32, the intersection of all lines. We can see that scaling the depth results in the biggest improvements which are clearly visible up until 64 layers. However, diminishing returns are already visible after 16 layers. Interestingly, scaling the width of the network seems to result in the smallest changes. Decreasing the patch size and thus increasing the effective sequence length shows surprisingly robust improvements without introducing parameters. These findings suggest that compute might be a better predictor of performance than the number of parameters, and that scaling should emphasize depth over width if any. Overall, we find that scaling all dimensions proportionally results in robust improvements.
 
-![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028326119.webp)
+![Figure 8](https://cdn.giraffish.top/blog/26-07-14-1784028326119.webp)
 
 *Figure 8: Scaling different model dimensions of the Vision Transformer.*
 
@@ -967,7 +967,7 @@ This design is inherited from the Transformer model for text, and we use it thro
 
 > 💡 **批注**: 分类聚合方式与优化超参数耦合；不能用未调学习率的 GAP 结果证明 class token 必需。
 
-![Figure 9](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028331498.webp)
+![Figure 9](https://cdn.giraffish.top/blog/26-07-14-1784028331498.webp)
 
 *Figure 9: Comparison of class-token and global average pooling classifiers. Both work similarly well, but require different learning-rates.*
 
@@ -993,13 +993,13 @@ In addition to different ways of encoding spatial information, we also tried dif
 
 > 💡 **设计空间解读**: 这里同时改变“位置是什么”和“位置在哪一层注入”。绝对 1D/2D 编码直接给 token 加坐标，relative attention 则把相对位移变成 attention logits 的偏置；每层独立注入提高自由度，却增加参数并可能重复学习同一空间关系。
 
-![Table 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028336801.webp)
+![Table 8](https://cdn.giraffish.top/blog/26-07-14-1784028336801.webp)
 
 *Table 8: Results of the ablation study on positional embeddings with ViT-B/16 model evaluated on ImageNet 5-shot linear.*
 
 > 💡 **Table 8 批读**: 去掉位置编码时 5-shot 指标为 0.61382，默认 1D stem 编码为 0.64206，相差约 2.82 个百分点；而有位置的各种方案集中在约 0.6396–0.6429。决定性因素是“有没有位置”，不是 1D、2D、相对位置或逐层注入中的细微选择。
 
-![Figure 10](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028339405.webp)
+![Figure 10](https://cdn.giraffish.top/blog/26-07-14-1784028339405.webp)
 
 
 
@@ -1025,7 +1025,7 @@ Another quantity of interest is the largest batch-size each model can fit onto a
 
 > 💡 **批注**: 最大 batch 更大意味着训练大数据时并行效率更好，这是 ViT 计算优势的重要硬件侧证据。
 
-![Figure 12](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028352031.webp)
+![Figure 12](https://cdn.giraffish.top/blog/26-07-14-1784028352031.webp)
 *Figure 12: Left: Real wall-clock timings of various architectures across input sizes. ViT models have speed comparable to similar ResNets. Right: Largest per-core batch-size fitting on device with various architectures across input sizes. ViT models are clearly more memory-efficient.*
 
 > 💡 **Figure 12 批读**: 实际吞吐并未完全呈理论二次恶化，且大型 ViT 的可容纳 batch 明显优于 ResNet。
@@ -1044,7 +1044,7 @@ Moreover, we have modified ViT to process inputs in the 2-dimensional shape, ins
 
 Figure 13 presents the performance of Axial ResNet, Axial-ViT-B/32 and Axial-ViT-B/16 on ImageNet 5-shot linear, when pre-trained on the JFT dataset, versus the pre-training compute, both in terms of number of FLOPs and inference time (examples per second). As we can see, both Axial-ViT-B/32 and Axial-ViT-B/16 do better than their ViT-B counterpart in terms of performance, but it comes at the cost of more compute. This is because in Axial-ViT models, each Transformer block with global self-attention is replaced by two Axial Transformer blocks, one with row and one with column self-attention, and although the sequence length that self-attention operates on is smaller in the axial case, there is an extra MLP per Axial-ViT block. For the AxialResNet, although it looks reasonable in terms of accuracy/compute trade-off (Figure 13, left), the naive implementation is extremely slow on TPUs (Figure 13, right).
 
-![Figure 13](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028360135.webp)
+![Figure 13](https://cdn.giraffish.top/blog/26-07-14-1784028360135.webp)
 
 *Figure 13: Performance of Axial-Attention based models, in terms of top-1 accuracy on ImageNet 5-shot linear, versus their speed in terms of number of FLOPs (left) and inference time (left).*
 
@@ -1058,7 +1058,7 @@ Figure 13 presents the performance of Axial ResNet, Axial-ViT-B/32 and Axial-ViT
 
 To understand how ViT uses self-attention to integrate information across the image, we analyzed the average distance spanned by attention weights at different layers (Figure 11). This “attention distance” is analogous to receptive field size in CNNs. Average attention distance is highly variable across heads in lower layers, with some heads attending to much of the image, while others attend to small regions at or near the query location. As depth increases, attention distance increases for all heads. In the second half of the network, most heads attend widely across tokens.
 
-![Figure 11](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028365941.webp)
+![Figure 11](https://cdn.giraffish.top/blog/26-07-14-1784028365941.webp)
 
 *Figure 11: Size of attended area by head and network depth. Attention distance was computed for 128 example images by averaging the distance between the query pixel and all other pixels, weighted by the attention weight. Each dot shows the mean attention distance across images for one of 16 heads at one layer. Image width is 224 pixels.*
 
@@ -1074,7 +1074,7 @@ To compute maps of the attention from the output token to the input space (Figur
 
 > 💡 **批注**: Rollout 比只看最后一层注意力更合理，因为它累计了中间层 token 混合路径；但它仍不是严格因果解释。
 
-![Figure 14](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028370835.webp)
+![Figure 14](https://cdn.giraffish.top/blog/26-07-14-1784028370835.webp)
 
 *Figure 14: Further example attention maps as in Figure 6 (random selection).*
 
@@ -1094,7 +1094,7 @@ We also evaluate our flagship ViT-H/14 model on the ObjectNet benchmark followin
 
 Table 9 shows the scores attained on each of the VTAB-1k tasks.
 
-![Table 9](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-07-14-1784028377943.webp)
+![Table 9](https://cdn.giraffish.top/blog/26-07-14-1784028377943.webp)
 
 *Table 9: Breakdown of VTAB-1k performance across tasks.*
 

@@ -1,6 +1,6 @@
 ---
-index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788270806377.webp'
-banner_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp'
+index_img: 'https://cdn.giraffish.top/blog/26-09-01-1788270806377.webp'
+banner_img: 'https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp'
 title: 'ACWM：[ICCV 2025] IRASim'
 categories:
   - 论文批读
@@ -166,7 +166,7 @@ World models empower agents to foresee the outcomes of their actions by learning
 
 When training a world model for robot manipulation, accurately simulating the intricate interactions between the robot, objects, and the surrounding environment remains a substantial challenge. Manipulation tasks are inherently delicate, where even subtle variations can result in task failure. Consequently, constructing a fine-grained world model is essential for faithfully capturing these precise interactions. Moreover, modern robotic manipulation policy leverages an action chunking technique [4, 5] which generates action trajectories rather than single actions to accomplish complex manipulation tasks. In this paper, we focus on building a world model that generates videos, with fine-grained robot-object interaction details, of a robot executing an action trajectory given historical observation (Fig. 1). We refer to this task as the trajectory-to-video task. Inspired by recent advances in text-to-video generation [6, 7], we leverage generative models to capture visual details that are essential for representing the intricate dynamics of the world (e.g., robot-object contact and object articulation). However, text-to-video models are trained to generate videos based on high-level textual descriptions that provide general contextual cues rather than detailed, frame-level instructions. This is diferent from the trajectory-to-video task in which each action in the trajectory provides an exact description of the robot’s movement in each frame of the predicted video.
 
-![Figure 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261236005.webp)
+![Figure 1](https://cdn.giraffish.top/blog/26-09-01-1788261236005.webp)
 
 *Figure 1 Overview of IRASim. IRASim is a fine-grained world model for robot manipulation. It generates high-fidelity videos that simulate accurate robot-object interactions of a robot executes an action trajectory, given historical observation.*
 
@@ -276,7 +276,7 @@ However, directly difusing the entire video in the pixel space is time-consuming
 
 ### 3.3 IRASim
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261258772.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-09-01-1788261258772.webp)
 
 *Figure 2 Network Architecture of IRASim. (a) shows the general difusion transformer architecture of IRASim. The input to IRASim includes the historical frames and the given trajectory. (b) Video-level adaptation (Video-Ada). (c) Frame-level adaptation (Frame-Ada).*
 
@@ -367,13 +367,13 @@ Metrics. Following [39], we evaluate the performance with two types of metrics: 
 
 Video Generation of Short Trajectories. Qualitative results are shown in Fig. 3(a) and Fig. 10. Quantitative results are shown in Tab. 1. As shown in Fig. 3(a) and Fig. 10, IRASim-Frame-Ada efectively models fine-grained robot-object interactions and generates high-quality videos that closely align with the ground truth. It surpasses all the comparing baseline methods in our primary evaluation metrics, Latent L2 and PSNR, as well as the human evaluation in Sec 4.1. As illustrated in Appendix A.1 & A 11, baseline methods struggle to guide the robot arm along the given trajectory and fail to realistically simulate interactions between the robot and the objects.
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261262759.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-09-01-1788261262759.webp)
 
 *Figure 3 Qualitative Results. We show video generation of IRASim with (a) short trajectories and (b) long trajectories on the test set of RT-1, Bridge, and Language-Table. Ground-truths are in blue boxes. Predictions are in orange boxes. Initial ground-truth video frames are in green boxes. Please see our project page for videos.*
 
 > 💡 **图 3 解读**: 绿色为历史真值、蓝色为未来真值、橙色为预测。
 
-![Table 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261269349.webp)
+![Table 1](https://cdn.giraffish.top/blog/26-09-01-1788261269349.webp)
 
 *Table 1 Quantitative results for short-trajectory video generation. We prioritize Latent L2 and PSNR as the primary evaluation metrics. Video-Ada and Frame-Ada are variants of IRASim.*
 
@@ -393,13 +393,13 @@ Video Generation of Short Trajectories. Qualitative results are shown in Fig. 3(
 >衡量图像结构相似度，例如边缘，亮度，局部结构
 > 
 
-![Table 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788257401975.webp)
+![Table 2](https://cdn.giraffish.top/blog/26-09-01-1788257401975.webp)
 
 *Table 2 Quantitative results for video generation on RoboNet dataset. &#42; indicates that the result is derived from [25].*
 
 Video Generation of Long Trajectories. Qualitative results are shown in Fig. 3(b) and Fig. 11. Quantitative results are shown in Tab. 3. We compare IRASim with the best baseline method LVDM [33]. IRASim-Frame-Ada consistently outperforms the comparison methods in all three datasets on Latent L2 loss. Fig. 3(b) and Fig. 11 show that it retains the powerful capability of generating visually realistic and accurate videos as in the short trajectory setting.
 
-![Table 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261272118.webp)
+![Table 3](https://cdn.giraffish.top/blog/26-09-01-1788261272118.webp)
 
 *Table 3 Quantitative Results on Video Generation of Long Trajectories.*
 
@@ -407,7 +407,7 @@ Video Generation of Long Trajectories. Qualitative results are shown in Fig. 3(b
 
 Human Preference Evaluation. We also perform a user study to help understand human preferences between IRASim-Frame-Ada and other methods. We juxtapose the videos of predicted by IRASim-Frame-Ada and the comparing method and ask humans which one they prefer. The ground-truth is also provided as a reference. IRASim-Frame-Ada beats all the comparing methods in all three datasets (Fig. 4). This result aligns with the Latent L2 loss which justifies the reason for using Latent L2 loss as one of the primary evaluation metrics.
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261275172.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-09-01-1788261275172.webp)
 
 *Figure 4 Human Preference Evaluation. We perform a user study to evaluate the human preference between IRASim-Frame-Ada and other baseline methods.*
 
@@ -415,7 +415,7 @@ Human Preference Evaluation. We also perform a user study to help understand hum
 
 Scaling. We follow [35] and train IRASim-Frame-Ada with diferent model sizes, ranging from 33M to 679M. Detailed parameters of these models are shown Appendix E. Results are shown in Fig. 5. Across all three test datasets, IRASim scales efectively with larger model size and more training steps, highlighting its strong potential for further performance gains through increased computation.
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261277952.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-09-01-1788261277952.webp)
 
 *Figure 5 Scaling. IRASim scales efectively with the increase of model sizes and training steps.*
 
@@ -429,13 +429,13 @@ We train the difusion policy with four diferent steps on the task of "pick up th
 
 Fig. 6 shows successful and failed rollouts generated by IRASim. Notably, IRASim successfully simulates scenarios where the bowl slips from the gripper, demonstrating strong capabilities to model fine-grained robot-object interaction. Tab. 4 reports the success rates of diferent models evaluated with the ground-truth Mujoco simulator and IRASim. The Pearson correlation coeficient between the two evaluation results is 0.99, indicating a strong correlation between evaluating in the ground-truth Mujoco simulator and IRASim. This result showcases the potential of levaraging IRASim as a world model for scalable real-world policy evaluation.
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261281469.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-09-01-1788261281469.webp)
 
 *Figure 6 Policy Evaluation with IRASim. IRASim can simulate both successful and failed rollouts. Notably, it is able to simulate a bowl slipping from the gripper.*
 
 > 💡 **图 6 解读**: 图中同时给出成功放置与碗从夹爪滑落的生成 rollout，说明模型的输出不只复制专家成功模式。
 
-![Table 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261284648.webp)
+![Table 4](https://cdn.giraffish.top/blog/26-09-01-1788261284648.webp)
 
 *Table 4 Success rates of four diferent models evaluated in the two evaluators. We observe a strong correlation between the evaluation results from the ground-truth Mujoco simulator and IRASim. The Pearson correlation coeficient between the two evaluations is 0.99.*
 
@@ -447,7 +447,7 @@ In this section, we perform experiments in both simulation and real-world settin
 
 > 💡 **与 GPC/经典 MPC 的关系**: 这是采样式 model-predictive ranking：模型不优化动作，只预测候选的视觉后果。相较 GPC-RANK+OPT，它避免对扩散过程求梯度，但计算量随候选数 K 线性增长。
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261286903.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-09-01-1788261286903.webp)
 
 *Figure 7 IRASim simulates the visual outcomes of diferent trajectories sampled from the policy and predicts the value of the final frame with a reward model. By selecting and executing the trajectory with the highest predicted value, we enhance the existing policy by spending more time thinking (test-time compute).*
 
@@ -461,7 +461,7 @@ Results are shown in Tab. 5. The K = 1 column show the performance of the vanill
 
 > 💡 **关键消融**: P=0 时 K 越大性能越差，体现典型的 model exploitation：候选越多，越容易选中世界模型错误乐观的轨迹。加入失败/非专家 rollout 后，世界模型覆盖扩大，K 的 scaling 才转为正向。
 
-![Table 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261289772.webp)
+![Table 5](https://cdn.giraffish.top/blog/26-09-01-1788261289772.webp)
 
 *Table 5 Results on Push-T Benchmark. K denotes the number of sampled trajectory. P denotes the number of post-trained rollouts used for training IRASim. We report the average IoU over 100 trials. &#42;GPC also uses additional rollouts beyond expert demonstrations to train the world model, but the number of these rollouts is not available in the paper [58].*
 
@@ -471,13 +471,13 @@ Real-Robot Experiments. We train IRASim on a real-robot dataset and perform expe
 
 Qualitative results are shown in Fig. 8. Quantitative results are shown in Tab. 6. We experiment with two functions for similarity comparison: 1) mean squared error (MSE) and 2) cosine similarity of the feature extracted from ResNet50. We observe that the MSE for value functions significantly outperformed the ResNet counterpart. And both variants significantly outperform the policy without planning which randomly selects a trajectory for rollout. These results demonstrate the potential of IRASim as a real-world manipulation world model for model-based planning. More details and discussion can be found in Appendix G.
 
-![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261292630.webp)
+![Figure 8](https://cdn.giraffish.top/blog/26-09-01-1788261292630.webp)
 
 *Figure 8 Qualitative Results on Real-Robot Model-based Planning. Historical frames are highlighted in red boxes, goal images in green boxes, real-robot rollouts in blue boxes, and videos generated by IRASim are shown in orange boxes. IRASim can generate videos, that faithfully matches with the ground truth in tasks involving object transportation and articulated object manipulation, enabling efective model-based planning.*
 
 > 💡 **图 8 解读**: 完整裁图把三个任务的历史帧、目标图、真实 rollout 与 IRASim 预测并列展示，可直接检查“预测结果是否足以给候选排序”。但三个任务都来自训练数据，且属于精选定性样例，因此不能单独证明对新任务或新场景的泛化。
 
-![Table 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261296123.webp)
+![Table 6](https://cdn.giraffish.top/blog/26-09-01-1788261296123.webp)
 
 *Table 6 Quantitative Results on Real-Robot Model-based Planning.*
 
@@ -487,7 +487,7 @@ Qualitative results are shown in Fig. 8. Quantitative results are shown in Tab. 
 
 In this section, we perform qualitative experiments in which we “control” the virtual robot in two datasets, Language-Table [10] and RT-1 [8], using trajectories collected with two distinct input sources: a keyboard and a VR controller. Notably, the trajectories collected through these input sources exhibit distributions that deviate from those in the original dataset. For Language-Table with a 2D translation action space, we use the arrow keys on the keyboard to input action trajectories. For RT-1 with a 3D action space, we use a VR controller to collect action trajectories as input. Specifically, we prompt IRASim with an image from each dataset and a trajectory collected with the keyboard or VR controller. Fig. 9 shows the video generated by IRASim. IRASim is able to follow trajectories collected with diferent input sources and simulate robot-object interaction in a realistic and reasonable way. More importantly, it is able to robustly handle multimodality in generation. Fig. 9(a) shows videos generated with an identical initial frame but diferent trajectories. In Appendix A.4, we demonstrate that IRASim can also handle physically implausible trajectories robustly.
 
-![Figure 9](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261299049.webp)
+![Figure 9](https://cdn.giraffish.top/blog/26-09-01-1788261299049.webp)
 
 *Figure 9 Flexible Action Controllability. We showcase controlling (a) the virtual robot in Language-Table with arrow keys on a keyboard and (b) the robot in RT-1 with a VR controller. Predictions are in orange boxes; initial frames are in green boxes.*
 
@@ -562,7 +562,7 @@ Qualitative results are shown in Fig. 12. IRASim-Frame-Ada consistently improves
 
 We perform experiments on rolling out a physically implausible trajectory. In particular, we input a trajectory that commands the robot to move downward even after it touches the table. Physically, the robot cannot penetrate the table and thus will remain on the table even if the input control commands it to move down. We input this trajectory to IRASim to evaluate its performance in handling physically implausible trajectories. As shown in Fig. 14, IRASim can generate physically accurate videos where the robot stays on the table.
 
-![Table 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261303761.webp)
+![Table 7](https://cdn.giraffish.top/blog/26-09-01-1788261303761.webp)
 
 *Table 7 Dataset Statistics. An "episode" is a single trial where the robot completes a task. A "sample" is a clip from an episode. "-" indicates that we follow previous work and do not use a validation set.*
 
@@ -624,13 +624,13 @@ In this section, we detail the baseline implementation. For VDM [32], we leverag
 
 We also briefly introduce the baseline details of iVideoGPT [25] and MaskViT [24]. Both of them use VQGAN [60] as the image tokenizer and require additional finetuning it on RoboNet, while IRASim employs the VAE encoder from SDXL [49] without the need for extra finetuning. Their parameter sizes are 436M and 228M, respectively. Moreover, iVideoGPT undergoes extensive pre-training on OpenX-Embodiment [61], whereas IRASim achieves better video prediction performance with training only on RoboNet.
 
-![Table 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261307486.webp)
+![Table 8](https://cdn.giraffish.top/blog/26-09-01-1788261307486.webp)
 
 *Table 8 Hyperparameters for VDM.*
 
 > 💡 **表 8 解读**: VDM 的表格给出较小 40M U-Net 配置；它还在 Language-Table 上降低训练分辨率，因此与 IRASim-XL 的总结果比较包含显著容量和分辨率差异。
 
-![Table 9](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261310044.webp)
+![Table 9](https://cdn.giraffish.top/blog/26-09-01-1788261310044.webp)
 
 *Table 9 Hyperparameters for LVDM.*
 
@@ -660,7 +660,7 @@ In this section, we detail the real-robot model-based planning experiment. The e
 
 Experiment Setup. We follow Babaeizadeh et al. [23] to set up this experiment. We implement a model-based policy to show the usefulness of IRASim. Our policy consists of a sampling-based planner, a cost function, and IRASim as the dynamic function. We first train IRASim with our own real robot dataset.
 
-![Table 10](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261313215.webp)
+![Table 10](https://cdn.giraffish.top/blog/26-09-01-1788261313215.webp)
 
 *Table 10 Hyperparameters for training IRASim.*
 
@@ -680,35 +680,35 @@ The screenshot of the GUI used in the human evaluation is shown in Fig. 15. The 
 
 You are asked to choose the more realistic and accurate video from two generated videos (shown above). The ground-truth video is given as a reference (shown below). Please carefully examine the given videos. If you can find a significant diference between the two generated videos, you may choose which one is better immediately. If not, please replay the videos more times. If you are still not able to find diferences, you may choose the "similar" option. Please do not guess. Your decision needs solid evidence.
 
-![Table 11](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261317710.webp)
+![Table 11](https://cdn.giraffish.top/blog/26-09-01-1788261317710.webp)
 
 *Table 11 Model Sizes. We use IRASim as an abbreviation of IRASim-Frame-Ada for brevity.*
 
-![Table 12](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261320571.webp)
+![Table 12](https://cdn.giraffish.top/blog/26-09-01-1788261320571.webp)
 
 *Table 12 Compution resources for training IRASim.*
 
-![Figure 10](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261323567.webp)
+![Figure 10](https://cdn.giraffish.top/blog/26-09-01-1788261323567.webp)
 
 *Figure 10 Additional Qualitative Results on Video Generation of Short Trajectories. We compare the results of diferent methods on (a) RT-1, (b) Bridge, and (c) Language-Table. Diferences between IRASim-Frame-Ada and other methods are highlighted in green and red boxes.*
 
-![Figure 11](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261329154.webp)
+![Figure 11](https://cdn.giraffish.top/blog/26-09-01-1788261329154.webp)
 
 *Figure 11 Additional Qualitative Results on Video Generation of Long Trajectories. We compare the results of diferent methods on (a) RT-1, (b) Bridge, and (c) Language-Table. Diferences between IRASim-Frame-Ada and other methods are highlighted in green and red boxes. Note that the input trajectory is the entire trajectory of an episode.*
 
-![Figure 12](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261334215.webp)
+![Figure 12](https://cdn.giraffish.top/blog/26-09-01-1788261334215.webp)
 
 *Figure 12 Additional Qualitative Results on Scaling. We compare the results of IRASim-Frame-Ada with diferent model sizes on (a) RT-1, (b) Bridge, and (c) Language-Table.*
 
-![Figure 13](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261339339.webp)
+![Figure 13](https://cdn.giraffish.top/blog/26-09-01-1788261339339.webp)
 
 *Figure 13 Quantitative results of IRASim-Frame-Ada on the RoboNet dataset. The robot is dragging the clothes, indicating that IRASim is capable of simulating the deformation of flexible objects.*
 
-![Figure 14](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261343219.webp)
+![Figure 14](https://cdn.giraffish.top/blog/26-09-01-1788261343219.webp)
 
 *Figure 14 Quantitative results show that IRASim is robust to physically implausible trajectories. We control the robot to poke at the table and record the command trajectory, which is very dangerous as it could damage the robot. As a result, the robotic arm is blocked by the table. We find that executing the same trajectory in IRASim yields similar results, rather than the robotic arm passing through the table. This indicates that IRASim has a certain understanding of the physical laws of the real world.*
 
-![Figure 15](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-09-01-1788261345956.webp)
+![Figure 15](https://cdn.giraffish.top/blog/26-09-01-1788261345956.webp)
 
 *Figure 15 Screenshot of the GUI in Human Preference Evaluation. The two videos in the upper row are generated by IRASim-Frame-Ada and a comparing method, arranged in a random left-right order. The video in the lower row is the ground-truth video.*
 

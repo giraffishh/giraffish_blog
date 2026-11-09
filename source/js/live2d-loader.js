@@ -1,5 +1,5 @@
-// GitLab Raw serves JS/CSS as text/plain + nosniff. Fetch the mirror
-// files with CORS, then load scripts and styles with explicit types.
+// Fetch Live2D assets from the CDN with CORS, then load the
+// scripts and styles with explicit types.
 (() => {
   const entry = document.currentScript;
   if (screen.width < 768 || window.__giraffishLive2DLoading) return;

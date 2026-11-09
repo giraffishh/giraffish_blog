@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774442387365.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774442387365.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-25-1774421924055.webp
+  https://cdn.giraffish.top/blog/26-03-25-1774421924055.webp
 title: 'VLA-RTC：[Arxiv 2509.23224] A2C2 Leave-No-Observation-Behind'
 categories:
   - 论文批读
@@ -191,7 +191,7 @@ The trend of scaling up neural network policies using foundation models brings r
 > - **隐式 open-loop**: 一旦 chunk 生成完成，执行期间就不再看新 observation
 > - **真正棘手的点**: 第二层问题不会因为把推理做得更快就自动消失，它解释了为什么即使没有显式 delay，只要 horizon 拉长，性能也仍然会掉。
 
-![Figure 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547330708.webp)
+![Figure 1](https://cdn.giraffish.top/blog/26-03-27-1774547330708.webp)
 
 *Figure 1: 异步 action chunk 执行示意图。每个执行动作至少基于落后 `d` 步的 observation，最坏情况会落后 `d + e` 步。*
 
@@ -326,7 +326,7 @@ $$
 > - $\tau_k$ 是 chunk 内位置特征，指示当前修正对应第 $k$ 个 action，使模型区分 chunk 前段、中段和后段的时间语义。
 > - $z_{t+k}$ 是 base policy 的内部表示，$l$ 是语言指令；二者共同提供任务上下文，约束 correction 不偏离原任务语义。
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547341483.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-03-27-1774547341483.webp)
 *Figure 2: A2C2 总览。大模型继续产出 chunk，小模型在 chunk 内逐步修正当前动作。*
 
 > 💡 **Figure 2 批读**: 如果 RTC 是“新旧 chunk 的粘合剂”，A2C2 更像“当前 action 的校准器”。它并不回头重采整个 chunk，而是只修改马上要执行的那个 action。
@@ -383,7 +383,7 @@ $$
 
 With these inference results, we created a new dataset for correction head training $D_{\mathrm{cor}}$ as
 
-![Correction Dataset](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547347788.webp)
+![Correction Dataset](https://cdn.giraffish.top/blog/26-03-27-1774547347788.webp)
 *复杂数据集定义：correction head 的训练样本显式包含历史时刻预测出的 base action 与时间特征。*
 
 > 💡 **Correction Dataset 批读**:
@@ -399,7 +399,7 @@ $$
 
 $\hat{a}$ is a base action inferred by the base policy. There are some possible combinations of the base action with different time features $\tau$. The predicted residual action is denoted by $\Delta a_{\mathrm{residual}}$. The loss function is the mean squared error (MSE):
 
-![MSE Loss](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547715174.webp)
+![MSE Loss](https://cdn.giraffish.top/blog/26-03-27-1774547715174.webp)
 *复杂损失定义：correction head 只学 residual，不需要重新学习整条动作序列。*
 
 Where $N$ denotes the batch size, i.e., the number of training samples in a mini-batch.
@@ -447,7 +447,7 @@ For benchmarking 3D robot manipulation, we used the LIBERO Spatial benchmark, wh
 
 In Kinetix, we used a flow-matching policy as the base model, following prior work on RTC (Black et al., 2025). The correction head network is a 3-layer multilayer perceptron (MLP). The input layer receives the concatenation of the state vector (2722-dim), the base action (6-dim), and the 2-dimensional sinusoidal positional feature. We did not use language instructions or latent representations from base policies, as the model was trained and evaluated separately for each task. Hidden layers have 512 units each with ReLU activation (Nair & Hinton, 2010) and layer normalization (Ba et al., 2016). The output layer produces a 6-dimensional residual vector, which is added elementwise to the base action. The total parameter count is 0.31M. Figure 3 shows the implementation detail for the Kinetix experiment.
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547356349.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-03-27-1774547356349.webp)
 *Figure 3: Kinetix 中的 correction head 是一个很小的 MLP，输入当前状态、base action 和 chunk 位置编码，输出 residual action。*
 
 > 💡 **Figure 3 批读**:
@@ -460,7 +460,7 @@ In Kinetix, we used a flow-matching policy as the base model, following prior wo
 
 For LIBERO Spatial, we adopted SmolVLA (Shukor et al., 2025) (450M parameters) as the base, since it provides competitive performance among VLA models. The correction head consists of a transformer encoder and a lightweight MLP. Visual observations (top and wrist cameras) are encoded into 512-dimensional tokens using a ResNet-18 (He et al., 2016) pretrained on ImageNet (Deng et al., 2009). Language instructions are embedded by the smolVLM encoder provided in the base policy. The base action, latent features of the base policy, and the sinusoidal time embedding are also projected into 512-dim tokens. All tokens are concatenated and processed by a 6-layer transformer encoder. The pooled embedding, along with the base action and state vector, is passed through a 3-layer MLP (hidden size 512) to predict the residual action. The number of total parameters is 32M. Figure 4 shows the implementation detail for the LIBERO experiment.
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547360523.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-03-27-1774547360523.webp)
 *Figure 4: LIBERO 中的 correction head 更复杂，需要消费视觉 token、语言特征、state、base action 和时间嵌入。*
 
 > 💡 **Figure 4 批读**:
@@ -490,7 +490,7 @@ We evaluate the proposed action chunk correction framework in the Kinetix benchm
 
 In contrast, the action chunk correction maintains consistently higher success rates across all settings. Because it refines each action using the most recent observation, the action chunk correction can counteract both the temporal misalignment introduced by inference delay and the drift that accumulates within long action horizons. For example, at delay $d = 4$, our proposed method achieves nearly `35%` higher success than the naive baseline, and remains above `85%` even for horizons $H = 7$. This demonstrates that real-time correction of action chunks maintains performance both with inference delays and with long-horizon execution.
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547188817.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-03-27-1774547188817.webp)
 *Figure 5: Kinetix 总结果。左图固定 `e = max(d, 1)` 看 delay 效应，右图固定 `d = 1` 看 execution horizon 效应。*
 
 > 💡 **Figure 5 批读**:
@@ -503,7 +503,7 @@ In contrast, the action chunk correction maintains consistently higher success r
 
 Figure 6 and Table 1 summarize the evaluation on the LIBERO Spatial benchmark. We tested the Naive async and A2C2 on this setting. Across 10 manipulation tasks with multimodal inputs, the correction head consistently improved success rates over the naive baseline under both long horizons and injected delays. For example, with execution horizon $H = 40$ and delay $d = 10$, the naive baseline achieved only `67%` success, whereas A2C2 reached `84%`. Even when no delay was present, action chunk correction provided notable gains at long horizons ($H = 50$, $d = 0$), raising success from `72.2%` to `81.6%`. These results demonstrate that residual refinement by the correction head mitigates the degradation caused by outdated action chunks and restores closed-loop responsiveness, enabling large VLA models to maintain high success rates in tasks that require fine-grained spatial reasoning.
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547273397.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-03-27-1774547273397.webp)
 *Figure 6: LIBERO Spatial 结果。左图固定 execution horizon 看 delay 效应，右图固定 `d = 0` 看 execution horizon 效应。*
 
 > 💡 **Figure 6 批读**:
@@ -627,7 +627,7 @@ Appendix 里最值钱的是三类信息: 任务环境、训练超参数、以及
 
 We reused the 12 tasks from the Kinetix benchmark (Matthews et al., 2025) used in the RTC paper (Black et al., 2025). A sample visualization of each of the environments is shown in Figure 7. The Kinetix environment has an observation space with 2722 dimensions which do not include any images. Instead, it encodes information about polygons, circles, joints, thrusters, gravity, and the states of motors and thrusters described below. For entities not used in a given task, their corresponding entries are zero-padded. The action space has 6 dimensions. The first four correspond to motor controls, and the last two correspond to thruster controls. For unused actuators, their entries are set to zero via padding.
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547286484.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-03-27-1774547286484.webp)
 *Figure 7: Kinetix 的 12 个任务示意图。*
 
 > 💡 **Kinetix 环境特点**: 没有图像输入，状态向量很大，但最关键的是物理过程动态性强，所以 stale action 会很快放大成失败。
@@ -672,7 +672,7 @@ The correction head is then trained with the flow policy. The correction policy 
 
 In the evaluation, we rolled out 2048 per task and computed the success rate for different delays and execution horizon lengths. In the Kinetix simulation, we tested all combinations of delay and execution horizons compatible with the chosen action chunk size. All results are in Table 4.
 
-![Table 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-27-1774547292061.webp)
+![Table 4](https://cdn.giraffish.top/blog/26-03-27-1774547292061.webp)
 *Table 4: Kinetix 在不同 delay / execution horizon 下的完整结果。每个单元格依次给出 naive、RTC、A2C2。*
 
 > 💡 **Table 4 批读**:

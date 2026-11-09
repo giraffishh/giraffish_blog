@@ -1,6 +1,6 @@
 ---
-index_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-02-1767347342110.webp'
-banner_img: 'https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766802296337.webp'
+index_img: 'https://cdn.giraffish.top/blog/26-01-02-1767347342110.webp'
+banner_img: 'https://cdn.giraffish.top/blog/25-12-27-1766802296337.webp'
 title: CS203 Data Structure and Algorithm Analysis
 categories:
   - 学习笔记
@@ -199,7 +199,7 @@ void postOrder(TreeNode root) {
 
 ### 哈夫曼编码
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-28-1766903490802.webp)
+![](https://cdn.giraffish.top/blog/25-12-28-1766903490802.webp)
 
 伪代码：
 
@@ -324,7 +324,7 @@ sandbox="allow-scripts allow-same-origin"
 - **小顶堆（min heap）**：任意节点的值 $\leq$ 其子节点的值
 - **大顶堆（max heap）**：任意节点的值 $\geq$ 其子节点的值
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766848535739.png)
+![](https://cdn.giraffish.top/blog/25-12-27-1766848535739.png)
 
 下文实现的是大顶堆，若要将其转换为小顶堆，只需将所有大小逻辑判断进行逆转（例如，将 $\geq$ 替换为 $\leq$ ）
 
@@ -336,7 +336,7 @@ sandbox="allow-scripts allow-same-origin"
 
 如下图所示，给定索引 $i$ ，其左子节点的索引为 $2i + 1$ ，右子节点的索引为 $2i + 2$ ，父节点的索引为 $(i - 1) / 2$（向下整除）。当索引越界时，表示空节点或节点不存在
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766848848137.png)
+![](https://cdn.giraffish.top/blog/25-12-27-1766848848137.png)
 
 ### 堆的操作
 
@@ -494,7 +494,7 @@ $$
 
 如下图所示，设邻接矩阵为 $M$、顶点列表为 $V$ ，那么矩阵元素 $M[i, j] = 1$ 表示顶点 $V[i]$ 到顶点 $V[j]$ 之间存在边，反之 $M[i, j] = 0$ 表示两顶点之间无边
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766841494423.png)
+![](https://cdn.giraffish.top/blog/25-12-27-1766841494423.png)
 
 - 对于无向图，两个方向的边等价，此时邻接矩阵关于主对角线对称
 - 将邻接矩阵的元素从 $1$ 和 $0$ 替换为权重，则可表示有权图
@@ -504,7 +504,7 @@ $$
 
 **邻接表（adjacency list）** 使用 $n$ 个链表来表示图，链表节点表示顶点。第 $i$ 个链表对应顶点 $i$ ，其中存储了该顶点的所有邻接顶点（与该顶点相连的顶点）
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766841834550.png)
+![](https://cdn.giraffish.top/blog/25-12-27-1766841834550.png)
 
 邻接表仅存储实际存在的边，而边的总数通常远小于 $n^2$ ，$Space = O(|V|+|E|)$，因此它更加节省空间。然而，在邻接表中需要通过遍历链表来查找边，因此其时间效率不如邻接矩阵
 
@@ -1061,7 +1061,7 @@ Kruskal(G):
 2. **互相可达**：集合内任意两个点 $u, v$，都存在 $u \to v$ 的路径，也存在 $v \to u$ 的路径
 3. **极大性**：你不能再往这个集合里添加任何一个新的点，否则就不满足“互相可达”的性质了
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766827654312.webp)
+![](https://cdn.giraffish.top/blog/25-12-27-1766827654312.webp)
 
 #### 2. 求解 SCC（Kosaraju 算法）
 

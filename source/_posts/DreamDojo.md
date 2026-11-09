@@ -7,8 +7,8 @@ tags:
   - DreamDojo
 categories:
   - 论文批读
-index_img: https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-31-1788167306005.webp
-banner_img: https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-03-28-1743151467842.webp
+index_img: https://cdn.giraffish.top/blog/26-08-31-1788167306005.webp
+banner_img: https://cdn.giraffish.top/blog/25-03-28-1743151467842.webp
 comments: true
 abbrlink: 730c6bb4
 ---
@@ -220,7 +220,7 @@ In summary, our main contributions include:
 
 \- Multiple downstream applications highlight the potential of DREAMDOJO in performing live teleoperation, policy evaluation, model-based planning, etc., accelerating the development of robot policies.
 
-![Figure 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097139626.webp)
+![Figure 1](https://cdn.giraffish.top/blog/26-08-30-1788097139626.webp)
 *Figure 1: DREAMDOJO overview. DREAMDOJO acquires comprehensive physical knowledge from large-scale human datasets by utilizing latent actions as unified labels. After post-training and distillation on the target robots, our model can predict the future world in real time with continuous action controls. DREAMDOJO can robustly generalize to various objects and environments, facilitating large-scale policy evaluation without real-world deployment. It also enables live teleoperation and online model-based planning.*
 
 > 💡 **图 1 读法**:
@@ -342,7 +342,7 @@ To address this limitation, one might consider increasing the scale of real robo
 
 3. DreamDojo-HV is a large-scale in-house dataset collected through crowdsourcing. It features a wide spectrum of loco-manipulation skills and extremely diverse environments, such as household, industrial, retail, educational, and administrative (see Fig. 2 for the distribution), which significantly increases the scale and diversity of our data corpus. Each episode is annotated with a text that describes the task being performed.
 
-![Figure 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097145835.webp)
+![Figure 2](https://cdn.giraffish.top/blog/26-08-30-1788097145835.webp)
 
 *Figure 2: Distribution analysis of DreamDojo-HV. (a) Distribution of the scenarios and random examples from the most frequent categories. (b) [Left]: Distribution of subtask numbers within each video. Most videos involve long-horizon tasks that require multiple interactions to accomplish. [Right]: Representative skills in DreamDojo-HV and their frequencies. Our dataset covers a wide range of interaction types beyond pick-and-place. (c) Visualization of skill verbs and object names based on their frequency of occurrence in language annotations.*
 
@@ -350,7 +350,7 @@ To address this limitation, one might consider increasing the scale of real robo
 
 As shown in Tab. 1, our final dataset comprises a total of 44,711 hours, making it the largest human interaction dataset to date for world model pretraining. It includes more than 9,869 unique scenes, 6,015 unique tasks, and 43,237 unique objects, representing the majority of interactions in daily activities. Its scale and diversity also provide thorough coverage of various action distributions and increase the stochasticity of the future, thereby enhancing the controllability of actions. In Sec. 4.3, we demonstrate that increasing the data scale and diversity continues to enhance model performance across all benchmarks.
 
-![Table 1](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097782644.webp)
+![Table 1](https://cdn.giraffish.top/blog/26-08-30-1788097782644.webp)
 
 *Table 1: Scale and diversity comparison to existing large-scale datasets used by previous world models. Our curated data mixture excels in both scale and diversity, encompassing $15 \times$ longer duration, $96 \times$ more skills, and $2,000 \times$ more scenes than the previously largest dataset for world model training. $\dagger$ Estimated by GPT based on the global language annotation of each video clip.*
 
@@ -380,7 +380,7 @@ To address the inefficient knowledge transfer caused by absence of action labels
 
 On the other hand, latent actions (Bruce et al., 2024; Gao et al., 2025; Ye et al., 2025), which extract action information purely from videos in a self-supervised manner and provide consistent action interpretation across embodiments, have gained increasing attention recently. Inspired by (Gao et al., 2025), we adopt continuous latent actions due to their superiority in cross-embodiment generalization and efficient adaptability. We establish a latent action model as a VAE (Kingma and Welling, 2013) using the spatiotemporal Transformer architecture (Bruce et al., 2024). It has an information bottleneck design that can automatically disentangle the most critical action information from the context. Specifically, unlike the standard VAE, our VAE encoder takes two consecutive frames $f^{t:t+1}$ , extracts spatiotemporal features, and projects the global features to a low-dimensional embedding $\hat{a}_{t}$ . The VAE decoder receives this embedding along with the former frame $f^{t}$ , aggregates the information and predicts the subsequent frame $f^{t+1}$ . The entire VAE is supervised by the reconstruction loss of the later frame and the KL divergence. The compactness of the embedding and the regularization term together create an information bottleneck. To reconstruct the later frame, the model has to disentangle and compress the most critical motions between frames.
 
-![Figure 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097164263.webp)
+![Figure 3](https://cdn.giraffish.top/blog/26-08-30-1788097164263.webp)
 
 *Figure 3: Latent action model. [Left]: The information bottleneck design of our latent action model enforces action disentanglement, producing a continuous latent vector that represents actions between frames. [Right]: We retrieve and group the frame pairs from different datasets that share the most similar latent actions. The embodiments are performing the same actions despite the significant differences in context.*
 
@@ -561,7 +561,7 @@ During inference, the teacher model utilizes 35 denoising steps for generation, 
 
 Benchmark construction. To demonstrate the effectiveness of our method, we conduct a systematic evaluation that emphasizes out-of-distribution scenarios and counterfactual actions. To be specific, we mirror the diverse and novel interactions in the three human datasets and construct three corresponding evaluation sets using the Fourier GR-1 humanoid robot: (1) In-lab Eval, (2) EgoDex Eval, (3) DreamDojo-HV Eval. We make every effort to replicate the objects observed in the human videos, allowing our robots to perform the same interactions that reflect similar underlying physics. We also collect a (4) Counterfactual Eval set that focuses on counterfactual actions not present in current robot learning datasets, such as patting a toy or reaching toward an object but missing it. To assess DREAMDOJO's generalization to diverse environmental changes, we further employ Gemini 2.5 Flash Image (a.k.a. Nano Banana) (Comanici et al., 2025) to edit the backgrounds of EgoDex Eval and DreamDojo-HV Eval to replicate typical observations in the original datasets. This results in (5) EgoDex-novel Eval and (6) DreamDojo-HV-novel Eval, with each consisting of 25 samples. A glimpse of the samples from our benchmarks is provided in Fig. 4.
 
-![Figure 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097179403.webp)
+![Figure 4](https://cdn.giraffish.top/blog/26-08-30-1788097179403.webp)
 
 *Figure 4: Benchmark visualization. We rigorously construct six evaluation benchmarks that reflect the diverse scenarios and actions present in human datasets, while being out-of-distribution for the robot training datasets.*
 
@@ -593,7 +593,7 @@ We conduct experiments on both In-lab Eval and EgoDex Eval. To demonstrate the e
 
 All compared methods are pretrained for 50k steps on the corresponding human datasets and post-trained for 25k steps on the in-distribution GR-1 dataset. The post-trained models are evaluated on In-lab Eval and EgoDex Eval, which contain novel objects and actions not present in the GR-1 training dataset. The results are reported in Tab. 2. While pretraining on human videos through action-free video prediction brings marginal benefits, introducing latent actions significantly narrows the gap to the ideal scenario where ground-truth action labels are available. We also provide the PSNR curves throughout the post-training stage in the Appendix. Pretraining with latent actions can reach a much higher upper bound than action-free pretraining and without pretraining. Note that, although MANO actions can also be extracted from videos (Pavlakos et al., 2024), it is likely not as precise as using the Apple Vision Pro to derive the MANO labels in Tab. 2. Hence, we choose latent actions as unified proxy actions for all human videos during pretraining.
 
-![Table 2](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097187676.webp)
+![Table 2](https://cdn.giraffish.top/blog/26-08-30-1788097187676.webp)
 
 *Table 2: Effects of different action conditioning methods. Latent action conditioning performs on par with the ideal settings in simulation quality and is the most scalable in use. We denote retargeted action and MANO in gray because they represent ideal collection setups when additional action capture devices are equipped. The best results are marked with bold, and the second best results are underlined.*
 
@@ -603,7 +603,7 @@ All compared methods are pretrained for 50k steps on the corresponding human dat
 
 We also conduct a dataset ablation to validate the benefits of increasing data diversity. Specifically, we pretrain our model on different data combinations for 50k steps, and then post-train on the GR-1 dataset for 25k steps. Unlike our final models, the sampling ratio is uniform across each dataset for the model variants in this ablation study. We evaluate the post-trained models on In-lab Eval, EgoDex Eval, and DreamDojo-HV Eval, which contain unseen object interactions, as well as on Counterfactual Eval, which features counterfactual actions. From the results in Tab. 3, increasing data diversity not only improves physics modeling but also enhances the controllability for out-of-distribution actions.
 
-![Table 3](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097194632.webp)
+![Table 3](https://cdn.giraffish.top/blog/26-08-30-1788097194632.webp)
 
 *Table 3: Effects of using different data mixtures. Adding more human datasets to pretraining consistently improves the performance for both out-of-distribution scenarios and counterfactual actions, highlighting the potential of our approach. The best results are marked with bold, and the second best results are underlined.*
 
@@ -613,7 +613,7 @@ We also conduct a dataset ablation to validate the benefits of increasing data d
 
 To benchmark the generalization ability in unseen scenarios, we generate video samples using the two final models, DREAMDoJO-2B and DREAMDoJO-14B, and conduct evaluations with Cosmos-Predict2.5 without human video pretraining. All models are post-trained for 30k steps. After post-training, we ask 12 volunteers to evaluate three model pairs: DREAMDoJO-2B vs. Cosmos-Predict2.5, DREAMDoJO-14B vs. Cosmos-Predict2.5, and DREAMDoJO-14B vs. DREAMDoJO-2B. The evaluation is conducted on 50 samples from EgoDex-novel Eval and DreamDojo-HV-novel Eval. The results in Tab. 4 show that our DREAMDoJO-2B surpass the original Cosmos-Predict2.5 in both physics correctness and action following by a non-trivial margin, while DREAMDoJO-14B exhibits a clear advantage over DREAMDoJO-2B in both axes due to its large capacity.
 
-![Table 4](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097203168.webp)
+![Table 4](https://cdn.giraffish.top/blog/26-08-30-1788097203168.webp)
 
 *Table 4: Human preference evaluation in diverse out-of-distribution scenarios. DREAMDOJO outperforms the pretrained Cosmos-Predict2.5 by a non-trivial margin. Our DREAMDOJO-14B demonstrates the most competitive performance in both physics correctness and action following.*
 
@@ -623,7 +623,7 @@ To benchmark the generalization ability in unseen scenarios, we generate video s
 
 To efficiently verify the effectiveness of our architectural design and training objective, we finetune Cosmos-Predict2.5 for 30k steps only on the GR-1 training dataset. The finetuned models are then evaluated on a held-out GR-1 validation set with expert demonstrations and the Counterfactual Eval set. Starting with the simple Cosmos-Predict2.5 base architecture, we gradually apply our modifications: relative action transformation, chunked action injection, and the temporal consistency loss. The evaluation results are shown in Tab. 5. Both relative actions and chunked injection can significantly improve simulation quality, indicating their importance for achieving precise action controllability. The proposed temporal consistency loss further improves performance on both benchmarks, demonstrating its effectiveness in enhancing action following and object modeling. In the Appendix, we also provide qualitative comparisons for these variants.
 
-![Table 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097208188.webp)
+![Table 5](https://cdn.giraffish.top/blog/26-08-30-1788097208188.webp)
 
 *Table 5: Ablations of architecture and loss designs. Our design choices can effectively enhance the simulation quality of both expert and counterfactual trajectories.*
 
@@ -633,7 +633,7 @@ To efficiently verify the effectiveness of our architectural design and training
 
 To unlock real-time inference, we distill the GR-1 post-trained variant of DREAMDOJO-2B using the same GR-1 dataset. Stress testing the capabilities of this distillation process, we run both the teacher and student models on GR-1 Long Eval, generating 600 frames (1 minute) of long-horizon, multi-stage tasks. As seen in Tab. 6, our student model, despite being few-step and autoregressive, achieves performance close to that of the teacher while running nearly $4 \times$ faster on a single NVIDIA H100 GPU. In addition, the autoregressive architecture of our student offers two extra advantages. First, since the student generates each latent frame autoregressively, it enables real-time streaming, which we demonstrate in Sec. 4.7 is crucial for multiple downstream applications. Second, unlike the teacher that is conditioned on a single initial frame, the distilled model can naturally incorporate multiple frames as context, resulting in superior robustness to occlusions and camera shifts. See our Appendix for qualitative samples.
 
-![Table 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097221974.webp)
+![Table 6](https://cdn.giraffish.top/blog/26-08-30-1788097221974.webp)
 
 *Table 6: Results of our distillation pipeline. Our distilled model is significantly faster, able to inference at real-time 10.81 FPS with minor degradation in long-horizon rollouts and performance close to that of the teacher. The autoregressive causal prediction of the student model also provides finer granularity for interaction and better context awareness.*
 
@@ -641,7 +641,7 @@ To unlock real-time inference, we distill the GR-1 post-trained variant of DREAM
 
 Lastly, we ablate the choice of teacher model in Tab. 7, evaluating the distillation results of a teacher pretrained on human videos versus one without pretraining (Cosmos-Predict2.5). Across all four evaluation datasets, we observe that the former significantly outperforms the latter. This suggests that the benefits of generalization achieved through our human video pre-training are preserved after distillation, resulting in student models that also excel in unseen scenarios.
 
-![Table 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097234337.webp)
+![Table 7](https://cdn.giraffish.top/blog/26-08-30-1788097234337.webp)
 
 *Table 7: Generalization ability after distillation. Thanks to our strong pretraining, DREAMDOJO shows consistently better generalization than the baseline after distillation.*
 
@@ -659,7 +659,7 @@ Following WorldEval (Li et al., 2025) and SIMPLER (Li et al., 2024), we utilize 
 
 Model-based planning. Being able to simulate future outcomes conditioned on actions allows model-based planning that can strengthen and correct the policies at test time (Qi et al., 2025). In this paper, we adopt a simple algorithm for model-based planning. Specifically, similar to the policy evaluation experiment above, we setup 10 AgiBot fruit packing scenes as our touchstone. We ensemble 5 model checkpoints from training to generate action proposals that exhibit sufficient variance at inference time. These action proposals are sent to DREAMDOJO to predict future video trajectories. To ensure execution efficiency, we batch all the action inputs and process them using the distilled DREAMDOJO-2B. Subsequently, the best proposal is selected by an external value model that takes a short video clip as input and is executed by the robot. The implementation details of the value model are provided in the Appendix.
 
-![Figure 5](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097244048.webp)
+![Figure 5](https://cdn.giraffish.top/blog/26-08-30-1788097244048.webp)
 
 *Figure 5: Downstream applications. We show evidences that can be readily applied to benefit robot learning in policy evaluation without requiring real-world deployment, as well as for test-time model-based planning.*
 
@@ -669,7 +669,7 @@ We experiment with two different groups of checkpoints. The results are presente
 
 Live teleoperation. We can also provide action conditions by connecting the teleoperation devices used for robot data collection to DREAMDOJO. To verify this, we deploy DREAMDOJO-2B on a local desktop equipped with an NVIDIA RTX 5090 GPU and connect a PICO VR controller to capture the upper-body action inputs for the G1 robot. As a result, we found that we could directly teleoperate the virtual robot at real-time speed. An example is shown in Fig. 6. For live teleoperation videos, please visit our website.
 
-![Figure 6](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097361917.webp)
+![Figure 6](https://cdn.giraffish.top/blog/26-08-30-1788097361917.webp)
 
 *Figure 6: Live teleoperation. We can teleoperate a virtual G1 robot using the PICO VR controller in real time.*
 
@@ -768,7 +768,7 @@ Autoregressive video generation. Autoregressive video generation offers the fine
 
 Fig. 7 shows our web UI for our human preference evaluation, allowing the evaluators to assess physics correctness and action following intuitively.
 
-![Figure 7](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097296319.webp)
+![Figure 7](https://cdn.giraffish.top/blog/26-08-30-1788097296319.webp)
 
 *Figure 7: Web UI for human preference evaluation. To intuitively compare physics correctness and action controls, we devise a web UI that can display the ground-truth video alongside two videos generated by two different models simultaneously. The order of the generated videos will be randomly switched to avoid any potential bias.*
 
@@ -778,7 +778,7 @@ Fig. 7 shows our web UI for our human preference evaluation, allowing the evalua
 
 In addition to the quantitative evaluations, we demonstrate the effectiveness of human data pretraining through visualizations. The samples in Fig. 8 verify that incorporating human data pretraining is essential for precise physics modeling of objects not captured by the robot dataset.
 
-![Figure 8](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097302511.webp)
+![Figure 8](https://cdn.giraffish.top/blog/26-08-30-1788097302511.webp)
 
 *Figure 8: Qualitative comparison of human data pretraining effects. Through pretraining on diverse human interaction data, DREAMDOJO acquires a generalizable understanding of general physics, resulting in more realistic simulation for objects that are unseen in the target robot dataset.*
 
@@ -786,7 +786,7 @@ In addition to the quantitative evaluations, we demonstrate the effectiveness of
 
 We provide qualitative comparisons of the results from different model designs as outlined in Tab. 5. Both relative actions and chunked injection significantly enhance simulation quality, underscoring their importance for achieving precise action controllability. Additionally, the proposed temporal consistency loss further reinforces the modeling quality of objects.
 
-![Figure 9](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097308283.webp)
+![Figure 9](https://cdn.giraffish.top/blog/26-08-30-1788097308283.webp)
 
 *Figure 9: Qualitative comparison of our design choices. Applying all our techniques results in the best capabilities for object modeling and action following.*
 
@@ -794,13 +794,13 @@ We provide qualitative comparisons of the results from different model designs a
 
 We compare the 1-minute videos generated by the teacher model and the student model in Fig. 10. DREAMDOJO can continuously predict long-horizon rollouts in real time with strong stability and action following.
 
-![Figure 10](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097317593.webp)
+![Figure 10](https://cdn.giraffish.top/blog/26-08-30-1788097317593.webp)
 
 *Figure 10: Long-horizon rollouts for 1 minute. Note that the teacher model generates videos in a chunk-wise manner and operates at a speed (2.72 FPS) that is $4 \times$ slower than that of the student model (10.81 FPS).*
 
 In Fig. 11, we also visualize representative samples that illustrate the superior consistency of the student model. The distilled DREAMDOJO can recover objects from occlusions by modeling a short context, whereas the teacher model is unable to achieve this due to its single-frame conditioning.
 
-![Figure 11](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097323434.webp)
+![Figure 11](https://cdn.giraffish.top/blog/26-08-30-1788097323434.webp)
 
 *Figure 11: The advantage of student context. The student model exhibits better consistency in handling occlusions and camera shifts, while the teacher model has no way to ensure that due to the missing context.*
 
@@ -808,7 +808,7 @@ In Fig. 11, we also visualize representative samples that illustrate the superio
 
 To assist a better understanding of the DreamDojo-HV dataset, we visualize more data samples in Fig. 12, highlighting its extensive coverage of interaction types and scenarios.
 
-![Figure 12](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097329692.webp)
+![Figure 12](https://cdn.giraffish.top/blog/26-08-30-1788097329692.webp)
 
 *Figure 12: Diversity of DreamDojo-HV. We visualize more samples from the curated DreamDojo-HV dataset, which encompasses extremely diverse actions and tool-using scenarios.*
 
@@ -816,7 +816,7 @@ To assist a better understanding of the DreamDojo-HV dataset, we visualize more 
 
 We visualize how the PSNR scores will evolve during post-training. Fig. 13 shows that pretraining with latent actions can reach a much higher upper bound than action-free pretraining and without pretraining, especially on EgoDex Eval.
 
-![Figure 13](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097337869.webp)
+![Figure 13](https://cdn.giraffish.top/blog/26-08-30-1788097337869.webp)
 
 *Figure 13: Post-training PSNR curves using different action conditioning. Latent action conditioning can achieve comparable performance as high-quality action labels obtained using extra devices. On EgoDex Eval, our approach can also reach a much higher upper bound compared to action-free pretraining and without pretraining.*
 
@@ -838,7 +838,7 @@ To automatically judge the value of the predicted futures, we train an external 
 > \text{执行那个方案}
 > $$
 
-![Figure 14](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-08-30-1788097341863.webp)
+![Figure 14](https://cdn.giraffish.top/blog/26-08-30-1788097341863.webp)
 
 *Figure 14: Value model estimation. We visualize the estimated value and the ground-truth value of two representative episodes. Our value model reliably estimates the number of steps remaining to complete the current subtask.*
 

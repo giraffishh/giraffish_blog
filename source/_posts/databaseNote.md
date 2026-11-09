@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-02-1767336738658.webp
+  https://cdn.giraffish.top/blog/26-01-02-1767336738658.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766802296337.webp
+  https://cdn.giraffish.top/blog/25-12-27-1766802296337.webp
 title: CS307 Principles of Database Systems
 categories:
   - 学习笔记
@@ -16,7 +16,7 @@ updated: 2026-01-05 23:52:48
 
 ---
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-02-1767339056414.webp)
+![](https://cdn.giraffish.top/blog/26-01-02-1767339056414.webp)
 
 ## SQL
 
@@ -977,7 +977,7 @@ $F = \{ A \rightarrow B, B \rightarrow C, A \rightarrow C \}$
 
 > Chen's Notation (陈氏表示法)
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-01-06-1767701184078.webp)
+![](https://cdn.giraffish.top/blog/26-01-06-1767701184078.webp)
 
 ### 1. 基本组件 (Basic Components) 
 

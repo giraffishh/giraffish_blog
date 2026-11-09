@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-03-14-1773458241802.webp
+  https://cdn.giraffish.top/blog/26-03-14-1773458241802.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766802296337.webp
+  https://cdn.giraffish.top/blog/25-12-27-1766802296337.webp
 title: CS208 Algorithm Design and Analysis
 categories:
   - 学习笔记
@@ -432,7 +432,7 @@ $$
 
 ### 问题定义
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-06-09-1781018226006.webp)
+![](https://cdn.giraffish.top/blog/26-06-09-1781018226006.webp)
 
 **输入 (Input)**：给定一组 jobs，每个 job $j$ 都有开始时间 $s_j$ 和结束时间 $f_j$。
 
@@ -512,7 +512,7 @@ $$
 
 #### 问题定义
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-06-09-1781018328875.webp)
+![](https://cdn.giraffish.top/blog/26-06-09-1781018328875.webp)
 
 **输入 (Input)**：给定一组 jobs，每个 job $j$ 都有开始时间 $s_j$、结束时间 $f_j$ 和权重 $w_j$。
 

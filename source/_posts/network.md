@@ -1,8 +1,8 @@
 ---
 index_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776790942253.webp
+  https://cdn.giraffish.top/blog/26-04-22-1776790942253.webp
 banner_img: >-
-  https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/25-12-27-1766802296337.webp
+  https://cdn.giraffish.top/blog/25-12-27-1766802296337.webp
 title: CS305 Computer Networks
 categories:
   - 学习笔记
@@ -20,15 +20,15 @@ updated: 2026-06-18 00:47:09
 
 **整体结构：**
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776830476296.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776830476296.webp)
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776832248853.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776832248853.webp)
 
 > **ISP**: Internet Service Provider
 >
 > **IXP**: Internet exchange point
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776833051906.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776833051906.webp)
 
 ### Delay & Packet Loss
 
@@ -116,7 +116,7 @@ $$
 
 ### TCP/IP五层模型
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776828187581.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776828187581.webp)
 
 #### 1. 应用层 (Application Layer)
 
@@ -751,7 +751,7 @@ User Agent 也常被叫做 **mail reader（邮件客户端）**，它是用户�
 6. Bob 的 mail server 收到后，把邮件放入 Bob 的 **mailbox**
 7. Bob 再通过自己的邮件客户端读取这封邮件
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776845515414.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776845515414.webp)
 
 #### 4. SMTP 协议
 
@@ -1465,7 +1465,7 @@ $$
 
 GBN 的发送方可以在窗口内连续发送多个 packet，但接收方通常只按序接收
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776862180536.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776862180536.webp)
 
 特点：
 
@@ -1479,7 +1479,7 @@ GBN 的发送方可以在窗口内连续发送多个 packet，但接收方通常
 
 **Selective Repeat（SR）**
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776862259576.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776862259576.webp)
 
 特点：
 
@@ -2077,7 +2077,7 @@ TCP 重传不一定意味着“数据真的丢了”，常见情况有：
 
 TCP 是 **connection-oriented** 协议，所以在正式交换数据前，双方要先建立连接
 
-![](https://mirrors.sustech.edu.cn/git/giraffish/image-hosting/-/raw/main/blog/26-04-22-1776873418697.webp)
+![](https://cdn.giraffish.top/blog/26-04-22-1776873418697.webp)
 
 TCP 使用 **3-way handshake（三次握手）** 来建立连接
 
