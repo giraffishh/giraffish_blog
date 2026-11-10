@@ -878,7 +878,9 @@ import {createFileStore, writeFileContent, writeCheckedFile, hasFilePermission} 
       attr(rec.text, 'font-weight', n.weight);
       attr(rec.text, 'fill', textColor);
       rec.text.replaceChildren(
-        ...n.lines.map((line, i) => el('tspan', { x, dy: i ? n.lineHeight : 0 }, line)),
+        ...n.lines.map((line, i) =>
+          el('tspan', { x, y: 4 + n.font + i * n.lineHeight }, line),
+        ),
       );
       if (n.children.length) {
         if (!rec.toggle) {
@@ -2315,8 +2317,9 @@ import {createFileStore, writeFileContent, writeCheckedFile, hasFilePermission} 
     nodeCache.get(id)?.g.focus({ preventScroll: true });
   }
   function editedSource(text, line, label) {
-    if (!label.trim() || /[\r\n]/.test(label) || label.includes('<!--') || label.includes('-->'))
-      throw Error('请输入非空的单行节点名称');
+    label = label.replace(/\r\n?/g, '\n').replace(/\\n/g, '\n').trim();
+    if (!label || label.includes('<!--') || label.includes('-->'))
+      throw Error('请输入非空的节点名称，且不能包含 Markdown 注释');
     const lines = text.split('\n'),
       old = lines[line - 1];
     // Preserve the Markdown hierarchy and every unrelated line.
@@ -2326,13 +2329,13 @@ import {createFileStore, writeFileContent, writeCheckedFile, hasFilePermission} 
       (old.startsWith('\uFEFF') ? '\uFEFF' : '') +
       heading[1] +
       ' ' +
-      label.trim() +
+      label.replace(/\n/g, '\\n') +
       (old.endsWith('\r') ? '\r' : '');
     const result = lines.join('\n'),
       tree = parseMarkdown(result),
       node = tree.nodes.find((n) => n.line === line);
     if (tree.nodes.length !== nodes.length || node?.label !== label.trim())
-      throw Error('名称不能包含 Markdown 注释、换行或末尾标题标记');
+      throw Error('名称不能包含 Markdown 注释或末尾标题标记');
     return { text: result, model: tree };
   }
 
@@ -2663,7 +2666,7 @@ import {createFileStore, writeFileContent, writeCheckedFile, hasFilePermission} 
     if (e.key === 'Escape') {
       e.preventDefault();
       endEdit();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       saveEdit();
     }

@@ -73,6 +73,7 @@
       const label = m[2]
         .replace(/\s+#+\s*$/, '')
         .replace(/<br\s*\/?\s*>/gi, ' / ')
+        .replace(/\\n/g, '\n')
         .trim();
       if (!label) throw Error(`第 ${i + 1} 行格式错误：标题内容不能为空。`);
       if (depth && !stack[depth - 1])
@@ -200,28 +201,32 @@
         return measure(text, fontCSS);
       };
       const lines = [];
-      let line = '';
-      for (const token of label.match(/[A-Za-z0-9_\-]+|\s+|[^A-Za-z0-9_\s\-]/gu) || []) {
-        if (width(line + token) <= 260) {
-          line += token;
-          continue;
+      // Wrap each explicit line separately, retaining blank lines.
+      for (const paragraph of label.split('\n')) {
+        const firstLine = lines.length;
+        let line = '';
+        for (const token of paragraph.match(/[A-Za-z0-9_\-]+|\s+|[^A-Za-z0-9_\s\-]/gu) || []) {
+          if (width(line + token) <= 260) {
+            line += token;
+            continue;
+          }
+          if (line.trim()) {
+            lines.push(line.trim());
+            line = '';
+          }
+          if (width(token) <= 260) {
+            line = token.trimStart();
+            continue;
+          }
+          for (const ch of token) {
+            if (width(line + ch) > 260 && line) {
+              lines.push(line);
+              line = ch;
+            } else line += ch;
+          }
         }
-        if (line.trim()) {
-          lines.push(line.trim());
-          line = '';
-        }
-        if (width(token) <= 260) {
-          line = token.trimStart();
-          continue;
-        }
-        for (const ch of token) {
-          if (width(line + ch) > 260 && line) {
-            lines.push(line);
-            line = ch;
-          } else line += ch;
-        }
+        if (line.trim() || lines.length === firstLine) lines.push(line.trim());
       }
-      if (line.trim()) lines.push(line.trim());
       const lineHeight = Math.ceil(font * 1.25);
       let w = 16;
       for (const text of lines) w = Math.max(w, width(text) + 16);
