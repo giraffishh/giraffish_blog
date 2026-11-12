@@ -213,3 +213,5 @@
 @media (prefers-reduced-motion:reduce) {
   .studio-ready .studio-sidebar, .studio-sidebar-backdrop { transition:none!important; }
 }
+
+@media (max-width:760px) { .writing-studio[data-pane-mode=render] .cm-line { padding-inline:8px; } }

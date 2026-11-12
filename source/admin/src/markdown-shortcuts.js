@@ -14,6 +14,9 @@ export const markdownShortcuts = [
   ['Mod-Shift-7','有序列表','ordered'], ['Mod-Shift-8','无序列表','unordered']
 ];
 const markers = {bold:'**',italic:'*',underline:'<u>',strike:'~~'};
+function hasItalicMarkers(before,after) {
+  return (before.match(/\*+$/)?.[0].length || 0)%2===1 && (after.match(/^\*+/)?.[0].length || 0)%2===1;
+}
 function inlineChange(state, range, kind) {
   const text = state.sliceDoc(range.from, range.to);
   if (kind === 'link' || kind === 'image') {
@@ -45,11 +48,13 @@ function inlineChange(state, range, kind) {
     const span = text.match(/^(`+)([\s\S]*?)\1$/);
     if (span) { open = close = span[1]; }
   }
-  if (text.length >= open.length + close.length && text.startsWith(open) && text.endsWith(close)) {
+  if (text.length >= open.length + close.length && text.startsWith(open) && text.endsWith(close) &&
+    (kind!=='italic' || hasItalicMarkers(text.match(/^\*+/)?.[0] || '',text.match(/\*+$/)?.[0] || ''))) {
     const insert = text.slice(open.length,-close.length);
     return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.range(range.from,range.from+insert.length)};
   }
-  if (range.from >= open.length && state.sliceDoc(range.from-open.length,range.from) === open && state.sliceDoc(range.to,range.to+close.length) === close) {
+  if (range.from >= open.length && state.sliceDoc(range.from-open.length,range.from) === open && state.sliceDoc(range.to,range.to+close.length) === close &&
+    (kind!=='italic' || hasItalicMarkers(state.sliceDoc(state.doc.lineAt(range.from).from,range.from),state.sliceDoc(range.to,state.doc.lineAt(range.to).to)))) {
     return {changes:[{from:range.from-open.length,to:range.from},{from:range.to,to:range.to+close.length}],range:EditorSelection.range(range.from-open.length,range.to-open.length)};
   }
   if (kind === 'code') {
@@ -133,7 +138,7 @@ export class MarkdownShortcuts {
     const close = button('×',()=>dialog.close()); close.setAttribute('aria-label','关闭快捷键说明');
     header.append(title,platform,close);
     const table = element('table');
-    const rows = [...markdownShortcuts.map(([key,label])=>[key,label]),['Enter','预览：新段落 / 继续列表'],['Shift-Enter','预览：普通换行'],['Mod-f','查找 / 替换'],['Mod-z','撤销'],['Mod-Shift-z','重做'],['Mod-s','保存'],['F1','快捷键帮助']];
+    const rows = [...markdownShortcuts.map(([key,label])=>[key,label]),['Mod-f','查找 / 替换'],['Mod-z','撤销'],['Mod-Shift-z','重做'],['Mod-s','保存'],['F1','快捷键帮助']];
     if (this.localFiles) rows.push(['Mod-o','打开文件'],['Mod-Shift-s','另存为']);
     const keys = rows.map(([key,label])=>{
       const row=element('tr'), name=element('td','',label), cell=element('td'), keycap=element('kbd');

@@ -56,13 +56,14 @@ body { background:#f4f6f2; }
 .writing-studio .cm-searchMatch { background:#f3e8b6; border-radius:2px; }.writing-studio .cm-searchMatch-selected { background:#c9e4d2; }
 .studio-preview { min-width:160px; width:100%; height:100%; padding:24px 44px 80px; overflow:auto; font:var(--studio-body-size)/var(--studio-body-leading) var(--studio-font); overflow-wrap:anywhere; background:#fffefb; }
 .studio-typography :is(h1,h2,h3,h4,h5,h6,p,ul,ol,li,blockquote,details,summary,table,th,td) { font-family:var(--studio-font); }
-.studio-typography :is(h1,h2,h3,h4,h5,h6) { color:var(--studio-ink); font-weight:600; line-height:1.4; margin:1.15em 0 .55em; }
-.studio-typography h1 { font-size:1.875em; margin-top:.6em; }
-.studio-typography h2 { font-size:1.5em; border-bottom:1px solid #e1e8df; padding-bottom:.3em; }
-.studio-typography h3 { font-size:1.25em; }
-.studio-typography h4 { font-size:1.125em; }
-.studio-typography h5 { font-size:1em; }
-.studio-typography h6 { font-size:1em; color:#62736a; }
+.studio-typography :is(h1,h2,h3,h4,h5,h6) { color:var(--studio-ink); font-weight:600; font-size:calc(1em * var(--studio-heading-scale,1)); line-height:1.4; margin:var(--studio-heading-top,1.15em) 0 .55em; }
+.studio-typography h1, .studio-preview-heading[data-heading-level="1"] { --studio-heading-scale:1.875; --studio-heading-top:.6em; }
+.studio-typography h2, .studio-preview-heading[data-heading-level="2"] { --studio-heading-scale:1.5; --studio-heading-bottom:calc(.85em + 1px); }
+.studio-typography h2 { border-bottom:1px solid #e1e8df; padding-bottom:.3em; }
+.studio-typography h3, .studio-preview-heading[data-heading-level="3"] { --studio-heading-scale:1.25; }
+.studio-typography h4, .studio-preview-heading[data-heading-level="4"] { --studio-heading-scale:1.125; }
+
+.studio-typography h6, .writing-studio[data-pane-mode=render] .cm-editor .cm-line.studio-preview-heading[data-heading-level="6"] { color:#62736a; }
 .studio-typography :is(p,ul,ol,li,blockquote,details) { font-size:inherit; line-height:inherit; }
 .studio-typography strong { font-weight:600; }
 .studio-typography a { color:#39725c; }.studio-typography p { margin:0 0 .85em; }.studio-typography img { max-width:100%; height:auto; border-radius:4px; }
@@ -232,4 +233,30 @@ body { background:#f4f6f2; }
    Higher specificity keeps mobile/render-mode padding from removing this space. */
 .writing-studio .studio-source .cm-editor .cm-content {
   padding-bottom:min(90px,calc(var(--admin-viewport-height,100vh) / 8));
+}
+/* Preview and its editable lines share the same text column and body font. */
+.writing-studio[data-pane-mode=render] .cm-line {
+  padding-inline:20px;
+  font-family:var(--studio-font);
+  overflow-wrap:anywhere;
+  position:relative;
+}
+.writing-studio[data-pane-mode=render] .studio-heading-syntax { position:absolute; transform:translateX(-100%); font-size:.55em; color:var(--studio-muted); opacity:.65; }
+
+/* Paint the exact rendered text range without changing block layout. */
+.studio-preview-selecting :is(.cm-selectionLayer,.cm-cursorLayer) { visibility:hidden; }
+.studio-preview-selecting ::selection { background:transparent; }
+::highlight(studio-preview-selection) { background:#b7d7eb; color:inherit; }
+
+.writing-studio[data-pane-mode=render] .studio-preview-selecting .cm-line.cm-activeLine:has(> br:only-child),
+.writing-studio[data-pane-mode=render] .studio-preview-selecting .cm-line.cm-activeLine:empty { min-height:0; font-size:0; line-height:0; }
+.writing-studio[data-pane-mode=render] .studio-preview-selecting .cm-line.studio-preview-blank { min-height:calc(var(--studio-body-size) * var(--studio-body-leading)); }
+
+/* Editable headings retain their level even after blur, navigation or reparsing. */
+.writing-studio[data-pane-mode=render] .cm-editor .cm-line.studio-preview-heading {
+  font-size:calc(var(--studio-body-size) * var(--studio-heading-scale,1));
+  font-weight:600;
+  line-height:1.4;
+  padding-top:var(--studio-heading-top,1.15em);
+  padding-bottom:var(--studio-heading-bottom,.55em);
 }

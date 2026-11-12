@@ -120,7 +120,7 @@ for(const [language,code] of fences) {
         return EditorSelection.cursor(direction ? line.to : line.from);
       },
       moveVertically:range => {
-        assert.equal(view.state.field(livePreview).decorations.size, 0, 'Target must be editable before native motion');
+        view.state.field(livePreview).decorations.between(block.from,block.to,(from,to,deco)=>assert.ok(!deco.spec.widget, 'Target must be editable before native motion'));
         assert.equal(range.head, start, 'Native motion must start at the original cursor');
         return EditorSelection.cursor(target);
       },
@@ -135,7 +135,7 @@ for(const [language,code] of fences) {
     assert.equal(view.state.selection.main.anchor, extend ? start : target);
     assert.equal(view.state.doc.toString(), doc);
     assert.equal(view.state.field(livePreview).revealed.length, 0);
-    assert.equal(view.state.field(livePreview).decorations.size, 0);
+    view.state.field(livePreview).decorations.between(block.from,block.to,(from,to,deco)=>assert.ok(!deco.spec.widget));
     view.dispatch({effects:renderMode.of(false)});
     assert.equal(moveRenderedLine(view, forward), false);
   }
@@ -279,6 +279,126 @@ for(const [language,code] of fences) {
         assert.equal(view.state.doc.toString(),expected);
       }
     }
+  }
+}
+// Mouse selection must not open or close any block, including its endpoints.
+{
+  const {livePreview,renderMode,renderedBlocks,editingBlock,previewPointer,createRenderedTextMap} = await import('./src/live-preview.js');
+  const text=Array.from({length:40},(_,i)=>`## Heading ${i}\n\nParagraph ${i}`).join('\n\n');
+  const blocks=new DocumentAnalysis().analyze(text).blocks;
+  let state=EditorState.create({doc:text,extensions:[livePreview]});
+  state=state.update({effects:[renderedBlocks.of(blocks),renderMode.of(true)]}).state;
+  const widgets=state.field(livePreview).decorations.size;
+  state=state.update({effects:[previewPointer.of({active:true}),editingBlock.of(true)]}).state;
+  state=state.update({selection:{anchor:5,head:text.length-3}}).state;
+  assert.equal(state.field(livePreview).decorations.size,widgets,'Dragging keeps every rendered block, including endpoints');
+  assert.deepEqual(state.field(livePreview).pointerBlocks,[],'Dragging must not expose new source blocks');
+  state=state.update({effects:previewPointer.of({active:false})}).state;
+  assert.equal(state.field(livePreview).decorations.size,widgets,'Release preserves the preview selection');
+  state=state.update({effects:previewPointer.of({active:true})}).state;
+  state=state.update({selection:{anchor:blocks[2].from+3}}).state;
+  assert.equal(state.field(livePreview).decorations.size,widgets,'A new press still does not expand anything');
+  state=state.update({effects:previewPointer.of({active:false,edit:true,layout:{from:blocks[2].from,to:blocks[2].to,heading:true,style:'min-height:64px'}})}).state;
+  assert.equal(state.field(livePreview).pointerFrozen,false,'Only a confirmed click enters editing');
+  assert.ok(state.field(livePreview).layouts.some(layout=>layout.from===blocks[2].from));
+  const clicked=state.field(livePreview).decorations.size;
+  state=state.update({effects:previewPointer.of({active:true})}).state;
+  state=state.update({selection:{anchor:blocks[2].from+3,head:blocks[7].to}}).state;
+  assert.equal(state.field(livePreview).decorations.size,clicked,'Dragging from an open source line also freezes layout');
+  state=state.update({effects:previewPointer.of({active:false})}).state;
+  assert.equal(state.field(livePreview).decorations.size,clicked);
+  state=state.update({changes:{from:0,insert:'x'}}).state;
+  assert.equal(state.field(livePreview).pointerFrozen,false,'Typing/formatting releases the selection layout lock');
+  assert.equal(state.field(livePreview).layouts[0].to,blocks[2].to+1);
+  state=state.update({effects:renderMode.of(false)}).state;
+  assert.equal(state.field(livePreview).decorations.size,0);
+  assert.equal(createRenderedTextMap('## Hello **world**, world',['Hello ','world',', world']).sourceOffset(2,7),25);
+  assert.equal(createRenderedTextMap('> Quote\n> - item',['\n','Quote','\n','item']).sourceOffset(1,2),4);
+  assert.equal(createRenderedTextMap('Say "hello"',['Say “hello”']).sourceOffset(0,5),5);
+  assert.equal(createRenderedTextMap('A &amp; B',['A & B'],markdown.utils.unescapeAll).sourceOffset(0,3),7);
+  assert.equal(createRenderedTextMap('A &#x1f600; B',['A 😀 B'],markdown.utils.unescapeAll).sourceOffset(0,4),11);
+  assert.equal(createRenderedTextMap('a\\*b',['a*b']).sourceOffset(0,2),3);
+
+}
+// Heading styling/copying must be independent of whether its widget was clicked.
+{
+  const {livePreview,renderMode,renderedBlocks,editingBlock,previewPointer,copyPreviewMarkdown}=await import('./src/live-preview.js');
+  const text='## DinoWM - 2024\n\nBody\n\n### Next';
+  const blocks=new DocumentAnalysis().analyze(text).blocks;
+  let state=EditorState.create({doc:text,extensions:[livePreview]});
+  state=state.update({effects:[renderedBlocks.of(blocks),renderMode.of(true),editingBlock.of(true)]}).state;
+  const headingLevel=()=>{let level;state.field(livePreview).decorations.between(0,blocks[0].to,(from,to,deco)=>{level ||= deco.spec.attributes?.['data-heading-level'];});return level;};
+  assert.equal(headingLevel(),'2','Heading style exists without click measurements');
+  state=state.update({effects:editingBlock.of(false)}).state;
+  state=state.update({effects:editingBlock.of(true)}).state;
+  assert.equal(headingLevel(),'2','Blur/refocus cannot shrink a heading');
+  state=state.update({effects:previewPointer.of({active:true})}).state;
+  state=state.update({effects:previewPointer.of({active:false,edit:true})}).state;
+  assert.equal(headingLevel(),'2','Repeated clicks do not need a connected old widget');
+  for(const [anchor,head,expected] of [[3,16,'## DinoWM - 2024'],[16,3,'## DinoWM - 2024'],[3,9,'DinoWM'],[0,16,'## DinoWM - 2024'],[3,22,'## DinoWM - 2024\n\nBody']]) {
+    state=state.update({selection:{anchor,head}}).state;
+    const raw=state.sliceDoc(Math.min(anchor,head),Math.max(anchor,head));
+    assert.equal(copyPreviewMarkdown(raw,state),expected);
+  }
+  state=state.update({effects:renderMode.of(false),selection:{anchor:3,head:16}}).state;
+  assert.equal(copyPreviewMarkdown('DinoWM - 2024',state),'DinoWM - 2024','Source/split copy stays verbatim');
+}
+// Cached text maps preserve source boundaries in both directions, including code.
+{
+  const {createRenderedTextMap,previewSelectionRange}=await import('./src/live-preview.js');
+  let decodes=0;
+  const mapped=createRenderedTextMap('A &amp; B', ['A & B'],entity=>{decodes++;return markdown.utils.unescapeAll(entity);});
+  assert.equal(mapped.sourceOffset(0,3),7);
+  assert.deepEqual(mapped.textPoint(7),{index:0,offset:3});
+  for(let i=0;i<100;i++) {mapped.sourceOffset(0,3);mapped.textPoint(7);}
+  assert.equal(decodes,1,'Repeated pointer lookups must not decode the source again');
+  const raw=String.raw`a\*b &amp; c`;
+  const code=createRenderedTextMap(raw,[{text:raw,literal:true}]);
+  for(let i=0;i<=raw.length;i++) {
+    assert.equal(code.sourceOffset(0,i),i);
+    assert.deepEqual(code.textPoint(i),{index:0,offset:i});
+  }
+  const mixed=createRenderedTextMap('Text `a\\*b &amp;` end',[
+    {text:'Text '},{text:String.raw`a\*b &amp;`,literal:true},{text:' end'}
+  ],markdown.utils.unescapeAll);
+  assert.equal(mixed.sourceOffset(1,3),9);
+  assert.equal(mixed.sourceOffset(2,4),21);
+  const state=EditorState.create({doc:'first line\nsecond line\nthird line'});
+  assert.deepEqual([previewSelectionRange(state,3,17,3).anchor,previewSelectionRange(state,3,17,3).head],[0,22]);
+  assert.deepEqual([previewSelectionRange(state,17,3,3).anchor,previewSelectionRange(state,17,3,3).head],[22,0]);
+  const word=previewSelectionRange(state,7,2,2);
+  assert.equal(state.sliceDoc(word.from,word.to),'first line');
+}
+// Frozen dragging updates the selection without rebuilding 2,000 block widgets.
+{
+  const {livePreview,renderMode,renderedBlocks,editingBlock,previewPointer}=await import('./src/live-preview.js');
+  const text=Array.from({length:2000},(_,i)=>`Paragraph ${i}`).join('\n\n');
+  let position=0;
+  const blocks=text.split('\n\n').map(text=>{const block={from:position,to:position+text.length,html:`<p>${text}</p>`,height:40};position+=text.length+2;return block;});
+  let state=EditorState.create({doc:text,extensions:[livePreview]});
+  state=state.update({effects:[renderedBlocks.of(blocks),renderMode.of(true),previewPointer.of({active:true}),editingBlock.of(true)]}).state;
+  const decorations=state.field(livePreview).decorations;
+  for(let i=1;i<200;i++) {
+    state=state.update({selection:{anchor:3,head:blocks[i].from+4}}).state;
+    assert.equal(state.field(livePreview).decorations,decorations);
+  }
+  state=state.update({effects:previewPointer.of({active:false})}).state;
+  assert.equal(state.field(livePreview).pointerFrozen,true);
+  state=state.update({effects:renderMode.of(false)}).state;
+  assert.equal(state.field(livePreview).pointerFrozen,false);
+  assert.equal(state.field(livePreview).decorations.size,0);
+}
+// Italic must not remove half of an existing bold delimiter.
+{
+  const {formatMarkdown}=await import('./src/markdown-shortcuts.js');
+  const {livePreview,renderMode}=await import('./src/live-preview.js');
+  for(const enabled of [false,true]) {
+    const view={state:EditorState.create({doc:'**word**',selection:{anchor:2,head:6},extensions:[livePreview]}),dispatch(tr){this.state=(tr.state?tr:this.state.update(tr)).state;}};
+    view.dispatch({effects:renderMode.of(enabled)});
+    formatMarkdown(view,'italic');assert.equal(view.state.doc.toString(),'***word***');
+    formatMarkdown(view,'italic');assert.equal(view.state.doc.toString(),'**word**');
+    view.dispatch({selection:{anchor:0,head:8}});
+    formatMarkdown(view,'italic');assert.equal(view.state.doc.toString(),'***word***');
   }
 }
 const url='https://example.com/a.webp';
