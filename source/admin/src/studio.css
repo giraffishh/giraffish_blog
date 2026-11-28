@@ -260,3 +260,10 @@ body { background:#f4f6f2; }
   padding-top:var(--studio-heading-top,1.15em);
   padding-bottom:var(--studio-heading-bottom,.55em);
 }
+
+/* Give the next blank source line a measurable row during keyboard navigation. */
+.writing-studio[data-pane-mode=render] .cm-editor .cm-line.studio-navigation-line {
+  min-height:calc(var(--studio-body-size) * var(--studio-body-leading));
+  font-size:var(--studio-body-size);
+  line-height:var(--studio-body-leading);
+}

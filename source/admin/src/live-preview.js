@@ -2,7 +2,7 @@ import { EditorSelection, Prec, StateEffect, StateField } from '@codemirror/stat
 import { Decoration, EditorView, WidgetType, keymap, ViewPlugin } from '@codemirror/view';
 import { populateRendered } from './rendered-document.js';
 import { searchPanelOpen } from '@codemirror/search';
-import {cursorLineUp, cursorLineDown, selectLineUp, selectLineDown, insertNewlineAndIndent} from '@codemirror/commands';
+import {insertNewlineAndIndent} from '@codemirror/commands';
 import {ensureSyntaxTree} from '@codemirror/language';
 import {insertNewlineContinueMarkupCommand} from '@codemirror/lang-markdown';
 const continuePreviewMarkup = insertNewlineContinueMarkupCommand({nonTightLists:false});
@@ -327,6 +327,10 @@ function decorations(value, state) {
   const revealed=new Set([...value.revealed,...value.pointerBlocks]);
   const layouts=new Map(value.layouts.map(layout=>[layout.from,layout]));
   if(value.pointerFrozen && value.pointerBlank!=null) ranges.push(Decoration.line({class:'studio-preview-blank'}).range(value.pointerBlank));
+  for(const position of value.revealed) {
+    const line=state.doc.lineAt(position);
+    if(!line.text) ranges.push(Decoration.line({class:'studio-navigation-line'}).range(line.from));
+  }
   for (const block of value.blocks) {
     if (block.to <= block.from || block.to > state.doc.length) continue;
     const selected = !value.pointerFrozen && state.selection.ranges.some(r =>
@@ -473,31 +477,61 @@ export const liveFocus = [EditorView.clipboardOutputFilter.of(copyPreviewMarkdow
   destroy() { disposePointerSession(this.view);clearPointerSelection(this.view); }
 })];
 
-// Native vertical motion skips block widgets. Expose only the adjacent target
-// before asking CodeMirror to calculate the visual row and horizontal column.
-export function moveRenderedLine(view, forward, extend = false) {
-  const state = view.state, preview = state.field(livePreview, false);
-  if (!preview?.enabled || view.composing) return false;
-  const targets = new Set();
-  for (const range of state.selection.ranges) {
-    if (!extend && !range.empty) return false;
-    const line = state.doc.lineAt(range.head);
-    const number = line.number + (forward ? 1 : -1);
-    if (number < 1 || number > state.doc.lines) continue;
-    const boundary = view.moveToLineBoundary(range, forward, true).head;
-    if (forward ? boundary < line.to : boundary > line.from) continue;
-    const adjacent = state.doc.line(number);
-    preview.decorations.between(adjacent.from, adjacent.to, (from, to, decoration) => {
-      if (decoration.spec.widget instanceof MarkdownBlock && from <= adjacent.to && to >= adjacent.from) targets.add(from);
-    });
+// Keep wrapped-row motion native, but cross source-line boundaries explicitly.
+// Zero-height separators and block widgets are not reliable geometric targets.
+export function moveRenderedLine(view,forward,extend=false) {
+  const state=view.state,preview=state.field(livePreview,false);
+  if(!preview?.enabled || view.composing) return false;
+  const plans=state.selection.ranges.map(range=>{
+    const line=state.doc.lineAt(range.head);
+    const collapse=!extend && !range.empty;
+    const boundary=view.moveToLineBoundary(range,forward,true).head;
+    const wrapped=!collapse && (forward ? boundary<line.to : boundary>line.from);
+    const number=line.number+(forward?1:-1);
+    const adjacent=number>=1 && number<=state.doc.lines ? state.doc.line(number) : null;
+    return {range,line,collapse,wrapped,adjacent};
+  });
+  if(plans.every(plan=>plan.wrapped) && !preview.pointerFrozen) return false;
+  const left=view.contentDOM.getBoundingClientRect().left;
+  for(const plan of plans) {
+    const {range,line}=plan;
+    plan.goal=range.goalColumn ?? ((view.coordsAtPos(range.head)?.left ?? left+(range.head-line.from)*view.defaultCharacterWidth)-left);
   }
-  if (!targets.size) return false;
-  view.dispatch({effects:[revealForNavigation.of([...targets]), editingBlock.of(true)]});
+  const targets=new Set();
+  const reveal=position=>{
+    targets.add(state.doc.lineAt(position).from);
+    preview.decorations.between(position,position,(from,to,decoration)=>{
+      if(decoration.spec.widget instanceof MarkdownBlock) targets.add(from);
+    });
+  };
+  for(const {range,adjacent,collapse} of plans) {
+    reveal(range.head);
+    if(collapse) reveal(forward?range.to:range.from);
+    else if(adjacent) reveal(forward?adjacent.from:adjacent.to);
+  }
+  view.dispatch({effects:[previewPointer.of({active:false,edit:true}),editingBlock.of(true),revealForNavigation.of([...targets])]});
   try {
-    const command = extend ? (forward ? selectLineDown : selectLineUp) : (forward ? cursorLineDown : cursorLineUp);
-    return command(view);
+    const ranges=plans.map(({range,line,adjacent,collapse,wrapped,goal})=>{
+      let head;
+      if(collapse) head=forward?range.to:range.from;
+      else if(wrapped) head=view.moveVertically(range,forward).head;
+      else if(!adjacent) head=forward?line.to:line.from;
+      else {
+        const edge=forward?adjacent.from:adjacent.to;
+        const rect=view.coordsAtPos(edge,forward?1:-1);
+        const hit=rect ? view.posAtCoords({x:view.contentDOM.getBoundingClientRect().left+goal,y:(rect.top+rect.bottom)/2},false) : null;
+        // Even if measuring is pending, never skip the immediate adjacent line.
+        head=Math.max(adjacent.from,Math.min(adjacent.to,hit ?? edge));
+        const block=blockAt(view.state.field(livePreview).blocks,head);
+        const heading=block && previewHeading(view.state,block);
+        if(heading) head=Math.max(heading.contentFrom,Math.min(heading.contentTo,head));
+      }
+      return extend ? EditorSelection.range(range.anchor,head,goal) : EditorSelection.cursor(head,forward?1:-1,undefined,goal);
+    });
+    view.dispatch({selection:EditorSelection.create(ranges,state.selection.mainIndex),effects:revealForNavigation.of([]),scrollIntoView:true,userEvent:'select'});
+    return true;
   } finally {
-    if (view.state.field(livePreview).revealed.length) view.dispatch({effects:revealForNavigation.of([])});
+    if(view.state.field(livePreview).revealed.length) view.dispatch({effects:revealForNavigation.of([])});
   }
 }
 

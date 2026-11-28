@@ -104,47 +104,53 @@ for(const [language,code] of fences) {
   }
   assert.match(markdown.render('**SimNorm: **正文'), /\*\*SimNorm: \*\*/);
 }
-// Crossing a rendered block must reveal it before native vertical navigation.
+// Vertical navigation visits adjacent source lines even when separators are
+// collapsed or the geometry lookup would otherwise jump across block widgets.
 {
-  const {livePreview, renderedBlocks, renderMode, editingBlock, moveRenderedLine} = await import('./src/live-preview.js');
-  const {EditorSelection} = await import('@codemirror/state');
-  for (const forward of [false,true]) for (const extend of [false,true]) for (const gap of ['\n','\n\n']) {
-    const doc = forward ? gap + '## Heading\n' : '## Heading' + gap;
-    const block = new DocumentAnalysis().analyze(doc).blocks[0];
-    const start = forward ? gap.length - 1 : doc.length - gap.length + 1;
-    const target = forward ? block.from : block.to;
-    const view = {
-      state:EditorState.create({doc, selection:{anchor:start}, extensions:[livePreview]}),
-      moveToLineBoundary:(range, direction) => {
-        const line = view.state.doc.lineAt(range.head);
-        return EditorSelection.cursor(direction ? line.to : line.from);
-      },
-      moveVertically:range => {
-        view.state.field(livePreview).decorations.between(block.from,block.to,(from,to,deco)=>assert.ok(!deco.spec.widget, 'Target must be editable before native motion'));
-        assert.equal(range.head, start, 'Native motion must start at the original cursor');
-        return EditorSelection.cursor(target);
-      },
-      dispatch:transaction => {
-        view.state = (transaction.state ? transaction : view.state.update(transaction)).state;
-      }
+  const {livePreview,renderedBlocks,renderMode,editingBlock,moveRenderedLine}=await import('./src/live-preview.js');
+  const {EditorSelection}=await import('@codemirror/state');
+  const doc='## Heading\n\nBody\n\n## Next\n\n$$\nx=1\n$$\n\nEnd';
+  const blocks=new DocumentAnalysis().analyze(doc).blocks;
+  const create=(position)=>{
+    const view={
+      state:EditorState.create({doc,selection:{anchor:position},extensions:[livePreview]}),
+      contentDOM:{getBoundingClientRect:()=>({left:20})},defaultCharacterWidth:8,
+      coordsAtPos:position=>{const line=view.state.doc.lineAt(position);return {left:20+(position-line.from)*8,top:line.number*24,bottom:line.number*24+20};},
+      posAtCoords:({x,y})=>{const line=view.state.doc.line(Math.max(1,Math.min(view.state.doc.lines,Math.floor(y/24))));return Math.min(line.to,line.from+Math.max(0,Math.round((x-20)/8)));},
+      moveToLineBoundary:(range,forward)=>{const line=view.state.doc.lineAt(range.head);return EditorSelection.cursor(forward?line.to:line.from);},
+      moveVertically:()=>assert.fail('Cross-block movement must not use native pixel scanning'),
+      dispatch:tr=>{view.state=(tr.state?tr:view.state.update(tr)).state;}
     };
-    view.dispatch({effects:[renderedBlocks.of([block]),renderMode.of(true),editingBlock.of(true)]});
-    assert.equal(view.state.field(livePreview).decorations.size, 1);
-    assert.equal(moveRenderedLine(view, forward, extend), true);
-    assert.equal(view.state.selection.main.head, target);
-    assert.equal(view.state.selection.main.anchor, extend ? start : target);
-    assert.equal(view.state.doc.toString(), doc);
-    assert.equal(view.state.field(livePreview).revealed.length, 0);
-    view.state.field(livePreview).decorations.between(block.from,block.to,(from,to,deco)=>assert.ok(!deco.spec.widget));
+    view.dispatch({effects:[renderedBlocks.of(blocks),renderMode.of(true),editingBlock.of(true)]});
+    return view;
+  };
+  for(const forward of [false,true]) for(const extend of [false,true]) {
+    const view=create(forward?3:doc.length);
+    const original=view.state.selection.main.anchor;
+    for(let i=0;i<view.state.doc.lines-1;i++) {
+      const before=view.state.doc.lineAt(view.state.selection.main.head).number;
+      assert.equal(moveRenderedLine(view,forward,extend),true);
+      assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,before+(forward?1:-1));
+      if(extend) assert.equal(view.state.selection.main.anchor,original);
+      assert.equal(view.state.field(livePreview).revealed.length,0);
+      assert.equal(view.state.doc.toString(),doc);
+    }
     view.dispatch({effects:renderMode.of(false)});
-    assert.equal(moveRenderedLine(view, forward), false);
+    assert.equal(moveRenderedLine(view,forward),false);
   }
-  // A wrapped visual row still belongs to normal CodeMirror navigation.
-  const doc = '## Heading\nlong wrapped source';
-  let state = EditorState.create({doc, selection:{anchor:doc.length}, extensions:[livePreview]});
-  state = state.update({effects:[renderedBlocks.of(new DocumentAnalysis().analyze(doc).blocks),renderMode.of(true),editingBlock.of(true)]}).state;
-  const wrapped = {state, moveToLineBoundary:() => EditorSelection.cursor(doc.length - 3), dispatch:() => assert.fail('Do not intercept wrapped-row motion')};
-  assert.equal(moveRenderedLine(wrapped, false), false);
+  const view=create(3);
+  view.posAtCoords=()=>doc.length; // Simulate stale/zero-height layout coordinates.
+  moveRenderedLine(view,true);
+  assert.equal(view.state.selection.main.head,view.state.doc.line(2).from);
+  moveRenderedLine(view,true);
+  assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,3);
+  view.dispatch({selection:{anchor:3,head:doc.length}});
+  moveRenderedLine(view,false);
+  assert.equal(view.state.selection.main.head,3,'Up collapses a selection to its start');
+  view.moveToLineBoundary=range=>EditorSelection.cursor(range.head+1);
+  assert.equal(moveRenderedLine(view,true),false,'Wrapped rows retain native visual navigation');
+  view.composing=true;
+  assert.equal(moveRenderedLine(view,true),false,'Do not interrupt composition');
 }
 // Shared formatting commands: toggles, selection/caret placement and undo in both modes.
 {
