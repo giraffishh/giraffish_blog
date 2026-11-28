@@ -235,7 +235,16 @@ body { background:#f4f6f2; }
 /* Allow the last line to reach the typing margin, including on small viewports.
    Higher specificity keeps mobile/render-mode padding from removing this space. */
 .writing-studio .studio-source .cm-editor .cm-content {
-  padding-bottom:min(90px,calc(var(--admin-viewport-height,100vh) / 8));
+  --studio-writing-margin:min(90px,calc(var(--admin-viewport-height,100vh) / 8));
+  --studio-writing-row:calc(var(--studio-body-size) * var(--studio-body-leading));
+  padding-bottom:var(--studio-writing-margin);
+}
+/* Reserve one writing row below the last block until a real blank line takes its place. */
+.writing-studio[data-pane-mode=render] .cm-editor .cm-content:not(.studio-empty-last-line) {
+  padding-bottom:calc(var(--studio-writing-margin) + var(--studio-writing-row));
+}
+.writing-studio[data-pane-mode=render] .cm-editor .cm-content.studio-empty-last-line > .cm-line:last-child {
+  min-height:var(--studio-writing-row);
 }
 /* Preview and its editable lines share the same text column and body font. */
 .writing-studio[data-pane-mode=render] .cm-line {

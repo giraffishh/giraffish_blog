@@ -288,8 +288,7 @@ export function continueAtDocumentEnd(view) {
     changes: separator ? {from:end, insert:separator} : undefined,
     selection: {anchor:end + separator.length},
     effects: [editingBlock.of(true), previewPointer.of({active:false, edit:true})],
-    userEvent: separator ? 'input.appendParagraph' : 'select.pointer',
-    scrollIntoView: true
+    userEvent: separator ? 'input.appendParagraph' : 'select.pointer'
   });
   view.focus();
 }
@@ -588,7 +587,12 @@ export const livePreview = StateField.define({
     next.decorations = decorations(next, tr.state);
     return next;
   },
-  provide: field => EditorView.decorations.from(field, value => value.decorations)
+  provide: field => [
+    EditorView.decorations.from(field, value => value.decorations),
+    // The last line may be outside CodeMirror's mounted viewport.
+    EditorView.contentAttributes.compute(['doc'], ({doc}) =>
+      doc.line(doc.lines).length === 0 ? {class:'studio-empty-last-line'} : {})
+  ]
 });
 function releasePointerSelection(view) {
   if(view.state.field(livePreview).pointerFrozen) view.dispatch({effects:previewPointer.of({active:false,edit:true})});
@@ -819,13 +823,17 @@ export function previewNewline(view, soft = false) {
   if (state.selection.ranges.every(literal)) return insertNewlineAndIndent(view);
   const spec = state.changeByRange(range => {
     const line = state.doc.lineAt(range.from);
-    const heading = range.empty && parsedHeading(tree, line);
-    if (heading && heading.contentFrom === heading.contentTo && !literal(range)) {
+    const newParagraph = Boolean(line.text.trim()) && !literal(range);
+    const heading = newParagraph && range.empty && parsedHeading(tree, line);
+    if (heading && heading.contentFrom === heading.contentTo) {
       return {changes:{from:line.from, to:line.to, insert:''}, range:EditorSelection.cursor(line.from)};
     }
     // One Enter creates a new paragraph; an already blank line needs no extra separator.
-    const insert = literal(range) || !line.text.trim() ? '\n' : '\n\n';
-    return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.cursor(range.from + insert.length)};
+    const insert = newParagraph ? '\n\n' : '\n';
+    // At the start of a paragraph, the new editable paragraph is above the existing text.
+    const insertBefore = newParagraph && range.empty && range.from === line.from;
+    const caret = insertBefore ? range.from : range.from + insert.length;
+    return {changes:{from:range.from,to:range.to,insert}, range:EditorSelection.cursor(caret)};
   });
   view.dispatch(state.update({...spec,effects:editingBlock.of(true),scrollIntoView:true,userEvent:'input'}));
   return true;

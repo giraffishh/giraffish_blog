@@ -180,7 +180,10 @@ for(const [language,code] of fences) {
 // A click below EOF starts one editable paragraph without exposing the final widget.
 {
   const {livePreview, renderMode, renderedBlocks, continueAtDocumentEnd} = await import('./src/live-preview.js');
-  for (const source of ['Final sentence', '$$\nx=1\n$$', 'Final sentence\n', 'Final sentence\n\n', '']) {
+  const {EditorView} = await import('@codemirror/view');
+  const hasEndRow = state => state.facet(EditorView.contentAttributes)
+    .some(attributes => attributes.class === 'studio-empty-last-line');
+  for (const source of ['Final sentence', '### Batch normalisation', '$$\nx=1\n$$', 'Final sentence\n', 'Final sentence\n\n', '']) {
     const blocks = new DocumentAnalysis().analyze(source).blocks;
     const view = {
       state:EditorState.create({doc:source, extensions:[livePreview]}),
@@ -189,7 +192,9 @@ for(const [language,code] of fences) {
     };
     view.dispatch({effects:[renderMode.of(true), renderedBlocks.of(blocks)]});
     const expected = source ? source.trimEnd() + '\n\n' : '';
+    assert.equal(hasEndRow(view.state), source === '' || source.endsWith('\n'));
     for (let click = 0; click < 2; click++) {
+      view.dispatch({selection:{anchor:0}});
       continueAtDocumentEnd(view);
       assert.equal(view.state.doc.toString(), expected);
       assert.equal(view.state.selection.main.head, expected.length);
@@ -201,9 +206,11 @@ for(const [language,code] of fences) {
         });
         assert.ok(stillRendered, 'Appending must keep the preceding block rendered');
       }
+      assert.ok(hasEndRow(view.state));
     }
     view.dispatch(view.state.replaceSelection('Next'));
     assert.equal(view.state.doc.toString(), expected + 'Next');
+    assert.equal(hasEndRow(view.state), false);
   }
 }
 // A pending automatic conversion may shorten source before a new EOF paragraph.
@@ -424,6 +431,18 @@ for(const [language,code] of fences) {
     assert.equal(previewNewline(view),true,marked);
     assert.equal(view.state.doc.toString(),expected,marked);
     undo(view);assert.equal(view.state.doc.toString(),marked.replace('§',''));
+  }
+  for (const block of ['$$\nx=1\n$$', '\\[\nx=1\n\\]', '## 标题', '正文']) {
+    for (const before of ['', '前文\n\n']) {
+      const view = editor(before + '§' + block);
+      assert.equal(previewNewline(view), true);
+      assert.equal(view.state.doc.lineAt(view.state.selection.main.head).text, '');
+      const typed = view.state.update(view.state.replaceSelection('补充说明'));
+      assert.equal(typed.newDoc.toString(), before + '补充说明\n\n' + block);
+      undo(view);
+      assert.equal(view.state.doc.toString(), before + block);
+      assert.equal(view.state.selection.main.head, before.length);
+    }
   }
   const soft=editor('前§后'); previewNewline(soft,true);assert.equal(soft.state.doc.toString(),'前\n后');
   const plain=editor('正文§',false);assert.equal(previewNewline(plain),false);assert.equal(plain.state.doc.toString(),'正文');
