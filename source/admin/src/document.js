@@ -92,7 +92,7 @@ export function inspectDocument(text, tokens = markdown.parse(text, {})) {
         line: image.line + token.meta.contentLine
       })));
     }
-    if (token.type === 'heading_open') {
+    if (token.type === 'heading_open' && tokens[i + 1].content.trim()) {
       headings.push({
         level: Number(token.tag[1]),
         text: tokens[i + 1].content,
@@ -125,7 +125,20 @@ export function inspectDocument(text, tokens = markdown.parse(text, {})) {
     images: [...new Map(images.map(image => [image.url, image])).values()]
   };
 }
-export function renderBlocks(text, parsed = parseDocument(text)) {
+// Compare renderer inputs after Markdown has resolved nesting and links.
+// Inline containers render their children; math renderers ignore delimiter style.
+function renderingKey(tokens) {
+  function describe(token) {
+    const math = ['math_inline', 'math_block', 'tex_display'].includes(token.type);
+    const content = token.type === 'inline' ? null : token.content;
+    return [token.type, token.tag, token.nesting, token.hidden, token.block,
+      token.attrs, token.info, token.meta, math ? null : token.markup,
+      token.type === 'math_inline' ? content.trim() : content, token.children?.map(describe)];
+  }
+  return JSON.stringify(tokens.map(describe));
+}
+
+export function renderBlocks(text, parsed = parseDocument(text), render = markdown.renderer.render.bind(markdown.renderer)) {
   // CodeMirror and markdown-it normalize line endings. Widget offsets must use
   // that same coordinate system, even when the opened file retains CRLF on disk.
   text = text.replace(/\r\n?/g, '\n');
@@ -172,7 +185,7 @@ export function renderBlocks(text, parsed = parseDocument(text)) {
     if (text[to - 1] === '\n') to--;
     if (text[to - 1] === '\r') to--;
     if (to <= from) continue;
-    const rendered = markdown.renderer.render(tokens.slice(start, i), markdown.options, env);
+    const rendered = render(tokens.slice(start, i), markdown.options, env);
     const html = first.type === 'html_block' && htmlStyles ? `${htmlStyles}\n${rendered}` : rendered;
     const heading = first.type === 'heading_open';
     const image = html.includes('<img');
@@ -211,7 +224,7 @@ export function renderBlocks(text, parsed = parseDocument(text)) {
 // One document per worker: mode changes reuse parsing and rendering without
 // retaining a history of large articles. An edit replaces the cached document.
 export class DocumentAnalysis {
-  analyze(text, preview = true) {
+  analyze(text, preview = true, formatting = false) {
     if (text !== this.text) {
       const parsed = parseDocument(text);
       const info = inspectDocument(text, parsed.tokens);
@@ -220,7 +233,21 @@ export class DocumentAnalysis {
       this.info = info;
       this.blocks = null;
     }
-    if (preview && this.blocks === null) this.blocks = renderBlocks(text, this.parsed);
+    if (preview && this.blocks === null) {
+      const previous = this.renderedGroups;
+      const groups = new Map();
+      this.blocks = renderBlocks(text, this.parsed, (tokens, options, env) => {
+        const line = tokens[0].map[0];
+        const prior = formatting && previous?.get(line);
+        // Fluid containers parse nested markup against the current reference environment.
+        const reusable = prior && !tokens.some(token => token.type === 'fluid_block')
+          && renderingKey(prior.tokens) === renderingKey(tokens);
+        const html = reusable ? prior.html : markdown.renderer.render(tokens, options, env);
+        groups.set(line, {tokens, html});
+        return html;
+      });
+      this.renderedGroups = groups;
+    }
     return {
       blocks: preview ? this.blocks : undefined,
       ...this.info

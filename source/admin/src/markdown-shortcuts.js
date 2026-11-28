@@ -17,6 +17,12 @@ const markers = {bold:'**',italic:'*',underline:'<u>',strike:'~~'};
 function hasItalicMarkers(before,after) {
   return (before.match(/\*+$/)?.[0].length || 0)%2===1 && (after.match(/^\*+/)?.[0].length || 0)%2===1;
 }
+// Formatting an existing selection keeps its active end, including backward drags.
+function contentSelection(original, from, to) {
+  return original.anchor > original.head
+    ? EditorSelection.range(to, from)
+    : EditorSelection.range(from, to);
+}
 function inlineChange(state, range, kind) {
   const text = state.sliceDoc(range.from, range.to);
   if (kind === 'link' || kind === 'image') {
@@ -35,11 +41,11 @@ function inlineChange(state, range, kind) {
       const content = text.split('\n').map((part,i)=>i && part.startsWith(container) ? part.slice(container.length) : part).join('\n'+container);
       const before = (range.from > line.from+container.length ? '\n'+container : '') + fence+'\n'+container;
       const after = '\n'+container+fence+(range.to < state.doc.length && state.sliceDoc(range.to,range.to+1)!=='\n' ? '\n'+container : '');
-      return {changes:{from:range.from,to:range.to,insert:before+content+after},range:EditorSelection.range(range.from+before.length,range.from+before.length+content.length)};
+      return {changes:{from:range.from,to:range.to,insert:before+content+after},range:contentSelection(range, range.from+before.length,range.from+before.length+content.length)};
     }
     const before = (range.from && state.sliceDoc(range.from-1,range.from) !== '\n' ? '\n' : '') + fence + '\n';
     const after = '\n' + fence + (range.to < state.doc.length && state.sliceDoc(range.to,range.to+1) !== '\n' ? '\n' : '');
-    return {changes:{from:range.from,to:range.to,insert:before+text+after},range:EditorSelection.range(range.from+before.length,range.from+before.length+text.length)};
+    return {changes:{from:range.from,to:range.to,insert:before+text+after},range:contentSelection(range, range.from+before.length,range.from+before.length+text.length)};
   }
   let open = markers[kind], close = kind === 'underline' ? '</u>' : open;
   if (kind === 'code') {
@@ -51,19 +57,19 @@ function inlineChange(state, range, kind) {
   if (text.length >= open.length + close.length && text.startsWith(open) && text.endsWith(close) &&
     (kind!=='italic' || hasItalicMarkers(text.match(/^\*+/)?.[0] || '',text.match(/\*+$/)?.[0] || ''))) {
     const insert = text.slice(open.length,-close.length);
-    return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.range(range.from,range.from+insert.length)};
+    return {changes:{from:range.from,to:range.to,insert},range:contentSelection(range, range.from,range.from+insert.length)};
   }
   if (range.from >= open.length && state.sliceDoc(range.from-open.length,range.from) === open && state.sliceDoc(range.to,range.to+close.length) === close &&
     (kind!=='italic' || hasItalicMarkers(state.sliceDoc(state.doc.lineAt(range.from).from,range.from),state.sliceDoc(range.to,state.doc.lineAt(range.to).to)))) {
-    return {changes:[{from:range.from-open.length,to:range.from},{from:range.to,to:range.to+close.length}],range:EditorSelection.range(range.from-open.length,range.to-open.length)};
+    return {changes:[{from:range.from-open.length,to:range.from},{from:range.to,to:range.to+close.length}],range:contentSelection(range, range.from-open.length,range.to-open.length)};
   }
   if (kind === 'code') {
     const pad = /^`|`$/.test(text) || (/^ .+ $/s.test(text) && text.trim()) ? ' ' : '';
     if (pad && state.sliceDoc(Math.max(0,range.from-open.length-1),range.from) === open+pad && state.sliceDoc(range.to,range.to+close.length+1) === pad+close) {
-      return {changes:[{from:range.from-open.length-1,to:range.from},{from:range.to,to:range.to+close.length+1}],range:EditorSelection.range(range.from-open.length-1,range.to-open.length-1)};
+      return {changes:[{from:range.from-open.length-1,to:range.from},{from:range.to,to:range.to+close.length+1}],range:contentSelection(range, range.from-open.length-1,range.to-open.length-1)};
     }
     const from = range.from + open.length + pad.length;
-    return {changes:{from:range.from,to:range.to,insert:open+pad+text+pad+close},range:EditorSelection.range(from,from+text.length)};
+    return {changes:{from:range.from,to:range.to,insert:open+pad+text+pad+close},range:contentSelection(range, from,from+text.length)};
   }
   // Whitespace outside emphasis markers keeps Markdown's delimiter rules valid.
   const leading = text.match(/^\s*/)[0].length;
@@ -71,7 +77,7 @@ function inlineChange(state, range, kind) {
   const content = text.slice(leading,text.length-trailing);
   const insert = text.slice(0,leading)+open+content+close+(trailing ? text.slice(-trailing) : '');
   const from = range.from+leading+open.length;
-  return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.range(from,from+content.length)};
+  return {changes:{from:range.from,to:range.to,insert},range:contentSelection(range, from,from+content.length)};
 }
 export function formatMarkdown(view, kind) {
   if (view.state.readOnly || view.composing) return false;
@@ -94,13 +100,38 @@ export function formatMarkdown(view, kind) {
     });
     const remove = prefix && selected.every(item => kind === 'ordered' ? /^\d+\. /.test(item.text) : item.text.startsWith(prefix+' '));
     const counters = new Map();
-    const changes = state.changes(selected.map(({line,offset,text,level}) => {
+    const prefixEdits = selected.map(({line,offset,text,level}) => {
       const number = (counters.get(level) || 0) + 1; counters.set(level,number);
       return {from:line.from+offset,to:line.from+offset+(text.match(pattern)?.[0].length || 0),insert:remove || !prefix ? '' : (kind==='ordered' ? `${number}.` : prefix)+' '};
-    }));
-    spec = {changes,selection:state.selection.map(changes)};
+    });
+    const changes = state.changes(prefixEdits);
+    const contentStarts = new Map();
+    for (const edit of prefixEdits) {
+      if (edit.from !== edit.to || edit.insert.length) {
+        contentStarts.set(state.doc.lineAt(edit.from).number, edit.to);
+      }
+    }
+
+    // The start of a replaced marker maps to its left edge in CodeMirror.
+    // Anchor the caret to the original body, even inside a marker or its indentation.
+    const ranges = state.selection.ranges.map(range => {
+      const firstLine = state.doc.lineAt(range.from);
+      const bodyStart = contentStarts.get(firstLine.number) ?? range.from;
+      const from = changes.mapPos(Math.max(range.from, bodyStart), 1);
+      if (range.empty) return EditorSelection.cursor(from);
+      const to = Math.max(from, changes.mapPos(range.to, -1));
+      return contentSelection(range, from, to);
+    });
+    spec = {changes, selection:EditorSelection.create(ranges, state.selection.mainIndex)};
   } else spec = state.changeByRange(range => inlineChange(state,range,kind));
-  view.dispatch(state.update({...spec,effects:editingBlock.of(true),annotations:isolateHistory.of('full'),scrollIntoView:true,userEvent:'input.format'}));
+  const formatted = state.update({...spec, effects:editingBlock.of(true),
+    annotations:isolateHistory.of('full'), scrollIntoView:true, userEvent:'input.format'});
+  view.dispatch(formatted);
+  // History otherwise reconstructs the redo selection from the old offsets.
+  // Record the actual typing position for wrappers, placeholders and replaced prefixes.
+  if (formatted.docChanged && !formatted.newSelection.eq(state.selection.map(formatted.changes, 1))) {
+    view.dispatch(view.state.update({selection:formatted.newSelection, userEvent:'select.format'}));
+  }
   return true;
 }
 

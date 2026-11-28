@@ -101,7 +101,18 @@ export function populateRendered(element, html, onLayout = () => {}, {print = fa
       if (url) link.href = url;
     }
   }
-  if (codeActions && !print && !styles.size) enhanceCodeBlocks(content);
+  if (codeActions && !print) {
+    for (const marker of content.querySelectorAll('.fluid-check-control[data-fluid-tag]')) {
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = marker.getAttribute('aria-checked') === 'true';
+      input.disabled = marker.getAttribute('aria-disabled') === 'true';
+      input.setAttribute('aria-label', marker.getAttribute('aria-label'));
+      input.dataset.fluidTag = marker.dataset.fluidTag;
+      marker.replaceWith(input);
+    }
+    if (!styles.size) enhanceCodeBlocks(content);
+  }
   if (styles.size) {
     const host = document.createElement('div');
     host.className = 'studio-html-preview';

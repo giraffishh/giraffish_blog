@@ -2,14 +2,14 @@ import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { markdown as markdownLanguage } from '@codemirror/lang-markdown';
-import { indentWithTab } from '@codemirror/commands';
+import { indentWithTab, isolateHistory, undo, redo } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
 import {EditorBackup, preference, storePreference} from './studio-storage.js';
 import {element as el, button, compactAction} from './studio-ui.js';
 import {DocumentExport} from './document-export.js';
-import {FormulaFormatter} from './formula-formatter.js';
+import {FormulaFormatter, editsBeforeFormulaFormatting} from './formula-formatter.js';
 import { templates } from './templates.js';
-import { livePreview, liveFocus, liveNavigation, quoteEditing, renderedBlocks } from './live-preview.js';
+import { livePreview, liveFocus, liveNavigation, quoteEditing, renderedBlocks, editingBlock, togglePreviewCheckbox } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
 import { createTemplateCard } from './template-card.js';
 import {clampRatio, modeAtRatio, dividerRatio, DEFAULT_SOURCE_FIRST, LayoutMotion, reducedMotion} from './layout-utils.js';
@@ -98,7 +98,10 @@ export class WritingStudio {
           'aria-label': '正文编辑器',
           spellcheck: 'false'
         }), EditorView.updateListener.of(update => {
-          if (update.docChanged && !this.syncing) this.commit(update.state.doc.toString());
+          if (update.docChanged && !this.syncing) {
+            const formatting = update.transactions.some(tr => tr.annotation(editsBeforeFormulaFormatting));
+            this.commit(update.state.doc.toString(), formatting);
+          }
           if (update.geometryChanged || update.viewportChanged) this.scrollSync?.schedule();
         })]
       })
@@ -150,7 +153,7 @@ export class WritingStudio {
     this.toolbarMore.setAttribute('aria-controls', this.toolbarTools.id);
     this.toolbarMore.setAttribute('aria-expanded', 'false');
     const tools = el('div', 'studio-editor-tools');
-    const modes = el('div', 'studio-modes');
+    const modes = el('div', 'studio-modes studio-segmented');
     modes.setAttribute('aria-label', '编辑模式');
     this.modeButtons = {};
     for (const [mode, label] of [['source', '源码'], ['split', '分屏'], ['render', '预览']]) {
@@ -220,6 +223,25 @@ export class WritingStudio {
     this.previewPane = el('article', 'studio-preview studio-typography');
     this.previewFrame.append(this.previewPane);
     this.previewPane.setAttribute('aria-label', '文章预览');
+    this.workspace.addEventListener('keydown', event => {
+      if (!event.target.matches?.('input[data-fluid-tag]') || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key !== 'z' && key !== 'y') return;
+      const command = key === 'y' || event.shiftKey ? redo : undo;
+      if (command(this.source)) {
+        event.preventDefault();
+        this.source.focus();
+      }
+    });
+    this.previewPane.addEventListener('change', event => {
+      const input = event.target;
+      if (!input.matches?.('input[data-fluid-tag]')) return;
+      const root = input.closest('.studio-rendered-block');
+      if (!root?.block) return;
+      const index = this.previewBlocks?.indexOf(root.block);
+      const block = this.source.state.field(livePreview).blocks[index];
+      togglePreviewCheckbox(this.source, root, input, block?.html === root.block.html ? block : null);
+    });
     this.previewPane.addEventListener('click', event => {
       const link = event.composedPath()[0].closest?.('a');
       if (link?.getAttribute('href')?.startsWith('#')) {
@@ -443,12 +465,12 @@ export class WritingStudio {
     this.updateSource();
     this.queueRender(0);
   }
-  commit(text) {
+  commit(text, formatting = false) {
     if (this.value === text) return;
     this.value = text;
     this.onChange(text);
     this.backup?.changed();
-    this.queueRender();
+    this.queueRender(400, formatting);
   }
   offerRecovery() {
     const backup = this.backup?.read();
@@ -463,7 +485,7 @@ export class WritingStudio {
       this.backup.clear();
     }));
   }
-  queueRender(delay = 400) {
+  queueRender(delay = 400, formatting = false) {
     clearTimeout(this.renderTimer);
     if (this.countedValue !== this.value) {
       this.countedValue = this.value;
@@ -476,7 +498,7 @@ export class WritingStudio {
     }
     this.renderTimer = setTimeout(() => {
       this.requestedValue = this.value;
-      this.renderer.request(id, this.value, this.mode !== 'source');
+      this.renderer.request(id, this.value, this.mode !== 'source', formatting);
     }, delay);
   }
   renderResult(data) {
@@ -494,6 +516,7 @@ export class WritingStudio {
   applyDocument(data) {
     this.showSidebar(this.activeSide);
     if (data.blocks) {
+      const restoreFocus = this.checkboxFocusAfterRender();
       if (this.appliedBlocks !== data.blocks) {
         this.appliedBlocks = data.blocks;
         this.source.dispatch({effects: renderedBlocks.of(data.blocks)});
@@ -502,9 +525,25 @@ export class WritingStudio {
         this.previewBlocks = data.blocks;
         this.lazyPreview.update(data.blocks);
       }
+      restoreFocus?.();
     }
     this.scrollSync?.refresh(data.blocks);
     if (this.paneLayout?.pending && data.blocks) this.paneLayout.change();
+  }
+  checkboxFocusAfterRender() {
+    const input = this.root.ownerDocument.activeElement;
+    if (!input?.matches('input[data-fluid-tag]') || !this.workspace.contains(input)) return null;
+    const block = input.closest('.studio-rendered-block');
+    if (!block) return null;
+    const pane = this.previewPane.contains(block) ? this.previewPane : this.source.contentDOM;
+    const startOf = node => node.block?.from ?? this.source.posAtDOM(node);
+    const start = startOf(block);
+    const index = Array.from(block.querySelectorAll('input[data-fluid-tag]')).indexOf(input);
+    return () => {
+      if (input.isConnected && startOf(block) === start) return;
+      const replacement = Array.from(pane.querySelectorAll('.studio-rendered-block')).find(node => startOf(node) === start);
+      replacement?.querySelectorAll('input[data-fluid-tag]')[index]?.focus({preventScroll:true});
+    };
   }
   updateOutline(line, force = false) {
     this.currentLine = line;
@@ -567,8 +606,8 @@ export class WritingStudio {
     } else if (tab === 'tools') {
       this.sideContent.append(this.formulas.panel(this.source, this.toolbarTools.id + '-formula'));
       let notes;
-      for (const [name, content] of Object.entries(templates)) {
-        const card = createTemplateCard(name, content, () => this.insert(`\n${content}\n`));
+      for (const [name, template] of Object.entries(templates)) {
+        const card = createTemplateCard(name, () => this.insertTemplate(template));
         if (['提示便签', '成功便签', '警告便签'].includes(name)) {
           if (!notes) {
             const group = el('div', 'studio-template-notes');
@@ -680,16 +719,19 @@ export class WritingStudio {
     this.scrollSync?.navigate(line.from);
     if (this.compact) this.toggleSidebar(false);
   }
-  insert(text) {
-    const from = this.source.state.selection.main.head;
+  insertTemplate(template) {
+    const {state} = this.source;
+    if (state.readOnly) return;
+    if (this.compact) this.toggleSidebar(false);
+    const from = state.selection.main.head;
+    const start = from + 1; // The existing insertion layout adds a leading newline.
     this.source.dispatch({
-      changes: {
-        from,
-        insert: text
-      },
-      selection: {
-        anchor: from + text.length
-      }
+      changes: {from, insert: `\n${template.source}\n`},
+      selection: {anchor: start + template.from, head: start + template.to},
+      effects: editingBlock.of(true),
+      annotations: isolateHistory.of('full'),
+      userEvent: 'input.template',
+      scrollIntoView: true
     });
     this.source.focus();
   }

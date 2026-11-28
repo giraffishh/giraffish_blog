@@ -1,3 +1,12 @@
+export function checkboxOptions(parts) {
+  const [label, checked, inline, disabled] = parts;
+  if (['true', 'false', 'checked'].includes(label)) {
+    return {text:'', checked:label !== 'false', inline:true, disabled:true};
+  }
+  const enabled = value => Boolean(value && value !== 'false');
+  return {text:label, checked:enabled(checked), inline:enabled(inline), disabled:enabled(disabled)};
+}
+
 // Fluid's installed tag set: themes/fluid/scripts/tags. This renderer previews
 // the supported tags; it never rewrites the original Hexo source.
 export function fluidTags(md) {
@@ -66,6 +75,7 @@ export function fluidTags(md) {
     if (!silent) {
       const token=state.push('fluid_inline','',0);
       token.meta={kind:match[1],args:match[2].trim()};
+      if (match[1] === 'cb' || match[1] === 'checkbox') token.meta.source = match[0];
     }
     state.pos+=match[0].length;
     return true;
@@ -81,8 +91,8 @@ export function fluidTags(md) {
       const url=md.validateLink(parts[0])?md.normalizeLink(parts[0]):'#';
       return `<a class="fluid-button" href="${escape(url)}" title="${escape(parts[2]||'')}">${escape(parts[1]||'链接')}</a>`;
     }
-    const checked = ['true','checked'].includes(parts[0]) || (parts[1] && parts[1]!=='false');
-    const text = ['true','false','checked'].includes(parts[0])?'':parts[0];
-    return `<span class="fluid-checkbox" role="checkbox" aria-checked="${Boolean(checked)}">${checked?'☑':'☐'} ${escape(text)}</span>`;
+    const {text, checked, inline, disabled} = checkboxOptions(parts);
+    const box = `<span class="fluid-check-control" role="checkbox" aria-checked="${checked}" aria-disabled="${disabled}" aria-label="${escape(text || '勾选框')}" data-fluid-tag="${escape(tokens[i].meta.source)}">${checked ? '☑' : '☐'}</span>`;
+    return `<span class="fluid-checkbox${inline ? '' : ' fluid-checkbox-block'}">${box} ${escape(text)}</span>`;
   };
 }

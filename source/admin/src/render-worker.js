@@ -6,6 +6,7 @@ self.onmessage = ({
     id,
     text,
     preview,
+    formatting,
     kind,
     articleId,
     data
@@ -18,7 +19,7 @@ self.onmessage = ({
     }
     self.postMessage({
       id,
-      ...document.analyze(text, preview)
+      ...document.analyze(text, preview, formatting)
     });
   } catch (error) {
     self.postMessage({

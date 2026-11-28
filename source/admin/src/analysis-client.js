@@ -52,12 +52,12 @@ function pump() {
     queue.delete(key);
     running = job;
     job.sequence = ++sequence;
-    worker.postMessage({id:job.sequence, kind:job.kind, text:job.text, preview:job.preview, articleId:job.articleId, data:job.data});
+    worker.postMessage({id:job.sequence, kind:job.kind, text:job.text, preview:job.preview, formatting:job.formatting, articleId:job.articleId, data:job.data});
   } catch { failWorker(); }
 }
 export class DocumentRenderer {
   constructor(onResult) { this.onResult = onResult; }
-  request(id, text, preview) {
+  request(id, text, preview, formatting = false) {
     const hit = cache.get(text);
     const done = result => this.onResult({...result, id});
     if (hit && (!preview || hit.result.blocks)) {
@@ -66,7 +66,7 @@ export class DocumentRenderer {
       queueMicrotask(() => { if (!this.destroyed) done(hit.result); });
       return;
     }
-    queue.set(this, {kind:'document', owner:this, id, text, preview, done});
+    queue.set(this, {kind:'document', owner:this, id, text, preview, formatting, done});
     pump();
   }
   destroy() { this.destroyed = true; queue.delete(this); }

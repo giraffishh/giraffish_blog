@@ -25,7 +25,7 @@ await Promise.all([
   cp(path.join(here, 'node_modules/katex/dist/katex.min.css'), `${out}/katex/katex.min.css`),
   writeFile(`${out}/config.json`, JSON.stringify(parse(await readFile(path.join(here,'config.yml'),'utf8'))))
 ]);
-const previews = Object.fromEntries(Object.entries(templates).map(([name,source])=>[name,markdown.render(source)]));
+const previews = Object.fromEntries(Object.entries(templates).map(([name,template])=>[name,markdown.render(template.source)]));
 const result = await build({
   absWorkingDir:here,
   entryPoints:entries.map(name => `src/${name}.js`),

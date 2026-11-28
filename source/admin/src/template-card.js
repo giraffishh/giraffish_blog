@@ -1,7 +1,7 @@
 import previews from 'studio:template-previews';
 import {populateRendered} from './rendered-document.js';
 
-export function createTemplateCard(name, content, onInsert) {
+export function createTemplateCard(name, onInsert) {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'studio-template';

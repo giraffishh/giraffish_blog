@@ -1,7 +1,11 @@
-import {EditorState} from '@codemirror/state';
+import {Annotation, EditorState} from '@codemirror/state';
 import {isolateHistory} from '@codemirror/commands';
 import {markdownLanguage} from '@codemirror/lang-markdown';
 import {element, button} from './studio-ui.js';
+
+// Preview invalidation only needs the user's original edits. The appended
+// delimiter replacements still participate in selection mapping and history.
+export const editsBeforeFormulaFormatting = Annotation.define();
 
 const delimiters = {
   dollar: [['$', '$'], ['$$', '$$']],
@@ -30,8 +34,16 @@ export function formulaChanges(text, target, selections = []) {
   const tokens = /\\[()[\]\\$]|\$\$?|\n[ \t]*\n/g;
   let protectedIndex = 0;
   let open = null;
-  for (const match of text.matchAll(tokens)) {
-    const token = match[0], at = match.index;
+  let match;
+  while ((match = tokens.exec(text))) {
+    const at = match.index;
+    let token = match[0];
+    // Between adjacent inline formulas the first dollar closes the current
+    // formula. Leave the second for the next scan (e.g. $x$$y$).
+    if (open?.token === '$' && token === '$$' && !/\s/.test(text[at - 1])) {
+      token = '$';
+      tokens.lastIndex = at + 1;
+    }
     while (protectedIndex < protectedText.length && protectedText[protectedIndex].to <= at) {
       if (open && protectedText[protectedIndex].from > open.at) open = null;
       protectedIndex++;
@@ -76,13 +88,13 @@ export class FormulaFormatter {
     if (this.mode === 'off' || !tr.docChanged || tr.isUserEvent('undo') || tr.isUserEvent('redo') ||
         tr.isUserEvent('input.formula') || tr.startState.readOnly) return tr;
     const changes = formulaChanges(tr.newDoc.toString(), this.mode);
-    return changes.length ? [tr, {changes, sequential:true}] : tr;
+    return changes.length ? [tr, {changes, sequential:true, annotations:editsBeforeFormulaFormatting.of(tr.changes)}] : tr;
   });
 
   convert(view, target, selectedOnly) {
     if (view.state.readOnly) return;
     const changes = formulaChanges(view.state.doc.toString(), target, selectedOnly ? view.state.selection.ranges : []);
-    if (changes.length) view.dispatch({changes, userEvent:'input.formula', annotations:isolateHistory.of('full')});
+    if (changes.length) view.dispatch({changes, userEvent:'input.formula', annotations:[isolateHistory.of('full'), editsBeforeFormulaFormatting.of(view.state.changes([]))]});
   }
 
   panel(view, groupName) {
@@ -92,7 +104,7 @@ export class FormulaFormatter {
     for (const [mode, label] of formats) {
       actions.append(button('转为 ' + label, () => this.convert(view, mode, true)));
     }
-    const slider = element('div', 'studio-shortcut-platform studio-formula-slider');
+    const slider = element('div', 'studio-segmented studio-formula-slider');
     slider.setAttribute('role','radiogroup');
     slider.setAttribute('aria-label','自动格式化');
     slider.dataset.mode = this.mode;
@@ -110,7 +122,7 @@ export class FormulaFormatter {
       option.append(input, element('span','',label));
       slider.append(option);
     }
-    panel.append(element('strong','','公式格式化'), actions, element('span','','自动格式化'), slider);
+    panel.append(element('span','studio-template-name','公式格式化'), actions, element('span','','自动格式化'), slider);
     return panel;
   }
 }

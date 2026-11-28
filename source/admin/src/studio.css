@@ -133,6 +133,9 @@ body { background:#f4f6f2; }
 .studio-typography .fluid-label { border-radius:3px; padding:2px 6px; background:#e8f1f9; color:#315b7e; font-size:.9em; }
 .studio-typography .fluid-button { display:inline-block; border:1px solid #6d9b85; border-radius:5px; padding:4px 12px; text-decoration:none; }
 .studio-typography .fluid-checkbox { white-space:normal; }
+.studio-typography .fluid-checkbox-block { display:block; }
+.studio-typography .fluid-checkbox input { accent-color:var(--studio-green); vertical-align:middle; cursor:pointer; }
+.studio-typography .fluid-checkbox input:disabled { cursor:default; }
 .studio-typography .fluid-gallery-row { display:flex; gap:8px; margin:8px 0; }
 .studio-typography .fluid-gallery-row > div { flex:1; min-width:0; }
 .studio-typography .fluid-gallery img { width:100%; height:auto; }
@@ -164,7 +167,7 @@ body { background:#f4f6f2; }
 .studio-template-photo::after { content:''; position:absolute; width:80%; height:45px; background:#9ebeb0; transform:rotate(35deg); bottom:-28px; left:3px; }
 .studio-template-photo + .studio-template-photo { background:#f1eee6; }
 .studio-template-photo + .studio-template-photo::after { background:#b6c3a1; transform:rotate(-30deg); left:18px; }
-.studio-template-notes { border:1px solid var(--studio-line); border-radius:6px; background:white; padding:10px; margin-bottom:10px; }
+.studio-template-notes, .studio-formula-tools { border:1px solid var(--studio-line); border-radius:6px; background:white; padding:10px; margin-bottom:10px; }
 .studio-template-note-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
 .writing-studio .studio-template-compact { min-width:0; padding:0!important; margin:0; border:0!important; }
 .studio-template-compact .studio-template-name { display:none; }
@@ -241,6 +244,7 @@ body { background:#f4f6f2; }
   overflow-wrap:anywhere;
   position:relative;
 }
+.writing-studio[data-pane-mode=render] .studio-heading-gap { display:inline-block; width:0; white-space:normal; }
 .writing-studio[data-pane-mode=render] .studio-heading-syntax { position:absolute; transform:translateX(-100%); font-size:.55em; color:var(--studio-muted); opacity:.65; }
 
 /* Paint the exact rendered text range without changing block layout. */

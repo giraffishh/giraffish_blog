@@ -121,6 +121,9 @@ for(const [language,code] of fences) {
   assert.equal(converted('Costs $5 and $10. Then \\( z \\).', 'dollar'), 'Costs $5 and $10. Then $z$.');
   assert.equal((markdown.render(dollars).match(/class="katex-display"/g) || []).length, 2);
   assert.match(markdown.render('$$x$$ after'), /katex-display[\s\S]* after/);
+  const adjacent = '\\(x\\)\\(y\\)';
+  assert.equal(converted(adjacent, 'dollar'), '$x$$y$');
+  assert.equal(converted('$x$$y$', 'tex'), adjacent);
   const formatter = new FormulaFormatter();
   const view = {state:EditorState.create({doc:tex,extensions:[formatter.extension,history()]}), dispatch(tr) {
     view.state = (tr.state ? tr : view.state.update(tr)).state;
@@ -135,6 +138,110 @@ for(const [language,code] of fences) {
   formatter.mode = 'off';
   view.dispatch({changes:{from:0,insert:'\\(raw\\) '},userEvent:'input.paste'});
   assert.ok(view.state.doc.toString().startsWith('\\(raw\\) '));
+}
+// Delimiter changes update source offsets while retaining rendered math. A real
+// edit combined with automatic conversion must still invalidate the edited block.
+{
+  const {FormulaFormatter} = await import('./src/formula-formatter.js');
+  const {livePreview, renderedBlocks, renderMode} = await import('./src/live-preview.js');
+  const source = 'First \\(x\\).\n\n$$\ny\n$$';
+  const analysis = new DocumentAnalysis();
+  const original = analysis.analyze(source);
+  const formatter = new FormulaFormatter();
+  const view = {
+    state:EditorState.create({doc:source, extensions:[formatter.extension, livePreview]}),
+    dispatch(spec) { this.state = this.state.update(spec).state; }
+  };
+  view.dispatch({effects:[renderedBlocks.of(original.blocks), renderMode.of(true)]});
+  formatter.convert(view, 'dollar', false);
+  const mapped = view.state.field(livePreview).blocks;
+  assert.ok(mapped.every(block => !block.dirty));
+  assert.equal(view.state.sliceDoc(mapped[1].from, mapped[1].to), '$$\ny\n$$');
+
+  const render = markdown.renderer.render;
+  let calls = 0;
+  markdown.renderer.render = function(...args) { calls++; return render.apply(this, args); };
+  try {
+    const converted = analysis.analyze(view.state.doc.toString(), true, true);
+    assert.equal(calls, 0, 'Equivalent blocks must not run Markdown or KaTeX rendering again');
+    assert.deepEqual(converted.blocks.map(block => block.html), original.blocks.map(block => block.html));
+    formatter.mode = 'tex';
+    view.dispatch({changes:{from:0,insert:'New '}, userEvent:'input.type'});
+    const edited = view.state.field(livePreview).blocks;
+    assert.equal(edited[0].dirty, true);
+    assert.equal(edited[1].dirty, false);
+    const updated = analysis.analyze(view.state.doc.toString(), true, true);
+    assert.equal(calls, 1);
+    assert.match(updated.blocks[0].html, /New First/);
+  } finally {
+    markdown.renderer.render = render;
+  }
+}
+// A click below EOF starts one editable paragraph without exposing the final widget.
+{
+  const {livePreview, renderMode, renderedBlocks, continueAtDocumentEnd} = await import('./src/live-preview.js');
+  for (const source of ['Final sentence', '$$\nx=1\n$$', 'Final sentence\n', 'Final sentence\n\n', '']) {
+    const blocks = new DocumentAnalysis().analyze(source).blocks;
+    const view = {
+      state:EditorState.create({doc:source, extensions:[livePreview]}),
+      dispatch(spec) { this.state = this.state.update(spec).state; },
+      focus() {}
+    };
+    view.dispatch({effects:[renderMode.of(true), renderedBlocks.of(blocks)]});
+    const expected = source ? source.trimEnd() + '\n\n' : '';
+    for (let click = 0; click < 2; click++) {
+      continueAtDocumentEnd(view);
+      assert.equal(view.state.doc.toString(), expected);
+      assert.equal(view.state.selection.main.head, expected.length);
+      const preview = view.state.field(livePreview);
+      for (const block of blocks) {
+        let stillRendered = false;
+        preview.decorations.between(block.from, block.to, (from, to, decoration) => {
+          if (from === block.from && to === block.to && decoration.spec.widget) stillRendered = true;
+        });
+        assert.ok(stillRendered, 'Appending must keep the preceding block rendered');
+      }
+    }
+    view.dispatch(view.state.replaceSelection('Next'));
+    assert.equal(view.state.doc.toString(), expected + 'Next');
+  }
+}
+// A pending automatic conversion may shorten source before a new EOF paragraph.
+{
+  const {FormulaFormatter} = await import('./src/formula-formatter.js');
+  const {livePreview, renderMode, renderedBlocks, continueAtDocumentEnd} = await import('./src/live-preview.js');
+  const source = 'Before \\(x\\).\n\nLast paragraph';
+  const formatter = new FormulaFormatter();
+  const view = {
+    state:EditorState.create({doc:source, extensions:[formatter.extension, livePreview]}),
+    dispatch(spec) { this.state = this.state.update(spec).state; },
+    focus() {}
+  };
+  const blocks = new DocumentAnalysis().analyze(source).blocks;
+  view.dispatch({effects:[renderedBlocks.of(blocks), renderMode.of(true)]});
+  formatter.mode = 'dollar';
+  continueAtDocumentEnd(view);
+  const last = view.state.field(livePreview).blocks.at(-1);
+  assert.equal(view.state.sliceDoc(last.from, last.to), 'Last paragraph');
+  assert.equal(view.state.doc.toString(), 'Before $x$.\n\nLast paragraph\n\n');
+}
+// Toggle the clicked occurrence while preserving unrelated Fluid parameters.
+{
+  const {checkboxChange} = await import('./src/live-preview.js');
+  function toggle(text, tag, index = 0, count = 1, checked = true) {
+    const state = EditorState.create({doc:text, extensions:[sourceMarkdown()]});
+    const edit = checkboxChange(state, {from:0, to:text.length}, tag, index, count, checked);
+    return edit ? state.update({changes:edit.changes}).newDoc.toString() : text;
+  }
+  const tag = '{% cb 待办事项,  false , true, false %}';
+  const updated = tag.replace('  false ', '  true ');
+  assert.equal(toggle('`'+tag+'` '+tag+' '+tag, tag, 1, 2), '`'+tag+'` '+tag+' '+updated);
+  assert.equal(toggle(updated, updated, 0, 1, false), tag);
+  assert.equal(toggle('{% checkbox 新任务 %}', '{% checkbox 新任务 %}'), '{% checkbox 新任务, true %}');
+  for (const locked of ['{% cb 锁定, false, true, true %}', '{% cb false %}']) {
+    assert.equal(toggle(locked, locked), locked);
+    assert.match(markdown.render(locked), /aria-disabled="true"/);
+  }
 }
 // Vertical navigation skips hidden paragraph separators without changing the
 // document, while preserving meaningful blank lines inside editable blocks.
@@ -236,6 +343,39 @@ for(const [language,code] of fences) {
     const empty=editor('',0,0,render);formatMarkdown(empty,'bold');
     assert.equal(empty.state.doc.toString(),'****'); assert.equal(empty.state.selection.main.head,2);
   }
+  // Type immediately after formatting, including when the old caret was on
+  // the marker itself. Undo/redo must restore both text and insertion point.
+  for (const render of [false,true]) {
+    for (const [kind, initial, pos, expected] of [
+      ...Array.from({length:6}, (_,i) => [`heading${i+1}`, '', 0, '#'.repeat(i+1)+' X']),
+      ['ordered', '', 0, '1. X'], ['unordered', 'abc', 0, '- Xabc'],
+      ['quote', 'abc', 2, '> abXc'], ['heading3', '## title', 0, '### Xtitle'],
+      ['heading0', '## title', 1, 'Xtitle'], ['ordered', '> - abc', 3, '> 1. Xabc'],
+      ['unordered', '  abc', 0, '  - Xabc'], ['unordered', '- abc', 3, 'aXbc'],
+      ['heading0', '  abc', 0, 'X  abc'],
+      ['code', '', 0, '`X`'], ['fence', '', 0, '```\nX\n```'], ['math', '', 0, '$$\nX\n$$'],
+      ['link', '', 0, '[X](https://)'], ['image', '', 0, '![X](https://)']
+    ]) {
+      const view=editor(initial,pos,pos,render);
+      formatMarkdown(view,kind);
+      const typed=()=>view.state.update(view.state.replaceSelection('X')).newDoc.toString();
+      assert.equal(typed(),expected,kind);
+      if (view.state.doc.toString() !== initial) {
+        undo(view);
+        assert.equal(view.state.doc.toString(),initial);
+        assert.equal(view.state.selection.main.head,pos);
+        redo(view);
+        assert.equal(typed(),expected);
+      }
+    }
+    for(const kind of ['bold','italic','strike','underline','code','math','fence','heading2','quote','ordered','unordered']) {
+      const view=editor('abc',3,0,render);
+      formatMarkdown(view,kind);
+      const range=view.state.selection.main;
+      assert.equal(view.state.sliceDoc(range.from,range.to),'abc',kind);
+      assert.ok(range.head<range.anchor,kind+' preserves the active end');
+    }
+  }
   const spaced=editor(' text ');formatMarkdown(spaced,'bold');assert.equal(spaced.state.doc.toString(),' **text** ');
   const url=editor('标题');formatMarkdown(url,'link');assert.equal(url.state.doc.toString(),'[标题](https://)');
   assert.equal(url.state.sliceDoc(url.state.selection.main.from,url.state.selection.main.to),'https://');
@@ -262,6 +402,8 @@ for(const [language,code] of fences) {
   const {previewNewline,livePreview,renderMode} = await import('./src/live-preview.js');
   const {history,undo} = await import('@codemirror/commands');
   const cases = [
+    ['## §',''], ['###§',''], ['##   ###§',''], ['前文\n\n## §\n\n后文','前文\n\n\n\n后文'],
+    ['```md\n## §\n```','```md\n## \n\n```'],
     ['正文§','正文\n\n'], ['前§后','前\n\n后'], ['## 标题§','## 标题\n\n'],
     ['正文\n\n§','正文\n\n\n'], ['§','\n'],
     ['- 第一项§','- 第一项\n- '], ['1. 第一项§','1. 第一项\n2. '],

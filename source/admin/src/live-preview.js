@@ -1,9 +1,11 @@
 import { EditorSelection, Prec, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, keymap, ViewPlugin } from '@codemirror/view';
+import {editsBeforeFormulaFormatting} from './formula-formatter.js';
+import {checkboxOptions} from './fluid.js';
 import { populateRendered } from './rendered-document.js';
 import { searchPanelOpen } from '@codemirror/search';
-import {insertNewlineAndIndent} from '@codemirror/commands';
-import {ensureSyntaxTree} from '@codemirror/language';
+import {insertNewlineAndIndent, isolateHistory} from '@codemirror/commands';
+import {ensureSyntaxTree, syntaxTree} from '@codemirror/language';
 import {insertNewlineContinueMarkupCommand} from '@codemirror/lang-markdown';
 const continuePreviewMarkup = insertNewlineContinueMarkupCommand({nonTightLists:false});
 export const renderedBlocks = StateEffect.define();
@@ -23,14 +25,44 @@ function measurePreviewBlock(view,node) {
   return {from,to:block.to,style:`box-sizing:border-box;min-height:${node.getBoundingClientRect().height}px;font-size:${style.fontSize};font-weight:${style.fontWeight};line-height:${style.lineHeight};padding-top:${style.marginTop};padding-bottom:${style.marginBottom}`};
 }
 // Heading presentation follows the Markdown, not a transient clicked DOM node.
-export function previewHeading(state,block) {
-  const line=state.doc.lineAt(block.from);
-  const marker=line.text.match(/^ {0,3}(#{1,6})(?:[ \t]+|$)/);
-  if (!marker || (!block.dirty && !/^<h[1-6]\b/.test(block.html))) return null;
-  const suffix=line.text.slice(marker[0].length).match(/[ \t]+#+[ \t]*$/)?.[0] || '';
-  return {level:marker[1].length,from:line.from,to:line.to,
-    contentFrom:line.from+marker[0].length,contentTo:line.to-suffix.length};
+function headingOnLine(line) {
+  const marker = line.text.match(/^( {0,3})(#{1,6})([ \t]+|$)/);
+  if (!marker) return null;
+  const contentFrom = line.from + marker[0].length;
+  const body = line.text.slice(marker[0].length);
+  const suffix = body.match(/(?:^|[ \t]+)#+[ \t]*$/)?.[0] || '';
+  return {
+    level: marker[2].length, from: line.from, to: line.to,
+    markerEnd: contentFrom - marker[3].length, contentFrom, contentTo: line.to - suffix.length
+  };
 }
+
+export function previewHeading(state, block) {
+  if (!block.dirty && !/^<h[1-6]\b/.test(block.html)) return null;
+  return headingOnLine(state.doc.lineAt(block.from));
+}
+
+function decorateHeading(ranges, heading) {
+  ranges.push(Decoration.line({attributes:{
+    class:'studio-preview-heading', 'data-heading-level':String(heading.level)
+  }}).range(heading.from));
+  // Only the hashes hang in the gutter. Keep the editable end of the empty
+  // heading in normal text flow so the browser can anchor IME composition there.
+  ranges.push(Decoration.mark({class:'studio-heading-syntax'}).range(heading.from, heading.markerEnd));
+  if (heading.markerEnd < heading.contentFrom) {
+    ranges.push(Decoration.mark({class:'studio-heading-gap'}).range(heading.markerEnd, heading.contentFrom));
+  }
+}
+
+function parsedHeading(tree, line) {
+  const heading = headingOnLine(line);
+  if (!heading) return null;
+  for (let node = tree.resolveInner(heading.markerEnd, -1); node; node = node.parent) {
+    if (node.name === 'ATXHeading' + heading.level) return heading;
+  }
+  return null;
+}
+
 export function copyPreviewMarkdown(text,state) {
   const preview=state.field(livePreview,false);
   if (!preview?.enabled || state.selection.ranges.every(range=>range.empty)) return text;
@@ -147,7 +179,20 @@ function pointerPoint(view,event) {
   const x = Math.max(rect.left+1,Math.min(rect.right-16,event.clientX));
   const y = Math.max(rect.top+1,Math.min(rect.bottom-1,event.clientY));
   const hit=doc.elementFromPoint(x,y);
+  const end = view.state.doc.length;
+  if ((hit === view.contentDOM || hit === view.scrollDOM) &&
+      event.clientY >= view.documentTop + view.lineBlockAt(end).bottom) {
+    return {...view.domAtPos(end), pos:end, belowDocument:true};
+  }
   const headingLine=hit?.closest('.studio-preview-heading');
+  if (headingLine) {
+    const line = view.state.doc.lineAt(view.posAtDOM(headingLine, 0));
+    const heading = headingOnLine(line);
+    if (heading && heading.contentFrom === heading.contentTo) {
+      const pos = heading.contentFrom;
+      return {...view.domAtPos(pos, -1), pos, needsHeadingSpace:pos === heading.markerEnd};
+    }
+  }
   if(headingLine && !hit.closest('.studio-heading-syntax')) {
     const point=textPointAt(headingLine,x,y);
     return {...point,pos:view.posAtDOM(point.node,point.offset)};
@@ -229,10 +274,34 @@ export function previewSelectionRange(state,anchor,head,clicks=1) {
   }
   return EditorSelection.range(anchor,head);
 }
+// Start a paragraph after the final block, or reuse the trailing writing space.
+export function continueAtDocumentEnd(view) {
+  const doc = view.state.doc;
+  const end = doc.length;
+  const lastLine = doc.line(doc.lines);
+  let separator = '';
+  if (end && !view.state.readOnly) {
+    if (lastLine.text.trim()) separator = '\n\n';
+    else if (doc.lines > 1 && doc.line(doc.lines - 1).text.trim()) separator = '\n';
+  }
+  view.dispatch({
+    changes: separator ? {from:end, insert:separator} : undefined,
+    selection: {anchor:end + separator.length},
+    effects: [editingBlock.of(true), previewPointer.of({active:false, edit:true})],
+    userEvent: separator ? 'input.appendParagraph' : 'select.pointer',
+    scrollIntoView: true
+  });
+  view.focus();
+}
+
 function finishPreviewPointer(view,session,click) {
   if (!view.dom.isConnected || pointerSessions.get(view)!==session) return;
   session.abort.abort();
   if (!click) {view.dispatch({effects:previewPointer.of({active:false})});return;}
+  if (session.anchor.belowDocument && session.head.belowDocument) {
+    continueAtDocumentEnd(view);
+    return;
+  }
   const pos=session.head.pos;
   const point=view.contentDOM.contains(session.head.node) ? session.head : pointAtSource(view,pos);
   const element=point.node.nodeType===1 ? point.node : point.node.parentElement;
@@ -249,7 +318,11 @@ function finishPreviewPointer(view,session,click) {
   if(top!=null) effects.push(EditorView.scrollIntoView(pos,{
     y:'start',yMargin:top-view.scrollDOM.getBoundingClientRect().top
   }));
-  view.dispatch({selection:{anchor:pos},effects});
+  if (session.head.needsHeadingSpace && !view.state.readOnly) {
+    view.dispatch({changes:{from:pos, insert:' '}, selection:{anchor:pos + 1}, effects, userEvent:'input'});
+  } else {
+    view.dispatch({selection:{anchor:pos}, effects});
+  }
   view.focus();
 }
 const previewMouseSelection = EditorView.mouseSelectionStyle.of((view,event) => {
@@ -286,6 +359,51 @@ function touchesEndpoint(range, block) {
   return (range.anchor >= block.from && range.anchor <= block.to) ||
     (range.head >= block.from && range.head <= block.to);
 }
+// Identify the exact rendered occurrence, even when labels repeat or the same
+// tag is shown as a code example. Refuse stale/ambiguous matches.
+export function checkboxChange(state, block, tag, occurrence, count, checked) {
+  if (!block || block.dirty || state.readOnly || !tag) return null;
+  const match = /^(\{%\s*(?:cb|checkbox)\s+)([^\n]*?)(\s*%\})$/.exec(tag);
+  if (!match) return null;
+  const args = match[2].split(',');
+  if (checkboxOptions(args.map(part => part.trim())).disabled) return null;
+  const source = state.sliceDoc(block.from, block.to);
+  const tree = ensureSyntaxTree(state, block.to, 50);
+  if (!tree) return null;
+  const matches = [];
+  for (let at = source.indexOf(tag); at !== -1; at = source.indexOf(tag, at + tag.length)) {
+    let start = at;
+    while (start > 0 && source[start - 1] === '\\') start--;
+    if ((at - start) % 2) continue;
+    const position = block.from + at;
+    if (!withinNode(tree, position + 1, ['InlineCode','FencedCode','CodeBlock','HTMLBlock','URL','Comment'])) matches.push(position);
+  }
+  if (matches.length !== count || matches[occurrence] == null) return null;
+  const value = String(checked);
+  let offset = match[1].length + args[0].length;
+  let insert = ', ' + value;
+  let length = 0;
+  if (args.length > 1) {
+    offset += 1 + args[1].match(/^\s*/)[0].length;
+    insert = value;
+    length = args[1].trim().length;
+  }
+  const from = matches[occurrence] + offset;
+  return {changes:{from, to:from + length, insert}, tag:tag.slice(0,offset) + insert + tag.slice(offset + length)};
+}
+
+export function togglePreviewCheckbox(view, root, input, block) {
+  const tag = input.dataset.fluidTag;
+  const peers = Array.from(root.querySelectorAll('input[data-fluid-tag]')).filter(peer => peer.dataset.fluidTag === tag);
+  const edit = checkboxChange(view.state, block, tag, peers.indexOf(input), peers.length, input.checked);
+  if (!edit) {
+    input.checked = !input.checked;
+    return;
+  }
+  input.dataset.fluidTag = edit.tag;
+  view.dispatch({changes:edit.changes, annotations:isolateHistory.of('full'), userEvent:'input.checkbox'});
+}
+
 class MarkdownBlock extends WidgetType {
   constructor(block) {
     super();
@@ -301,6 +419,12 @@ class MarkdownBlock extends WidgetType {
     const node = document.createElement('div');
     node.className = 'studio-rendered-block studio-rendered-editable studio-typography';
     populateRendered(node, this.block.html, () => { if (view.dom.isConnected) view.requestMeasure(); }, {codeActions:true});
+    node.addEventListener('change', event => {
+      const input = event.target;
+      if (!input.matches?.('input[data-fluid-tag]')) return;
+      const block = blockAt(view.state.field(livePreview).blocks, view.posAtDOM(node));
+      togglePreviewCheckbox(view, node, input, block);
+    });
     node.addEventListener('toggle', () => view.requestMeasure(), true);
     node.addEventListener('click', event => {
       const href = event.composedPath()[0].closest?.('a')?.getAttribute('href');
@@ -318,12 +442,13 @@ class MarkdownBlock extends WidgetType {
   }
   ignoreEvent(event) {
     // CodeMirror owns selection/autoscroll; the custom style leaves widgets intact.
-    return event.type !== 'mousedown';
+    return event.type !== 'mousedown' || event.target.matches?.('input[data-fluid-tag]');
   }
 }
 function decorations(value, state) {
   if (!value.enabled) return Decoration.none;
   const ranges = [];
+  const styledHeadings = new Set();
   const revealed=new Set([...value.revealed,...value.pointerBlocks]);
   const layouts=new Map(value.layouts.map(layout=>[layout.from,layout]));
   if(value.pointerFrozen && value.pointerBlank!=null) ranges.push(Decoration.line({class:'studio-preview-blank'}).range(value.pointerBlank));
@@ -336,12 +461,13 @@ function decorations(value, state) {
     const selected = !value.pointerFrozen && state.selection.ranges.some(r =>
       (value.editing && touchesEndpoint(r,block)) ||
       (value.searching && !r.empty && r.from <= block.to && r.to >= block.from));
-    if (block.dirty || selected || revealed.has(block.from)) {
+    const heading = previewHeading(state, block);
+    const emptyHeading = heading && heading.contentFrom === heading.contentTo;
+    if (emptyHeading || block.dirty || selected || revealed.has(block.from)) {
       const layout = layouts.get(block.from);
-      const heading=previewHeading(state,block);
-      if(heading) {
-        ranges.push(Decoration.line({attributes:{class:'studio-preview-heading','data-heading-level':String(heading.level)}}).range(heading.from));
-        ranges.push(Decoration.mark({class:'studio-heading-syntax'}).range(heading.from,heading.contentFrom));
+      if (heading) {
+        decorateHeading(ranges, heading);
+        styledHeadings.add(heading.from);
       } else {
         const firstLine = state.doc.lineAt(block.from);
         const singleLineParagraph = /^<p(?:>|\s)/.test(block.html) &&
@@ -360,6 +486,20 @@ function decorations(value, state) {
       block: true,
       inclusive: false
     }).range(block.from, block.to));
+  }
+  // A heading created on a new line has no rendered block until analysis returns.
+  if (value.editing && !value.pointerFrozen) {
+    for (const range of state.selection.ranges) {
+      const line = state.doc.lineAt(range.head);
+      if (styledHeadings.has(line.from)) continue;
+      const existing = blockAt(value.blocks, line.from);
+      if (existing && !existing.dirty) continue;
+      const heading = parsedHeading(syntaxTree(state), line);
+      if (heading) {
+        decorateHeading(ranges, heading);
+        styledHeadings.add(line.from);
+      }
+    }
   }
   return Decoration.set(ranges, true);
 }
@@ -391,11 +531,20 @@ export const livePreview = StateField.define({
       next.layouts = value.layouts.map(layout=>({...layout,from:tr.changes.mapPos(layout.from,-1),to:tr.changes.mapPos(layout.to,1)}));
       next.pointerBlocks = []; next.pointerFrozen = false; next.pointerActive = false;
       const changes = [];
-      tr.changes.iterChangedRanges((from, to) => changes.push({
-        from,
-        to
-      }));
+      const contentChanges = tr.annotation(editsBeforeFormulaFormatting) ?? tr.changes;
+      if (!tr.isUserEvent('input.checkbox')) {
+        contentChanges.iterChangedRanges((from, to) => changes.push({from, to}));
+      }
+      const appendingParagraph = tr.isUserEvent('input.appendParagraph');
       next.blocks = value.blocks.map(block => {
+        // Appended separators belong to the new paragraph. Keep the preceding
+        // rendered block and its original end until the parser catches up.
+        if (appendingParagraph && block.to === tr.startState.doc.length) {
+          // Automatic formula formatting can change offsets in the same transaction.
+          const start = tr.changes.mapPos(block.from, -1);
+          const end = tr.changes.mapPos(block.to, -1);
+          return {...block, from:start, to:end};
+        }
         const dirty = block.dirty || changes.some(({
           from,
           to
@@ -670,6 +819,10 @@ export function previewNewline(view, soft = false) {
   if (state.selection.ranges.every(literal)) return insertNewlineAndIndent(view);
   const spec = state.changeByRange(range => {
     const line = state.doc.lineAt(range.from);
+    const heading = range.empty && parsedHeading(tree, line);
+    if (heading && heading.contentFrom === heading.contentTo && !literal(range)) {
+      return {changes:{from:line.from, to:line.to, insert:''}, range:EditorSelection.cursor(line.from)};
+    }
     // One Enter creates a new paragraph; an already blank line needs no extra separator.
     const insert = literal(range) || !line.text.trim() ? '\n' : '\n\n';
     return {changes:{from:range.from,to:range.to,insert},range:EditorSelection.cursor(range.from + insert.length)};
