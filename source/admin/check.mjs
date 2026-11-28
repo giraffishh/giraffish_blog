@@ -104,16 +104,48 @@ for(const [language,code] of fences) {
   }
   assert.match(markdown.render('**SimNorm: **正文'), /\*\*SimNorm: \*\*/);
 }
-// Vertical navigation visits adjacent source lines even when separators are
-// collapsed or the geometry lookup would otherwise jump across block widgets.
+// Format source delimiters without touching literal Markdown or a partial selection.
+{
+  const {formulaChanges, FormulaFormatter} = await import('./src/formula-formatter.js');
+  const {history, undo, redo} = await import('@codemirror/commands');
+  const tex = 'Before \\(x\\), \\[y\\] after.\n\n> \\[\n> a+b\n> \\]';
+  const dollars = 'Before $x$, $$y$$ after.\n\n> $$\n> a+b\n> $$';
+  const literal = '\n\n`$code$`\n\n```tex\n\\(example\\)\n```\n\n    $literal$\n\n\\$5';
+  function converted(doc, mode, ranges = []) {
+    return EditorState.create({doc}).update({changes:formulaChanges(doc, mode, ranges)}).newDoc.toString();
+  }
+  assert.equal(converted(tex + literal, 'dollar'), dollars + literal);
+  assert.equal(converted(dollars + literal, 'tex'), tex + literal);
+  assert.equal(converted(tex, 'dollar', [{from:7,to:12}]), tex.replace('\\(x\\)', '$x$'));
+  assert.equal(converted(tex, 'dollar', [{from:8,to:11}]), tex);
+  assert.equal(converted('Costs $5 and $10. Then \\( z \\).', 'dollar'), 'Costs $5 and $10. Then $z$.');
+  assert.equal((markdown.render(dollars).match(/class="katex-display"/g) || []).length, 2);
+  assert.match(markdown.render('$$x$$ after'), /katex-display[\s\S]* after/);
+  const formatter = new FormulaFormatter();
+  const view = {state:EditorState.create({doc:tex,extensions:[formatter.extension,history()]}), dispatch(tr) {
+    view.state = (tr.state ? tr : view.state.update(tr)).state;
+  }};
+  formatter.mode = 'dollar';
+  formatter.convert(view, 'dollar', false);
+  assert.equal(view.state.doc.toString(), dollars);
+  view.dispatch({changes:{from:view.state.doc.length,insert:'\n\n\\(new\\)'},userEvent:'input.paste'});
+  assert.equal(view.state.doc.toString(), dollars+'\n\n$new$');
+  undo(view); assert.equal(view.state.doc.toString(), dollars);
+  redo(view); assert.equal(view.state.doc.toString(), dollars+'\n\n$new$');
+  formatter.mode = 'off';
+  view.dispatch({changes:{from:0,insert:'\\(raw\\) '},userEvent:'input.paste'});
+  assert.ok(view.state.doc.toString().startsWith('\\(raw\\) '));
+}
+// Vertical navigation skips hidden paragraph separators without changing the
+// document, while preserving meaningful blank lines inside editable blocks.
 {
   const {livePreview,renderedBlocks,renderMode,editingBlock,moveRenderedLine}=await import('./src/live-preview.js');
   const {EditorSelection}=await import('@codemirror/state');
   const doc='## Heading\n\nBody\n\n## Next\n\n$$\nx=1\n$$\n\nEnd';
-  const blocks=new DocumentAnalysis().analyze(doc).blocks;
-  const create=(position)=>{
+  const create=(position, document=doc)=>{
+    const blocks=new DocumentAnalysis().analyze(document).blocks;
     const view={
-      state:EditorState.create({doc,selection:{anchor:position},extensions:[livePreview]}),
+      state:EditorState.create({doc:document,selection:{anchor:position},extensions:[livePreview]}),
       contentDOM:{getBoundingClientRect:()=>({left:20})},defaultCharacterWidth:8,
       coordsAtPos:position=>{const line=view.state.doc.lineAt(position);return {left:20+(position-line.from)*8,top:line.number*24,bottom:line.number*24+20};},
       posAtCoords:({x,y})=>{const line=view.state.doc.line(Math.max(1,Math.min(view.state.doc.lines,Math.floor(y/24))));return Math.min(line.to,line.from+Math.max(0,Math.round((x-20)/8)));},
@@ -127,10 +159,10 @@ for(const [language,code] of fences) {
   for(const forward of [false,true]) for(const extend of [false,true]) {
     const view=create(forward?3:doc.length);
     const original=view.state.selection.main.anchor;
-    for(let i=0;i<view.state.doc.lines-1;i++) {
-      const before=view.state.doc.lineAt(view.state.selection.main.head).number;
+    const expectedLines = forward ? [3,5,7,8,9,11] : [9,8,7,5,3,1];
+    for (const expectedLine of expectedLines) {
       assert.equal(moveRenderedLine(view,forward,extend),true);
-      assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,before+(forward?1:-1));
+      assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,expectedLine);
       if(extend) assert.equal(view.state.selection.main.anchor,original);
       assert.equal(view.state.field(livePreview).revealed.length,0);
       assert.equal(view.state.doc.toString(),doc);
@@ -141,9 +173,9 @@ for(const [language,code] of fences) {
   const view=create(3);
   view.posAtCoords=()=>doc.length; // Simulate stale/zero-height layout coordinates.
   moveRenderedLine(view,true);
-  assert.equal(view.state.selection.main.head,view.state.doc.line(2).from);
+  assert.equal(view.state.selection.main.head,view.state.doc.line(3).to);
   moveRenderedLine(view,true);
-  assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,3);
+  assert.equal(view.state.doc.lineAt(view.state.selection.main.head).number,5);
   view.dispatch({selection:{anchor:3,head:doc.length}});
   moveRenderedLine(view,false);
   assert.equal(view.state.selection.main.head,3,'Up collapses a selection to its start');
@@ -151,6 +183,31 @@ for(const [language,code] of fences) {
   assert.equal(moveRenderedLine(view,true),false,'Wrapped rows retain native visual navigation');
   view.composing=true;
   assert.equal(moveRenderedLine(view,true),false,'Do not interrupt composition');
+  const separated = create(1, 'First\n\n \n\nSecond\n\n');
+  moveRenderedLine(separated,true);
+  assert.equal(separated.state.doc.lineAt(separated.state.selection.main.head).text,'Second');
+  let preservesSpacing = false;
+  separated.state.field(livePreview).decorations.between(0,separated.state.doc.length,(from,to,decoration)=>{
+    if (decoration.spec.attributes?.class === 'studio-preview-paragraph') preservesSpacing = true;
+  });
+  assert.ok(preservesSpacing,'Entering a paragraph by keyboard preserves its spacing');
+
+  moveRenderedLine(separated,true);
+  assert.equal(separated.state.doc.lineAt(separated.state.selection.main.head).text,'Second','Do not expose trailing separators');
+  const code = create(9, '```txt\none\n\ntwo\n```');
+  moveRenderedLine(code,true);
+  assert.equal(code.state.doc.lineAt(code.state.selection.main.head).number,3,'Blank code lines remain navigable');
+  moveRenderedLine(code,true);
+  assert.equal(code.state.doc.lineAt(code.state.selection.main.head).text,'two');
+  const newlyEmpty = create(7, 'First\n\n\nSecond');
+  moveRenderedLine(newlyEmpty,false);
+  assert.equal(newlyEmpty.state.doc.lineAt(newlyEmpty.state.selection.main.head).text,'First','A newly entered empty paragraph can navigate back to the previous paragraph');
+  const pendingParse = create(5, 'First\n\nSecond');
+  pendingParse.dispatch({changes:{from:5,insert:'\n\n'},selection:{anchor:7}});
+  moveRenderedLine(pendingParse,false);
+  assert.equal(pendingParse.state.doc.lineAt(pendingParse.state.selection.main.head).text,'First','New paragraph separators stay hidden while parsing catches up');
+
+
 }
 // Shared formatting commands: toggles, selection/caret placement and undo in both modes.
 {
@@ -170,7 +227,7 @@ for(const [language,code] of fences) {
       assert.equal(formatMarkdown(view,kind),true);
       assert.equal(view.state.doc.toString(),wrapped);
       assert.equal(view.state.sliceDoc(view.state.selection.main.from,view.state.selection.main.to),'文字');
-      if(render) assert.equal(view.state.field(livePreview).decorations.size,0);
+      if(render) view.state.field(livePreview).decorations.between(0,view.state.doc.length,(from,to,decoration)=>assert.ok(!decoration.spec.widget,'Formatted content stays editable'));
       formatMarkdown(view,kind); assert.equal(view.state.doc.toString(),'文字');
       undo(view); assert.equal(view.state.doc.toString(),wrapped);
       undo(view); assert.equal(view.state.doc.toString(),'文字');

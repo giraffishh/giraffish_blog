@@ -267,3 +267,8 @@ body { background:#f4f6f2; }
   font-size:var(--studio-body-size);
   line-height:var(--studio-body-leading);
 }
+
+/* Keyboard entry preserves the same paragraph spacing as rendered content. */
+.writing-studio[data-pane-mode=render] .cm-line.studio-preview-paragraph {
+  padding-bottom:.85em;
+}

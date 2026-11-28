@@ -7,6 +7,7 @@ import { openSearchPanel, search } from '@codemirror/search';
 import {EditorBackup, preference, storePreference} from './studio-storage.js';
 import {element as el, button, compactAction} from './studio-ui.js';
 import {DocumentExport} from './document-export.js';
+import {FormulaFormatter} from './formula-formatter.js';
 import { templates } from './templates.js';
 import { livePreview, liveFocus, liveNavigation, quoteEditing, renderedBlocks } from './live-preview.js';
 import { LazyDocument } from './rendered-document.js';
@@ -60,6 +61,7 @@ export class WritingStudio {
     this.compact = window.matchMedia(compactQuery).matches;
     this.desktopSidebarOpen = preference('sidebar-open', 'true') === 'true';
     if (cmsToolbar) activeStudios.add(this);
+    this.formulas = new FormulaFormatter();
     this.shortcuts = new MarkdownShortcuts(this, !cmsToolbar);
     this.build();
     this.exports = new DocumentExport({
@@ -71,7 +73,7 @@ export class WritingStudio {
       parent: this.sourcePane,
       state: EditorState.create({
         doc: value,
-        extensions: [this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, quoteEditing, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping,
+        extensions: [this.formulas.extension, this.shortcuts.extension, basicSetup, livePreview, liveFocus, liveNavigation, quoteEditing, markdownLanguage({codeLanguages:sourceCodeLanguage}), sourceCodeHighlight, keymap.of([indentWithTab]), EditorView.lineWrapping,
         // Keep typing comfortably above the footer instead of merely exposing the cursor.
         EditorView.scrollMargins.of(view => ({bottom:Math.min(90, view.scrollDOM.clientHeight / 8)})),
         search({
@@ -197,7 +199,7 @@ export class WritingStudio {
     const sidebarNav = el('div', 'studio-side-nav');
     sidebarNav.setAttribute('aria-label', '侧栏内容');
     this.sidebarButtons = {};
-    for (const [tab, title] of [['outline', '大纲'], ['metadata', '元数据'], ['images', '图片'], ['templates', '模板']]) {
+    for (const [tab, title] of [['outline', '大纲'], ['metadata', '元数据'], ['images', '图片'], ['tools', '工具']]) {
       if (tab === 'metadata' && !this.metadataEnabled) continue;
       const item = button(title, () => this.showSidebar(tab));
       item.setAttribute('aria-pressed', String(tab === 'outline'));
@@ -426,6 +428,7 @@ export class WritingStudio {
     if (!this.source || this.source.state.doc.toString() === this.value) return;
     this.syncing = true;
     this.source.dispatch({
+      filter: false, // Apply the exact body supplied by CMS or draft recovery.
       changes: {
         from: 0,
         to: this.source.state.doc.length,
@@ -561,7 +564,8 @@ export class WritingStudio {
         for (const field of this.metadataDock.form.children) if (field !== this.metadataDock.host) this.motion?.reveal(field);
       }
       return;
-    } else if (tab === 'templates') {
+    } else if (tab === 'tools') {
+      this.sideContent.append(this.formulas.panel(this.source, this.toolbarTools.id + '-formula'));
       let notes;
       for (const [name, content] of Object.entries(templates)) {
         const card = createTemplateCard(name, content, () => this.insert(`\n${content}\n`));

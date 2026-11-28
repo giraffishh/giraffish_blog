@@ -144,3 +144,11 @@
 .studio-shortcut-platform input:checked + span { color:#354555; font-weight:600; }
 .studio-shortcut-platform input:focus-visible + span { outline:2px solid currentColor; outline-offset:1px; border-radius:5px; }
 @media (prefers-reduced-motion:reduce) { .studio-shortcut-platform::before { transition:none; } }
+.studio-formula-tools { display:grid; gap:6px; margin-bottom:10px; padding:10px; background:var(--studio-paper); border:1px solid var(--studio-line); border-radius:6px; font-size:12px; }
+.studio-formula-actions { display:flex; flex-wrap:wrap; gap:4px; }
+.studio-formula-actions button { padding:4px 6px; background:#edf2ec; }
+.studio-formula-slider { width:100%; margin:0; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.studio-formula-slider::before { width:calc((100% - 4px) / 3); }
+.studio-formula-slider[data-mode=dollar]::before { transform:translateX(100%); }
+.studio-formula-slider[data-mode=tex]::before { transform:translateX(200%); }
+.studio-formula-slider label span { padding-inline:0; white-space:nowrap; }

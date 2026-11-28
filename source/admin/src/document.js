@@ -18,8 +18,9 @@ function texDelimiters(md) {
   };
   md.inline.ruler.before('escape', 'tex_math', (state, silent) => {
     const open = state.src.slice(state.pos, state.pos + 2);
-    if (open !== '\\(' && open !== '\\[') return false;
-    const end = closingAt(state.src, open === '\\(' ? '\\)' : '\\]', state.pos + 2);
+    if (open !== '\\(' && open !== '\\[' && open !== '$$') return false;
+    const close = open === '$$' ? '$$' : open === '\\(' ? '\\)' : '\\]';
+    const end = closingAt(state.src, close, state.pos + 2);
     if (end < 0 || end >= state.posMax) return false;
     if (!silent) {
       const token = state.push(open === '\\(' ? 'math_inline' : 'tex_display', 'math', 0);
@@ -30,15 +31,17 @@ function texDelimiters(md) {
     return true;
   });
   md.renderer.rules.tex_display = (tokens, index) => katex.renderToString(tokens[index].content, {...mathOptions, displayMode:true});
-  md.block.ruler.before('paragraph', 'tex_display_block', (state, start, end, silent) => {
+  md.block.ruler.at('math_block', (state, start, end, silent) => {
     const from = state.bMarks[start] + state.tShift[start];
-    if (state.sCount[start] - state.blkIndent >= 4 || state.src.slice(from, from + 2) !== '\\[') return false;
+    const open = state.src.slice(from, from + 2);
+    if (state.sCount[start] - state.blkIndent >= 4 || (open !== '$$' && open !== '\\[')) return false;
+    const delimiter = open === '$$' ? '$$' : '\\]';
     const lines = [];
     let last = start;
     for (; last < end; last++) {
       if (last > start && !state.isEmpty(last) && state.sCount[last] < state.blkIndent) return false;
       const line = state.src.slice(state.bMarks[last] + state.tShift[last] + (last === start ? 2 : 0), state.eMarks[last]);
-      const close = closingAt(line, '\\]', 0);
+      const close = closingAt(line, delimiter, 0);
       if (close >= 0) {
         if (line.slice(close + 2).trim()) return false;
         lines.push(line.slice(0, close));
@@ -51,7 +54,7 @@ function texDelimiters(md) {
     const token = state.push('math_block', 'math', 0);
     token.block = true;
     token.content = lines.join('\n');
-    token.markup = '\\[';
+    token.markup = open;
     token.map = [start, last + 1];
     state.line = last + 1;
     return true;
